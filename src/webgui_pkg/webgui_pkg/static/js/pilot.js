@@ -22,9 +22,9 @@ const img = document.getElementById("camera-output");
 ////////////////////////////////////////////////////////////////////////////////////////
 const cameraTopics = [
   { id: "camera-d455-1", topic: "/rs_node/camera1/compressed_video" },
+  { id: "camera-d455-2", topic: "/rs_node/camera2/compressed_video" },
   { id: "camera-rgb-1", topic: "/rgb_cam1/compressed" },
-  { id: "camera-rgb-2", topic: "/rgb_cam2/compressed" },
-  { id: "camera-rgb-3", topic: "/rgb_cam3/compressed" }
+  { id: "camera-rgb-2", topic: "/rgb_cam2/compressed" }
 ];
 
 cameraTopics.forEach(({ id, topic }) => {
@@ -124,4 +124,3 @@ function main() {
 }
 ////////////////////////////////////////////////////////////////////////////////////////
 main();
-

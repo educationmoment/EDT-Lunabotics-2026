@@ -1,43 +1,52 @@
 #include "SparkMax.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "interfaces_pkg/srv/depositing_request.hpp"
+#include "std_msgs/msg/bool.hpp"
 
-const float VIBRATOR_DUTY = 1.0;
+const float VIBRATOR_DUTY = 0.1;
 const float ERROR = 0.1;
 
 SparkMax leftLift("can0", 3);
 SparkMax rightLift("can0", 4);
 SparkMax tilt("can0", 5);
-SparkMax vibrator("can0", 6); 
+SparkMax vibrator("can0", 6);
 //Initalizes motor controllers
 
-void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrator, std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Response> response) {
+void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrator) {
     auto timer_start = std::chrono::high_resolution_clock::now();
-    while (fabs(leftLift.GetPosition() - lift_setpoint) > ERROR ||
-    fabs(rightLift.GetPosition() - lift_setpoint) > ERROR ||
-    fabs(tilt.GetPosition() - tilt_setpoint) > ERROR){
+    bool leftLiftReached = (fabs(lift_setpoint - leftLift.GetPosition() ) <=  ERROR);
+    bool rightLiftReached = (fabs(lift_setpoint - rightLift.GetPosition() ) <=  ERROR);
+    bool tiltReached = (fabs(tilt_setpoint - tilt.GetPosition() ) <=  ERROR);
 
-        if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.125){
+    while (!((leftLiftReached && rightLiftReached) && tiltReached)){
+        std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
+        if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.2){
+            if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.75){
+                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "WARNING: ACTUATORS GREATELY MISALIGNEDT");
+                rclcpp::shutdown();
+            }
             leftLift.SetPosition(rightLift.GetPosition());
-            rightLift.SetPosition(leftLift.GetPosition());
-        } //lift realignment
+            rightLift.SetPosition(rightLift.GetPosition());
+
+        } //block for lift realignment
         else {
             leftLift.SetPosition(lift_setpoint);
             rightLift.SetPosition(lift_setpoint);
             tilt.SetPosition(tilt_setpoint);
-        }
+        } //block for normal bucket movement
 
-        if (activate_vibrator){
-            vibrator.SetDutyCycle(VIBRATOR_DUTY);
-        }
+        if (activate_vibrator) vibrator.SetDutyCycle(VIBRATOR_DUTY);
 
-        if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - timer_start).count() > 10) {
-            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "ERROR: Depositing Cancelled Midway");
-            response->depositing_successful = false;
+        if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - timer_start).count() > 5) {
+            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "ERROR: Depositing Cancelled");
             break;
-        }
+        } //Timer for when to quit a stage due to timeout
+        
+        leftLiftReached = (fabs(lift_setpoint - leftLift.GetPosition() ) <=  ERROR);
+        rightLiftReached = (fabs(lift_setpoint - rightLift.GetPosition() ) <=  ERROR);
+        tiltReached = (fabs(tilt_setpoint - tilt.GetPosition() ) <=  ERROR); //Updates statuses
     }
-}    
+}
 
 void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Request> request,
     std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Response> response) {
@@ -49,18 +58,21 @@ void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Reque
 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting depositing process");
 
-        MoveBucket(3.8, 2.0, false, response); //Moves bucket up, tilts bucket 
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Scoop is lifted, beginning to jiggle");
+        MoveBucket(2.7, 0.0, false); //Moves bucket up, tilts bucket
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
 
         auto jiggleout_start = std::chrono::high_resolution_clock::now();
         while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - jiggleout_start).count() < 5) {
-            MoveBucket(3.8, 1.8, true, response);
+            MoveBucket(2.7, -0.5, true);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
+            vibrator.SetDutyCycle(VIBRATOR_DUTY);
         } //Vibrates sand out of bucket
+
         vibrator.SetDutyCycle(0.0f); //ensures vibrator turns off
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Done jiggling, returning to resting position");
-    
-        MoveBucket(0.0, 0.0, false, response); //Moves bucket up, tilts bucket 
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Bucket successuly reset");
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 2 complete, resetting bucket");
+
+        MoveBucket(0.0, 0.0, false); //Resets bucket
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Bucket successfully reset");
         response->depositing_successful = true;
 }
 

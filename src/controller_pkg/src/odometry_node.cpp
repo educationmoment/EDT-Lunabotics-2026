@@ -1,192 +1,171 @@
-//KSC ODOMETRY, ONLY TO BE USED AT KENNEDY SPACE CENTER ARENA
-#include "SparkMax.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "interfaces_pkg/msg/motor_health.hpp"
-#include "std_msgs/msg/bool.hpp"
+#define UCF_CODE true
+#ifndef UCF_CODE
+  //UCF ODOMETRY, ONLY TO BE USED AT UCF
+  #include "SparkMax.hpp"
+  #include "rclcpp/rclcpp.hpp"
+  #include "interfaces_pkg/msg/motor_health.hpp"
 
-class OdometryNode : public rclcpp::Node{
-public:
-    OdometryNode() : Node("odometry_node"), leftMotor("can0", 1),
-    rightMotor("can0", 2) {
-      health_subscriber_ = this->create_subscription<interfaces_pkg::msg::MotorHealth>(
-        "/health_topic", 10,
-        std::bind(&OdometryNode::positional_test, this, std::placeholders::_1)
-      );
+  class OdometryNode : public rclcpp::Node{
+  public:
+      OdometryNode() : Node("odometry_node"), leftMotor("can0", 1),
+      rightMotor("can0", 2) {
+        health_subscriber_ = this->create_subscription<interfaces_pkg::msg::MotorHealth>(
+          "/health_topic", 10,
+          std::bind(&OdometryNode::positional_test, thcis, std::placeholders::_1)
+        );
+  }
+  private:
+      SparkMax leftMotor;
+      SparkMax rightMotor;
+      //Motor controllers
 
-      left_subscriber_ = this->create_subscription<std_msgs::msg::Bool>(
-        "/obstacle_detection/left", 10,
-        std::bind(&OdometryNode::left_obstacle_detection, this, std::placeholders::_1));
+      rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
 
-      right_subscriber_ = this->create_subscription<std_msgs::msg::Bool>(
-        "/obstacle_detection/right", 10,
-        std::bind(&OdometryNode::right_obstacle_detection, this, std::placeholders::_1));
-}
+      float setpointMeters = 4.0f;
+      float radius = 0.1524f;
+      float setpointRotations = 108.0f * (setpointMeters / (6.28f * radius)); //conversion from distance in meters to rotations
+      float initialPosition;
+      bool initialized = false;
 
-private:
-    SparkMax leftMotor;
-    SparkMax rightMotor;
-    //Motor controllers
+      void positional_test(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
+        if (!initialized) {
+          initialPosition = health_msg->left_motor_position;
+          initialized = true;
+          RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
+        }
 
-    rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr left_subscriber_;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr right_subscriber_;
+        if (health_msg->left_motor_position - initialPosition <= setpointRotations){ //I might have to take an average of both motors, I will see with testing
+          leftMotor.SetVelocity(2500.0f);
+          rightMotor.SetVelocity(2500.0f);
+          RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+          RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+        }
+        else {
+          RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
+          leftMotor.SetDutyCycle(0.0f);
+          rightMotor.SetDutyCycle(0.0f);
+        }
+      }
+  };
 
-    float setpointMeters = 1.0f; 
-    float radius = 0.1524f;
-    float setpointRotations = 108.0f * (setpointMeters / (6.28f * radius)); //conversion from distance in meters to rotations
-    float initialPosition;
-    bool initialized = false;
-    
-    int obstacle_stage = 0; 
+  int main(int argc, char * argv[]) {
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<OdometryNode>());
+    rclcpp::shutdown();
+    return 0;
+  }
+#else
+  //KSC ODOMETRY, ONLY TO BE USED AT KENNEDY SPACE CENTER ARENA
+  #include "SparkMax.hpp"
+  #include "rclcpp/rclcpp.hpp"
+  #include "interfaces_pkg/msg/motor_health.hpp"
 
-    float initialPositionAvoidance;
-    bool initializedAvoidance = false;
+  class OdometryNode : public rclcpp::Node{
+  public:
+      OdometryNode() : Node("odometry_node"), leftMotor("can0", 1),
+      rightMotor("can0", 2) {
+        health_subscriber_ = this->create_subscription<interfaces_pkg::msg::MotorHealth>(
+          "/health_topic", 10,
+          std::bind(&OdometryNode::positional_test, this, std::placeholders::_1)
+        );
+  }
+  private:
+      SparkMax leftMotor;
+      SparkMax rightMotor;
+      //Motor controllers
 
-    bool left_obstacle_detected = false;
-    bool right_obstacle_detected = false;
-    bool turn_right = false;
+      rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
 
-    float obstacle_displacement_rotations = 0.0;
 
-    void left_obstacle_detection(const std_msgs::msg::Bool::SharedPtr left_msg) {
-      left_obstacle_detected = left_msg->data;
-    }
-  
-    void right_obstacle_detection(const std_msgs::msg::Bool::SharedPtr right_msg) {
-      right_obstacle_detected = right_msg->data;
-    }
+      float setpointMeters = 4.0f; //same for both forward and turn
+      float radius = 0.1524f;
+      float setpointRotations = 108.0f * (setpointMeters / (6.28f * radius)); //conversion from distance in meters to rotations
+      float initialPosition;
+      bool initialized = false;
 
-    enum class TravelAutonomy {FORWARD, AVOID_OBSTACLE, DONE};
+      enum class TravelAutonomy {FORWARD, TURN_RIGHT, RIGHT, DONE};
 
-    TravelAutonomy state = TravelAutonomy::FORWARD;
+      TravelAutonomy state = TravelAutonomy::FORWARD;
 
-    void positional_test(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
-      switch (state){
-        case TravelAutonomy::FORWARD:
-          if (!initialized) {
-            initialPosition = health_msg->left_motor_position;
-            initialized = true;
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
-          }
-
-          if (health_msg->left_motor_position - initialPosition  <= setpointRotations + obstacle_displacement_rotations){
-            leftMotor.SetVelocity(2500.0f);
-            rightMotor.SetVelocity(2500.0f);
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
-            if (left_obstacle_detected || right_obstacle_detected){
-              state = TravelAutonomy::AVOID_OBSTACLE;
-              if (left_obstacle_detected){
-                turn_right = true;
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "OBSTACLE DETECTED ON LEFT");
-              }
-              else {
-                turn_right = false;
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "OBSTACLE DETECTED ON RIGHT");
-              }
+      void positional_test(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
+        switch (state){
+          case TravelAutonomy::FORWARD:
+            if (!initialized) {
+              initialPosition = health_msg->left_motor_position;
+              initialized = true;
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
             }
-          }
-          else {
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
-            leftMotor.SetDutyCycle(0.0f);
-            rightMotor.SetDutyCycle(0.0f);
-            state = TravelAutonomy::DONE;
-          }
-        break;
 
-        case TravelAutonomy::AVOID_OBSTACLE:
-          
-          if (!initializedAvoidance) {
-            initialPositionAvoidance = health_msg->left_motor_position;
-            initializedAvoidance = true;
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Avoidance initalized at: %f", initialPositionAvoidance);
-          }
-        
-          switch (obstacle_stage) {
-            case 0: // Initial rotation
-              if (health_msg->left_motor_position - initialPositionAvoidance <= (turn_right ? 40 : -40)) {
-                leftMotor.SetVelocity((turn_right ? 2500.0 : -2500.0));  
-                rightMotor.SetVelocity((turn_right ? -2500.0 : 2500.0)); 
-              } else {
-                leftMotor.SetDutyCycle(0.0f);
-                rightMotor.SetDutyCycle(0.0f);
-                obstacle_stage++;
-                initialPositionAvoidance = health_msg->left_motor_position;
-                initializedAvoidance = false;
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "STAGE 1 COMPLETE");
-              }
-              break;
-        
-            case 1: // Forward
-              if (health_msg->left_motor_position - initialPositionAvoidance <= 70) {
-                leftMotor.SetVelocity(2500.0f);
-                rightMotor.SetVelocity(2500.0f);
-              } else {
-                leftMotor.SetDutyCycle(0.0f);
-                rightMotor.SetDutyCycle(0.0f);
-                obstacle_stage++;
-                initialPositionAvoidance = health_msg->left_motor_position;
-                initializedAvoidance = false;
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "STAGE 2 COMPLETE");
-              }
-              break;
-        
-            case 2: // Rotate 90 degrees
-              if (health_msg->left_motor_position - initialPositionAvoidance >= (turn_right ? -80 : 80)) {
-                leftMotor.SetVelocity((turn_right ? -2500.0 : 2500.0)); 
-                rightMotor.SetVelocity((turn_right ? 2500.0 : -2500.0));
-              } else {
-                leftMotor.SetDutyCycle(0.0f);
-                rightMotor.SetDutyCycle(0.0f);
-                obstacle_stage++;
-                initialPositionAvoidance = health_msg->left_motor_position;
-                initializedAvoidance = false;
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "STAGE 3 COMPLETE");
-              }
-              break;
-        
-            case 3: // Forward again
-              if (health_msg->left_motor_position - initialPositionAvoidance <= 70) {
-                leftMotor.SetVelocity(2500.0f);
-                rightMotor.SetVelocity(2500.0f);
-              } else {
-                leftMotor.SetDutyCycle(0.0f);
-                rightMotor.SetDutyCycle(0.0f);
-                obstacle_stage++;
-                initialPositionAvoidance = health_msg->left_motor_position;
-                initializedAvoidance = false;
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "STAGE 4 COMPLETE");
-              }
-              break;
-        
-            case 4: // Final alignment :3
-              if (health_msg->left_motor_position - initialPositionAvoidance <= (turn_right ? 30 : -30)) {
-                leftMotor.SetVelocity((turn_right ? 2500.0 : -2500.0));
-                rightMotor.SetVelocity((turn_right ? -2500.0 : 2500.0));
-              } else {
-                leftMotor.SetDutyCycle(0.0f);
-                rightMotor.SetDutyCycle(0.0f);
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "OBSTACLE SUCCESSFULLY AVOIDED");
-                state = TravelAutonomy::FORWARD;
-                obstacle_stage = 0;
-                initializedAvoidance = false;
-                left_obstacle_detected = false;
-                right_obstacle_detected = false;
-              }
-              break;
-          }
+            if (health_msg->left_motor_position - initialPosition <= setpointRotations){
+              leftMotor.SetVelocity(2500.0f);
+              rightMotor.SetVelocity(2500.0f);
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+            }
+            else {
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
+              leftMotor.SetDutyCycle(0.0f);
+              rightMotor.SetDutyCycle(0.0f);
+              state = TravelAutonomy::TURN_RIGHT;
+              initialized = false;
+            }
           break;
 
-        case TravelAutonomy::DONE:
-          RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Autonomy successfully completed!");
-          rclcpp::shutdown();
-      }
-    }
-};
+          case TravelAutonomy::TURN_RIGHT:
+            if (!initialized) {
+              initialPosition = health_msg->left_motor_position;
+              initialized = true;
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
+            }
 
-int main(int argc, char * argv[]) {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<OdometryNode>());
-  rclcpp::shutdown();
-  return 0;
-}
+            if (health_msg->left_motor_position - initialPosition <= 125){ //90 degree turn
+              leftMotor.SetVelocity(2500.0f);
+              rightMotor.SetVelocity(-2500.0f);
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+            }
+            else {
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
+              leftMotor.SetDutyCycle(0.0f);
+              rightMotor.SetDutyCycle(0.0f);
+              state = TravelAutonomy::RIGHT;
+              initialized = false;
+            }
+          break;
+
+          case TravelAutonomy::RIGHT:
+            if (!initialized) {
+              initialPosition = health_msg->left_motor_position;
+              initialized = true;
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
+            }
+
+            if (health_msg->left_motor_position - initialPosition <= setpointRotations){
+              leftMotor.SetVelocity(2500.0f);
+              rightMotor.SetVelocity(2500.0f);
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+            }
+            else {
+              RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
+              leftMotor.SetDutyCycle(0.0f);
+              rightMotor.SetDutyCycle(0.0f);
+              state = TravelAutonomy::DONE;
+              initialized = false;
+            }
+          break;
+
+          case TravelAutonomy::DONE:
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Autonomy successfully completed!");
+            rclcpp::shutdown();
+        }
+      }
+  };
+
+  int main(int argc, char * argv[]) {
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<OdometryNode>());
+    rclcpp::shutdown();
+    return 0;
+  }
+#endif

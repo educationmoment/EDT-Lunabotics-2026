@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Pilot Control Interface</title>
+    <link rel="stylesheet" href="../static/css/pilot.css"/>
+
+    <!-- ROS Libraries -->
+    <script src="{{url_for('static', filename='js/resources/roslib.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
+    <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/animation/quest_arrow.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/animation/digital_twin.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/resources/three.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/resources/DRACOLoader.js')}}"></script>
+    <script src="{{url_for('static', filename='js/resources/GLTFLoader.js')}}"></script>
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: black;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #camera-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        .multi-camera-checkerboard {
+            display: grid;
+            height: 100%;
+            width: 100%;
+        }
+
+        .camera-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            box-sizing: border-box;
+        }
+
+        .camera-container p {
+            color: white;
+            margin: 0 0 4px 0;
+            font-size: 1em;
+        }
+
+        .camera-frame {
+            width: 100%;
+            height: auto;
+            max-height: 90%;
+            object-fit: contain;
+            background-color: #222;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="camera-wrapper">
+        <div class="multi-camera-checkerboard" id="grid-layout">
+            <div class="camera-container" id="container-d455-2">
+                <p>D455 Camera 1</p>
+                <img id="camera-d455-2" class="camera-frame" />
+            </div>
+            <div class="camera-container" id="container-d455-1">
+                <p>D455 Camera 2</p>
+                <img id="camera-d455-1" class="camera-frame" />
+            </div>
+            <div class="camera-container" id="container-rgb-1">
+                <p>USB RGB Camera 1</p>
+                <img id="camera-rgb-1" class="camera-frame" />
+            </div>
+            <div class="camera-container" id="container-rgb-2">
+                <p>USB RGB Camera 2</p>
+                <img id="camera-rgb-2" class="camera-frame" />
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const feeds = [
+            { id: "camera-d455-2", container: "container-d455-2" },
+            { id: "camera-d455-1", container: "container-d455-1" },
+            { id: "camera-rgb-1",  container: "container-rgb-1"  },
+            { id: "camera-rgb-2",  container: "container-rgb-2"  }
+        ];
+
+        function updateCameraLayout() {
+            let activeCount = 0;
+
+            feeds.forEach(feed => {
+                const img = document.getElementById(feed.id);
+                const container = document.getElementById(feed.container);
+                if (!img || !container) return;
+
+                // Force re-check
+                const wasVisible = !container.classList.contains("hidden");
+                const isActive = img.complete && img.naturalWidth > 0;
+
+                if (isActive) {
+                    container.classList.remove("hidden");
+                    activeCount++;
+                } else {
+                    container.classList.add("hidden");
+                }
+            });
+
+            const layout = document.getElementById("grid-layout");
+            if (activeCount <= 1) {
+                layout.style.gridTemplateColumns = "1fr";
+                layout.style.gridTemplateRows = "1fr";
+            } else if (activeCount === 2) {
+                layout.style.gridTemplateColumns = "1fr 1fr";
+                layout.style.gridTemplateRows = "1fr";
+            } else {
+                layout.style.gridTemplateColumns = "1fr 1fr";
+                layout.style.gridTemplateRows = "1fr 1fr";
+            }
+        }
+
+        window.addEventListener("load", () => {
+            // Initial check after 1s
+            setTimeout(updateCameraLayout, 1000);
+            // Re-check every 5 seconds
+            setInterval(updateCameraLayout, 5000);
+        });
+    </script>
+</body>
+</html>
+

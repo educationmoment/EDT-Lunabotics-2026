@@ -11,7 +11,7 @@
 #include <algorithm>
 
 const float VELOCITY_MAX = 2500.0; //rpm, after gearbox turns into 11.1 RPM
-const float VIBRATOR_OUTPUT = 1.0f; //Constant value for vibrator output
+const float VIBRATOR_OUTPUT = 0.1f; //Constant value for vibrator output
 
 enum CAN_IDs {
   LEFT_MOTOR  = 1,
@@ -100,7 +100,7 @@ public:
     rightLift.SetF(0, 0.00021f);
     //PID settings for right lift
 
-    //PID settings for tilt 
+    //PID settings for tilt
     tilt.SetP(0, 1.51f);
     tilt.SetI(0, 0.0f);
     tilt.SetD(0, 0.0f);
@@ -174,8 +174,8 @@ private:
   bool alternate_mode_active_ = false;
   bool prev_alternate_button_ = false;
 
-  float lift_setpoint = 0.0f; 
-  float lift_position = 0.0f;
+  float left_lift_position = 0.0f;
+  float right_lift_position = 0.0f;
 
   // Helper for stepped output, in velocity control mode it is multiplied by VELOCITY_MAX
   float computeStepOutput(float value) {
@@ -229,7 +229,8 @@ private:
 
   //Keeps track of position for actuator control
   void position_callback(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
-    lift_position = health_msg->left_lift_position;
+    left_lift_position = health_msg->left_lift_position;
+    right_lift_position = health_msg->right_lift_position;
   }
 
   // Manual control - joy callback.
@@ -258,9 +259,9 @@ private:
       std::system("pkill -9 -f depositing_node");
       std::system("pkill -9 -f excavation_node");
       std::system("pkill -9 -f odometry_node");
-      
+
       std::this_thread::sleep_for(std::chrono::seconds(2)); //Allows time for the nodes to restarted
-  
+
       std::system("ros2 run controller_pkg excavation_node &");
       std::system("ros2 run controller_pkg depositing_node &");
     }
@@ -276,7 +277,7 @@ private:
       rightLift.SetDutyCycle(0.0f);
       tilt.SetDutyCycle(0.0f);
       return;
-    } 
+    }
 
     //----------EXCAVATION SYSTEM----------//
     // VIBRATOR TOGGLE (Right bumper)
@@ -295,7 +296,7 @@ private:
       rightLift.SetPosition(0.0f);
       tilt.SetPosition(0.0f);
     }
-    else { 
+    else {
     // TILT ACTUATOR (D pad left and right)
       float tilt_duty = 0.0f;
       if (joy_msg->buttons[15] > 0 && joy_msg->buttons[13] == 0) {
@@ -306,22 +307,23 @@ private:
       tilt.SetDutyCycle(tilt_duty);
 
       // LIFT ACTUATOR (D pad up and down)
-      
+      float lift_duty = 0.0f;
       if (joy_msg->buttons[12] > 0 && joy_msg->buttons[14] == 0) {
-        lift_setpoint += 1.0f;
+        lift_duty = 1.0f;
       } else if (joy_msg->buttons[13] > 0 && joy_msg->buttons[15] == 0) {
-        lift_setpoint += -1.0f;
+        lift_duty = -1.0f;
       }
+      if (fabs(left_lift_position - right_lift_position) >= 0.2){
+        leftLift.SetPosition(left_lift_position);
+        rightLift.SetPosition(left_lift_position);
+      } //Lift correction 
       else {
-        lift_setpoint = lift_position;
+        leftLift.SetDutyCycle(lift_duty);
+        rightLift.SetDutyCycle(lift_duty);
       }
-
-      lift_setpoint = std::clamp(lift_setpoint, -7.0f, 5.0f);
-      leftLift.SetPosition(lift_setpoint);
-      rightLift.SetPosition(lift_setpoint);
     }
     // EXCAVATION RESET BUTTON (X button)
-    
+
     //----------EXCAVATION SYSTEM----------//
 
     //----------DRIVETRAIN----------//
@@ -338,7 +340,7 @@ private:
     float left_drive_raw = 0.0;
     float right_drive_raw = 0.0;
     if (alternate_mode_active_) { //Left and right joystick, controlled with duty cycle
-      float leftJS = -joy_msg->axes[1]; 
+      float leftJS = -joy_msg->axes[1];
       float rightJS = -joy_msg->axes[3];
       left_drive_raw = std::max(-1.0f, std::min(1.0f, leftJS));
       right_drive_raw = std::max(-1.0f, std::min(1.0f, rightJS));
@@ -359,7 +361,7 @@ private:
 
       left_drive = computeStepOutput(left_drive_raw) * VELOCITY_MAX;
       right_drive = computeStepOutput(right_drive_raw) * VELOCITY_MAX;
-      
+
       leftMotor.SetVelocity(left_drive);
       rightMotor.SetVelocity(right_drive);
     }

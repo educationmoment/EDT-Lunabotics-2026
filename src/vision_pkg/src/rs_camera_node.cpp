@@ -26,28 +26,20 @@ public:
     RCLCPP_INFO(this->get_logger(), "Multi-camera node startup.");
 
     // Known D455 serials
-    std::string serial1 = "318122303486";
-    //std::string serial2 = "308222300472";
-
-    // Initialize RealSense pipeline for D455 #1
-    {
-      rs2::pipeline pipeline;
-      rs2::config cfg;
-      cfg.enable_device(serial1);
-      cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15); // Lower resolution + FPS
-      cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16, 10);
-      try {
-        pipeline.start(cfg);
-        pipelines_.push_back(pipeline);
-        RCLCPP_INFO(this->get_logger(), "Started D455 pipeline on device %s", serial1.c_str());
-      } catch (const rs2::error &e) {
-        RCLCPP_ERROR(this->get_logger(), "Error starting pipeline for D455 #1: %s", e.what());
-      }
-    }
+    rs2::config cfg;
+    cfg.enable_device("318122303486");
+    cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
+    cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16, 10);
     
+    try {
+      pipeline_.start(cfg);
+      RCLCPP_INFO(this->get_logger(), "Started D455 pipeline.");
+    } catch (const rs2::error &e) {
+      RCLCPP_ERROR(this->get_logger(), "Error starting D455 pipeline: %s", e.what());
+    }
     // Open USB RGB cameras explicitly
     cap_rgb1_.open("/dev/video0");
-    cap_rgb2_.open("/dev/video3");
+    cap_rgb2_.open("/dev/video8");
     
     if (!cap_rgb1_.isOpened()) {
       RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video0).\n");
@@ -69,7 +61,7 @@ public:
 
 private:
   rs2::context ctx;
-  std::vector<rs2::pipeline> pipelines_;
+  rs2::pipeline pipeline_;
   cv::VideoCapture cap_rgb1_;
   cv::VideoCapture cap_rgb2_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam1_pub_;
@@ -82,16 +74,14 @@ private:
 
   void timer_callback() {
     // Use poll_for_frames to avoid blocking and stalling pipeline
-    if (pipelines_.size() >= 1) {
-      rs2::frameset frames1;
-      if (pipelines_[0].poll_for_frames(&frames1)) {
-        rs2::frame color_frame1 = frames1.get_color_frame();
-        rs2::depth_frame depth_frame1 = frames1.get_depth_frame();
-        if (color_frame1) publish_realsense_image(color_frame1, d455_cam1_pub_);
-        if (depth_frame1 && depth_frame1.get_data()) obstacle_detection_callback(depth_frame1, L_obstacle_detection_pub_, R_obstacle_detection_pub_);
-      } else {
-        RCLCPP_WARN(this->get_logger(), "No frame available from D455 camera 1.");
-      }
+    rs2::frameset frames;
+    if (pipeline_.poll_for_frames(&frames)) {
+      rs2::frame color_frame = frames.get_color_frame();
+      rs2::depth_frame depth_frame = frames.get_depth_frame();
+      if (color_frame) publish_realsense_image(color_frame, d455_cam1_pub_);
+      if (depth_frame && depth_frame.get_data()) obstacle_detection_callback(depth_frame, L_obstacle_detection_pub_, R_obstacle_detection_pub_);
+    } else {
+      RCLCPP_WARN(this->get_logger(), "No D455 frames available.");
     }
 
     publish_rgb_camera(cap_rgb1_, rgb_cam1_pub_);

@@ -14,8 +14,8 @@ import subprocess
 # Create Flask App
 ##################################################
 # app = Flask(
-        # __name__, 
-        # template_folder=templates_dir, 
+        # __name__,
+        # template_folder=templates_dir,
         # static_folder=static_dir
     # )
 ##################################################
@@ -25,7 +25,7 @@ app = Flask(
 
 ### Define Routes
 ##################################################
-## Route to HOME 
+## Route to HOME
 @app.route('/', methods=['GET'])
 def get_main():
     return render_template('index.html')
@@ -50,7 +50,7 @@ def get_networking():
 
 @app.route('/get_active_nodes', methods=['GET'])
 def get_active_nodes():
-    
+
     # Get Active Nodes
     active_nodes = subprocess.run(
         ['ros2', 'node', 'list'],
@@ -78,7 +78,7 @@ def get_active_nodes():
     return jsonify({
         "number_nodes": len(active_nodes),
         "number_topics": len(active_topics),
-        "number_services": len(active_services), 
+        "number_services": len(active_services),
         "active_nodes": active_nodes,
         "active_topics": active_topics,
         "active_services": active_services
