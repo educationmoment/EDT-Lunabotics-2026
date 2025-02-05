@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Pilot Control Interface</title>
+        <link rel="stylesheet" href="{{url_for('static', filename='css/pilot.css')}}">
+
+        <!-- ROSJS External Libraries -->
+        <!-- -> Must be Sourced First -->
+        <script src="{{url_for('static', filename='js/roslib.min.js')}}"></script>
+        <script src="{{url_for('static', filename='js/eventemitter2.min.js')}}"></script>
+        
+        <!-- Global ROS Setup Code -->
+        <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
+        
+        <!-- Pilot GUI Specific Setup Code -->
+        <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
+        <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>  
+    </head>
+    <body>
+        <div class="outer-box">
+
+
+            <!-- TOP-LEFT: Quest Arrow -->
+            <div class="inner-div inner-quad-2">
+                <!-- TO-DO: Add Canvas Element to Animate Quest Arrow -->
+                
+                <canvas id="quest-arrow"></canvas>
+                <p>inner-quad-2</p>
+            </div>
+
+            <!-- TOP-RIGHT: List Autonomous Functions -->
+            <!-- Overlay Indicator and Autonomous Function Name -->
+            <div class="inner-div inner-quad-1">
+
+                <!-- TO-DO: Add Div Object with Function-Indicators -->
+                <div id="function-indicators" style="color: white;"> Function Indicators</div>
+                <button style="color: black;" id="start-stop-button">Start/Stop</button>
+
+            </div>
+
+            <!-- BOTTOM-LEFT: Limited ROS Logs -->
+            <div class="inner-div inner-quad-3">
+
+                <!-- TO-DO: Add Div object with NODE logs -->
+                <div id="output-logs" style="color: white;">Output LOGS</div>
+            </div>
+            
+            <!-- BOTTOM-RIGHT: Digital Twin -->
+            <div class="inner-div inner-quad-4">
+                
+                <!-- TO-DO: Add Canvas object with Digital Twin -->
+                <canvas id="digital-twin"></canvas>
+            </div>
+
+            <!-- Camera Feed -->
+            <div class="camera-feed">
+                <!-- DONE: Add Image Behind DIV Elements -->
+                <!-- NOTE: Using a canvas element may be better -->
+                 
+                <img id="camera-output">
+            </div>
+        </div>
+    </body>
+</html>

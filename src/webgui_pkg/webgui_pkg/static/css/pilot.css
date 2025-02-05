@@ -1,0 +1,87 @@
+html {
+    background-color: black;
+
+}
+
+/* Class: outer-box */
+/* 
+    Encompasses ALL elements of the page
+    
+    Description:
+        -- Adds a background to the webpage around the borders
+        -- Indicates if Video feed cuts out by becoming visible to user
+*/
+.outer-box {
+    display: flex;
+    justify-content: center;
+
+    align-content: center;
+    
+    background-color: rgb(192, 192, 192);
+    position: fixed;
+
+    width: 110vw;
+    height: 110vh;
+
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 30%;
+
+    z-index: 0;
+
+}
+
+
+/* Class: inner-div */
+/* 
+    Elements that overlay on-top of Video Feed:
+        -- Quadrant 1: Autonomous Function Indicators
+            > Show Current State of autonomous functionality
+        -- Quadrant 2: Quest Arrow
+            > Shows animated Arrow inside a canvas that points towards April Tag
+        -- Quadrant 3: ROS Logger Output
+            > Shows ROS2 Logger Output (info, warning, and errors)
+        -- Quadrant 4: Robot Digital Twin
+            > SHows animated Digital Twin, indicates actuator positions
+*/
+.inner-div {
+    /* background-color: blue; */
+    z-index: 3;
+
+    width: 30vw;
+    height: 30vh;
+
+    border: solid 1px black;
+
+
+    justify-content: center;
+    align-content: center;
+
+    border-radius: 20px;
+
+    background-color: rgba( 0, 0, 0, 0.39);
+}
+
+.inner-quad-1 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.camera-feed {
+    background-color: rgb(0, 192, 192);
+    
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    z-index: 2;
+}
+
+
+
+img {
+    width: 100vw;
+    height: 100vh;
+}
