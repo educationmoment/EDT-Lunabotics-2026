@@ -25,7 +25,7 @@ outLogs_div.textContent += "   Hello World";
 ////////////////////////////////////////////////////////////////////////////////////////
 var listener = new ROSLIB.Topic({
     ros : ROS,
-    name : '/compressed_video',
+    name : '/rs_node/compressed_video',
     messageType : 'sensor_msgs/CompressedImage'
 });
 

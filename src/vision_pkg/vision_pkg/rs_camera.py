@@ -9,6 +9,7 @@
 # Import Dependencies
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import Image
 import numpy as np
 import rclpy
 import pyrealsense2 as rs
@@ -32,7 +33,10 @@ class CameraNode( Node ):
         self.init_camera()
 
         # Initiallize Publisher
-        self.init_comp_publisher(topic_name="compressed_video")
+        self.init_comp_publisher(
+            rgb_topic_name="rs_node/compressed_video",
+            depth_topic_name="rs_node/depth_video"
+        )
 
         # Initiallize AprilTag Detector
         self.init_detector()
@@ -53,7 +57,6 @@ class CameraNode( Node ):
 
     # Timer Callback Function
     def callback_timer(self) -> None:
-        # self.get_logger().info(f"[ Camera.CALLBACK_TIMER ] Tick ({self.timer_counter})")
         self.timer_counter += 1
 
         # Collect Frames + Error Handling
@@ -67,16 +70,15 @@ class CameraNode( Node ):
         video_frame = frames.get_color_frame()
         depth_frame = frames.get_depth_frame()
 
-        # video_frame = frames.get_infrared_frame()
-        # video_frame = frames.get_fisheye_frame()
-
         # If Empty, Return
         if not video_frame: return
+        if not depth_frame: return
 
         # Collect Data
         image = video_frame.as_frame().get_data()
         np_image = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2RGB)
 
+        # TO-DO: Implement Depth Frame
 
 
         # Collect AprilTag Location
@@ -87,25 +89,21 @@ class CameraNode( Node ):
         else:
             self.get_logger().info(f"[ CameraNode.timer ]Tag ID: {result[0].tag_id}")
 
+            # Collect Corner and Center Locations
             center = tuple(map(int, result[0].center))
-            corner = tuple( map(list,result[0].corners) )
+            corner = tuple(map(list,result[0].corners))
 
             cv.putText(np_image, "",center, cv.FONT_HERSHEY_SIMPLEX, 1, (50, 255, 40), 4)
             
-            # cv.circle(np_image, center, 5, (255, 255, 0), 4)
-            # cv.circle(np_image, tuple(map(int, result[0].center) ), 5, (255, 255, 0), 4)
-
-            # Draw Corners onto image 
-            # for i in range(4):
-                # cv.circle(np_image, (int(corner[i][0]), int(corner[i][1]) ), 10, (255, 0, 0), 10)
-            
+            # Unpack Center Location
             center_x, center_y = center
 
+            # Draw Corners and Center onto image 
+            for i in range(4):
+                cv.circle(np_image, (int(corner[i][0]), int(corner[i][1]) ), 10, (255, 0, 0), 10)
+            cv.circle(np_image, (center_x, center_y), 5, (255, 0, 255), 4)
+            
             # Get Distance to Center
-            # self.get_logger().warn(f"[ DEBUG ] Length: {center}")
-            # self.get_logger().warn(f"[ DEBUG ] Type: {type(map(int, result[0].center))}")
-
-
             # ISSUE: The grayscale image used to detect the april tag appears to have a different resolution
             #           than the depth frame.
             self.get_logger().info(f"[ DEBUG ] {center_x},{center_y}")
@@ -113,22 +111,30 @@ class CameraNode( Node ):
                 distance_center = depth_frame.get_distance( int(center_x), int(center_y) )
                 self.get_logger().warn(f"Distance: {distance_center}")
 
-
             
 
         # Generate Message
-        msg = CompressedImage()
+        rgb_msg = CompressedImage()
+        depth_msg = Image()
 
-        # Populate Message
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.format = "jpeg"
-        # msg.data = cv.imencode( ".jpg", np_image )[1].flatten().tolist()
+        # Populate RGB Message
+        rgb_msg.header.stamp = self.get_clock().now().to_msg()
+        rgb_msg.format = "jpeg"
 
-        # ChatGPT Suggested Fix
-        msg.data = cv.imencode( ".jpg", np_image )[1].tobytes()
+        # Populate Depth Message
+        depth_msg.header.stamp = self.get_clock().now().to_msg()
+        depth_msg.encoding = "16UC1"
+        # depth_msg.height = depth_frame.shape[0]
+        # depth_msg.width  = depth_frame.shape[1]
 
-        # Send Message
-        self.pub.publish(msg=msg)
+        # Pack Image Data
+        rgb_msg.data = cv.imencode( ".jpg", np_image )[1].tobytes() # ChatGPT Suggested Fix
+        # depth_msg.data = depth_frame.tobytes()
+
+        # Send Messages
+        self.pub_rgb.publish(msg=rgb_msg)
+        self.pub_depth.publish(msg=depth_msg)
+
         self.get_logger().info("[ Camera.CALLBACK_TIMER ] Frames Collected")
         return
 
@@ -167,14 +173,21 @@ class CameraNode( Node ):
         return
 
     # Initiallize Compressed Image Publisher
-    def init_comp_publisher(self, topic_name: str) -> None:
+    def init_comp_publisher(self, rgb_topic_name: str, depth_topic_name: str) -> None:
         self.get_logger().info("[ Camera.INIT_COMP_PUBLISHER ] Starting Compressed Image Publisher")
-        self.pub = self.create_publisher(
+        self.pub_rgb = self.create_publisher(
             msg_type = CompressedImage,
-            topic = topic_name,
+            topic = rgb_topic_name,
             qos_profile = 3
         )
-        self.get_logger().info(f"[ Camera.INIT_COMP_PUBLISHER ] Publisher On \033[31m/{topic_name}\033[0m Initiallized")
+        self.get_logger().info(f"[ Camera.INIT_COMP_PUBLISHER ] RGB publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
+        
+        self.pub_depth = self.create_publisher(
+            msg_type = Image,
+            topic = depth_topic_name,
+            qos_profile = 3
+        )
+        self.get_logger().info(f"[ Camera.INIT_COMP_PUBLISHER ] Depth publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
         return
 
 
