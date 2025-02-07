@@ -2,26 +2,34 @@
     RS_CAMERA:
     
     Description:
-
-
+        Realsense Camera Node for handling a Single D455 Intel Realsense Camera.
+        
+        
+        
+        
+        Publishes four topics:
+            Name                        Type                            Oneline-Description
+        rs_node/compressed_video    sensor_msgs/msg/CompressedImage     Used to publish RGB uint8 video feed
+        rs_node/depth_video         sensor_msgs/msg/Image               Used to publish depth camera footage
+        rs_node/accel_data          std_msgs/msg/Float32MultiArray      Used to publish x,y,z acceleration data
+        rs_node/gyro_data           std_msgs/msg/Float32MultiArray      Used to publish roll, pitch, yaw gyroscope data
 """
 
 # Import Dependencies
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from sensor_msgs.msg import Image
+from example_msgs.msg import Float32MultiArray
 import numpy as np
 import rclpy
 import pyrealsense2 as rs
 import cv2 as cv
-
-# Working on April Tag
 import apriltag 
 
-#########
+###################
 # Camera Node
 class CameraNode( Node ):
-
+    ##########
     # Initiallize Node
     def __init__(self, poll_period_sec: float=0.250) -> None:
         
@@ -33,7 +41,7 @@ class CameraNode( Node ):
         self.init_camera()
 
         # Initiallize Publisher
-        self.init_comp_publisher(
+        self.init_node_publisher(
             rgb_topic_name="rs_node/compressed_video",
             depth_topic_name="rs_node/depth_video"
         )
@@ -46,6 +54,7 @@ class CameraNode( Node ):
         self.init_timer(period=poll_period_sec)
         return
 
+    ##########
     # Destructor
     def __del__(self) -> None:
         self.get_logger().info("[ Camera.DEL ] Destroying Camera Node")
@@ -55,6 +64,7 @@ class CameraNode( Node ):
 
     ### CameraNode: CALLBACK FUNCTIONS  ###
 
+    ##########
     # Timer Callback Function
     def callback_timer(self) -> None:
         self.timer_counter += 1
@@ -102,6 +112,22 @@ class CameraNode( Node ):
             ------------------------
         """)
         #####################################
+
+        #####################################
+        # TODO: IMU -- Publish Accel/Gyro   #
+        #####################################
+
+        # Pack and Publish Accelerometer Data 
+        data = Float32MultiArray()
+        data.data = list(accl_data.x, accl_data.y, accl_data.z)
+        self.pub_accel.publish(msg=data)
+
+        # Pack and Publish Gyroscope Data
+        data = Float32MultiArray()
+        data.data = list(gyro_data.x, gyro_data.y, gyro_data.z)
+        self.pub_gyro.publish(msg=data)
+        #####################################
+
 
         # Collect AprilTag Location
         np_grayscale = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2GRAY )
@@ -155,6 +181,7 @@ class CameraNode( Node ):
 
     ### CameraNode: Initiallizers       ###
 
+    ##########
     # Initiallize AprilTag Detector
     def init_detector(self) -> None:
         self.get_logger().info("[ CameraNode.init_detector ] Initiallizing Detector")
@@ -162,6 +189,7 @@ class CameraNode( Node ):
         self.get_logger().info("[ CameraNode.init_detector ] Detector Initiallized")
         return
 
+    ##########
     # Initiallize Timer
     def init_timer(self, period: float) -> None:
         self.get_logger().info(f"[ Camera.INIT_TIMER ] Starting Timer, Period={period}")
@@ -173,6 +201,7 @@ class CameraNode( Node ):
         self.get_logger().info("[ Camera.INIT_TIMER ] Timer Initiallized")
         return
 
+    ##########
     # Initiallize Camera Pipeline
     def init_camera(self) -> None:
         self.get_logger().info("[ Camera.INIT_CAMERA ] Starting Camera")
@@ -194,24 +223,60 @@ class CameraNode( Node ):
         self.get_logger().info("[ Camera.INIT_CAMERA ] IMU Initiallized")
         return
 
+    ##########
     # Initiallize Compressed Image Publisher
-    def init_comp_publisher(self, rgb_topic_name: str, depth_topic_name: str) -> None:
-        self.get_logger().info("[ Camera.INIT_COMP_PUBLISHER ] Starting Compressed Image Publisher")
+    def init_node_publisher(self, rgb_topic_name: str, depth_topic_name: str, imu_accel_topic_name: str, imu_gyro_topic_name: str) -> None:
+        # self.get_logger().info("[ Camera.init_node_publisher ] Starting Compressed Image Publisher")
+        # self.get_logger().info(f"[ Camera.init_node_publisher ] RGB publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
+        # self.get_logger().info(f"[ Camera.init_node_publisher ] Depth publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
+        
+        ##########
+        # Initiallize the RGB Camera Publisher
+        #       Type == Compressed Image
+        #       Topic == Specified in Function Call
+        #       Quality of Service == 3 frames
         self.pub_rgb = self.create_publisher(
             msg_type = CompressedImage,
             topic = rgb_topic_name,
             qos_profile = 3
         )
-        self.get_logger().info(f"[ Camera.INIT_COMP_PUBLISHER ] RGB publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
         
+
+        ##########
+        # Initiallize the Depth Camera Publisher
+        #       Type == Normal Image
+        #       Topic == Specified in Function Call
+        #       Quality of Service == 3 frames
         self.pub_depth = self.create_publisher(
             msg_type = Image,
             topic = depth_topic_name,
             qos_profile = 3
         )
-        self.get_logger().info(f"[ Camera.INIT_COMP_PUBLISHER ] Depth publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
+
+        ##########
+        # Initiallize the IMU Accelerometer Publisher
+        #       Type == 32-bit Float Array
+        #       Topic == Specified in Function Call
+        #       Quality of Service == 5 frames
+        self.pub_accel = self.create_publisher(
+            msg_type    = Float32MultiArray,
+            topic       = imu_accel_topic_name,
+            qos_profile = 5    
+        )
+
+        ##########
+        # Initiallize the IMU Gyroscope Publisher
+        #       Type == 32-bit Float Array
+        #       Topic == Specified in Function Call
+        #       Quality of Service == 5 frames
+        self.pub_gyro = self.create_publisher(
+            msg_type    = Float32MultiArray,
+            topic       = imu_gyro_topic_name,
+            qos_profile = 5
+        )
         return
 
+    ##########
     # Print Corners on AprilTag
     def overlay_tag_corners(self, np_image, tag):
         
@@ -232,6 +297,7 @@ class CameraNode( Node ):
             # Return Image (Find out if it is possible to modify by reference)
             return np_image
 
+    ##########
     # Print Center on AprilTag
     def overlay_tag_center(self, np_image, tag):
         # Determine of the tag passed is REALLY a tag:
@@ -251,18 +317,18 @@ class CameraNode( Node ):
             return np_image        
 
 
-
+#####################################
 # Main Function
 def main() -> int:
     rclpy.init()
-    node = CameraNode(0.017)
+    node = CameraNode(0.017)        
     try:
         rclpy.spin(node=node)
         rclpy.shutdown()
     except KeyboardInterrupt:
         print("\n\033[100m[ Main.MAIN ] Keyboard Interrupt Pressed", end='\033[0m\n')
-
     return 0
 
 if __name__ == "__main__":
-    exit( main() )
+    # exit( main() )
+    main()      # Maybe this will solve the Seg fault
