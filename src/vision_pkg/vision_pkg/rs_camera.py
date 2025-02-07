@@ -19,7 +19,7 @@
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from sensor_msgs.msg import Image
-from example_msgs.msg import Float32MultiArray
+from example_interfaces.msg import Float32MultiArray
 import numpy as np
 import rclpy
 import pyrealsense2 as rs
@@ -43,7 +43,9 @@ class CameraNode( Node ):
         # Initiallize Publisher
         self.init_node_publisher(
             rgb_topic_name="rs_node/compressed_video",
-            depth_topic_name="rs_node/depth_video"
+            depth_topic_name="rs_node/depth_video",
+            imu_accel_topic_name="rs_node/imu/accel_info",
+            imu_gyro_topic_name="rs_node/imu/gyro_info"
         )
 
         # Initiallize AprilTag Detector
@@ -111,6 +113,14 @@ class CameraNode( Node ):
                 Z: {accl_data.z}
             ------------------------
         """)
+        self.get_logger().info(f"""
+            Gyro Frame:
+                X: {gyro_data.x}
+                Y: {gyro_data.y}
+                Z: {gyro_data.z}
+            ------------------------
+        """)
+
         #####################################
 
         #####################################
@@ -121,12 +131,12 @@ class CameraNode( Node ):
 
         # Pack and Publish Accelerometer Data 
         data = Float32MultiArray()
-        data.data = list(accl_data.x, accl_data.y, accl_data.z)
+        data.data = [accl_data.x, accl_data.y, accl_data.z]
         self.pub_accel.publish(msg=data)
 
         # Pack and Publish Gyroscope Data
         data = Float32MultiArray()
-        data.data = list(gyro_data.x, gyro_data.y, gyro_data.z)
+        data.data = [gyro_data.x, gyro_data.y, gyro_data.z]
         self.pub_gyro.publish(msg=data)
         #####################################
 
