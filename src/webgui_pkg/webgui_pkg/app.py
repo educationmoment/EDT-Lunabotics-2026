@@ -22,7 +22,7 @@ app = Flask(
     __name__
 )
 
-# Define Routes
+### Define Routes
 ##################################################
 ## Route to HOME 
 @app.route('/', methods=['GET'])
@@ -46,15 +46,17 @@ def get_networking():
 ##################################################
 
 
-# Debugging
+### Debugging: Issue - Flask server served to default ip. 127.0.0.1 on 5000
+#   Issue appears to be resolved as of February 7
 ##################################################
-print('----------')
-print('\033[104m' + f"{__name__}" + '\033[0m')
-print('----------')
+# print('----------')
+# print('\033[104m' + f"{__name__}" + '\033[0m')
+# print('----------')
 ##################################################
 
 
-# Start Application
+## Start Application:
+#       Any IP can connect to server on port 59440
 ##################################################
 if __name__ == "__main__" or __name__ == "webgui_pkg.app":
     app.run(host='0.0.0.0', port=59440, debug=True)  # Run the app

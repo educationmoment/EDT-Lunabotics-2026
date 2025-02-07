@@ -1,21 +1,24 @@
 """ 
-    RS_CAMERA:
+    RS_CAMERA_Node:
     
-    Description:
-        Realsense Camera Node for handling a Single D455 Intel Realsense Camera.
-        
-        
-        
-        
-        Publishes four topics:
-            Name                        Type                            Oneline-Description
-        rs_node/compressed_video    sensor_msgs/msg/CompressedImage     Used to publish RGB uint8 video feed
-        rs_node/depth_video         sensor_msgs/msg/Image               Used to publish depth camera footage
-        rs_node/accel_data          std_msgs/msg/Float32MultiArray      Used to publish x,y,z acceleration data
-        rs_node/gyro_data           std_msgs/msg/Float32MultiArray      Used to publish roll, pitch, yaw gyroscope data
+        Description:
+            Realsense Camera Node for handling a Single D455 Intel Realsense Camera.
+            This node collects video and depth, as well as IMU acceleration and 
+            gyroscope frames. It publishes to it's respective topics
+            at a fixed frequency (i.e. 30FPS at 33 ms). A new frequency can be set
+            by passing the desired period to the CameraNode.init_timer() method.
+            
+
+
+            Publishes four topics:
+                Name                        Type                            Oneline-Description
+            rs_node/compressed_video    sensor_msgs/msg/CompressedImage     Used to publish RGB uint8 video feed
+            rs_node/depth_video         sensor_msgs/msg/Image               Used to publish depth camera footage
+            rs_node/accel_data          std_msgs/msg/Float32MultiArray      Used to publish x,y,z acceleration data
+            rs_node/gyro_data           std_msgs/msg/Float32MultiArray      Used to publish roll, pitch, yaw gyroscope data
 """
 
-# Import Dependencies
+### Import Dependencies
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from sensor_msgs.msg import Image
@@ -33,25 +36,25 @@ class CameraNode( Node ):
     # Initiallize Node
     def __init__(self, poll_period_sec: float=0.250) -> None:
         
-        # Initiallize Camera Node 
+        ## Initiallize Camera Node 
         super().__init__("camera_node")
         self.get_logger().info("[ Camera.INIT ] Initiallized")
 
-        # Initiallize Camera
+        ## Initiallize Camera
         self.init_camera()
 
-        # Initiallize Publisher
+        ## Initiallize Publisher
         self.init_node_publisher(
-            rgb_topic_name="rs_node/compressed_video",
-            depth_topic_name="rs_node/depth_video",
+            rgb_topic_name="rs_node/compressed_video",      # Consider changing to rs_node/camera/rgb_video
+            depth_topic_name="rs_node/depth_video",         # Consider changing to rs_node/camera/depth_video
             imu_accel_topic_name="rs_node/imu/accel_info",
             imu_gyro_topic_name="rs_node/imu/gyro_info"
         )
 
-        # Initiallize AprilTag Detector
+        ## Initiallize AprilTag Detector
         self.init_detector()
 
-        # Initialize Timer
+        ## Initialize Timer
         self.timer_counter = 0
         self.init_timer(period=poll_period_sec)
         return
@@ -60,8 +63,9 @@ class CameraNode( Node ):
     # Destructor
     def __del__(self) -> None:
         self.get_logger().info("[ Camera.DEL ] Destroying Camera Node")
-        if self.pipeline: self.pipeline.stop()
 
+        ## Stop Pipeline
+        if self.pipeline: self.pipeline.stop()
         return
 
     ### CameraNode: CALLBACK FUNCTIONS  ###
@@ -71,21 +75,20 @@ class CameraNode( Node ):
     def callback_timer(self) -> None:
         self.timer_counter += 1
 
-        # Collect Frames + Error Handling
+        ## Collect Frames + Error Handling
         try:
             frames = self.pipeline.wait_for_frames()
         except Exception as e:
             self.get_logger().error(f"[ Camera.CALLBACK_TIMER ] Error: {e}")
             return
-        
         video_frame = frames.get_color_frame()
         depth_frame = frames.get_depth_frame()
 
-        # If Empty, Return
+        ## If Empty, Return
         if not video_frame: return
         if not depth_frame: return
 
-        # Collect Data
+        ## Collect Data
         image = video_frame.as_frame().get_data()
         np_image = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2RGB)
 
@@ -129,19 +132,19 @@ class CameraNode( Node ):
         #   is published correctly          #
         #####################################
 
-        # Pack and Publish Accelerometer Data 
+        ## Pack and Publish Accelerometer Data 
         data = Float32MultiArray()
         data.data = [accl_data.x, accl_data.y, accl_data.z]
         self.pub_accel.publish(msg=data)
 
-        # Pack and Publish Gyroscope Data
+        ## Pack and Publish Gyroscope Data
         data = Float32MultiArray()
         data.data = [gyro_data.x, gyro_data.y, gyro_data.z]
         self.pub_gyro.publish(msg=data)
         #####################################
 
 
-        # Collect AprilTag Location
+        ## Collect AprilTag Location
         np_grayscale = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2GRAY )
         result = self.detector.detect(np_grayscale)
         if len(result) == 0:
@@ -169,26 +172,26 @@ class CameraNode( Node ):
                 cv.putText(np_image, f"{distance_center:0.3f}", (center_x - 20, center_y - 20), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 128, 40), 2)
                 # self.get_logger().warn(f"Distance: {distance_center}")
 
-        # Generate Message
+        ## Generate Message
         rgb_msg = CompressedImage()
         depth_msg = Image()
 
-        # Populate RGB Message
+        ## Populate RGB Message
         rgb_msg.header.stamp = self.get_clock().now().to_msg()
         rgb_msg.format = "jpeg"
 
-        # Populate Depth Message
+        ## Populate Depth Message
         depth_msg.header.stamp = self.get_clock().now().to_msg()
         depth_msg.encoding = "16UC1"
 
-        # Pack Image Data
+        ## Pack Image Data
         rgb_msg.data = cv.imencode( ".jpg", np_image )[1].tobytes() # ChatGPT Suggested Fix
 
-        # Send Messages
+        ## Send Messages
         self.pub_rgb.publish(msg=rgb_msg)
         self.pub_depth.publish(msg=depth_msg)
 
-        # Frames Collected
+        ## Frames Collected
         return
 
     ### CameraNode: Initiallizers       ###
@@ -197,6 +200,8 @@ class CameraNode( Node ):
     # Initiallize AprilTag Detector
     def init_detector(self) -> None:
         self.get_logger().info("[ CameraNode.init_detector ] Initiallizing Detector")
+        
+        ## Initiallize the AprilTag detector object
         self.detector = apriltag.Detector()
         self.get_logger().info("[ CameraNode.init_detector ] Detector Initiallized")
         return
@@ -206,6 +211,13 @@ class CameraNode( Node ):
     def init_timer(self, period: float) -> None:
         self.get_logger().info(f"[ Camera.INIT_TIMER ] Starting Timer, Period={period}")
         
+        ## Initiallize the Timer Object
+        #   - Period set by period parameter
+        #       - Determines Frame Rate: 
+        #               24FPS == 0.042
+        #               30FPS == 0.033
+        #               60FPS == 0.017
+        #   - Callback set to self.callback_timer method
         self.timer = self.create_timer(
             timer_period_sec=period,
             callback=self.callback_timer
@@ -219,17 +231,17 @@ class CameraNode( Node ):
         self.get_logger().info("[ Camera.INIT_CAMERA ] Starting Camera")
         self.get_logger().info("[ Camera.INIT_CAMERA ] Starting IMU")
 
-        # Initiallize Camera Pipeline
+        ## Initiallize Camera Pipeline
         self.pipeline = rs.pipeline()
         config = rs.config()
 
-        # Select, Configure, and Enable Streams in Pipeline configuration
+        ## Select, Configure, and Enable Streams in Pipeline configuration
         config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 30)
         config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16,  30)
         config.enable_stream(rs.stream.accel)
         config.enable_stream(rs.stream.gyro)
 
-        # Send Configuration to Pipeline
+        ## Send Configuration to Pipeline
         self.pipeline.start( config )
         self.get_logger().info("[ Camera.INIT_CAMERA ] Camera Initiallized")
         self.get_logger().info("[ Camera.INIT_CAMERA ] IMU Initiallized")
@@ -292,12 +304,12 @@ class CameraNode( Node ):
     # Print Corners on AprilTag
     def overlay_tag_corners(self, np_image, tag):
         
-        # Determine of the tag passed is REALLY a tag:
+        ## Determine of the tag passed is REALLY a tag:
         #   If NONE, then passed tag does not exist 
         if tag == None or np_image.size == 0:
             return np.zeros(1)
 
-        # Tag is real, what do we do now?
+        ## Tag is real, what do we do now?
         else:
             # Collect Corners
             corners = tuple(map(list, tag.corners))
@@ -312,12 +324,12 @@ class CameraNode( Node ):
     ##########
     # Print Center on AprilTag
     def overlay_tag_center(self, np_image, tag):
-        # Determine of the tag passed is REALLY a tag:
+        ## Determine of the tag passed is REALLY a tag:
         #   If NONE, then passed tag does not exist 
         if tag == None or np_image.size == 0:
             return np.zeros(1)
 
-        # Tag is real, what do we do now?
+        ## Tag is real, what do we do now?
         else:
             # Collect Center
             center_X, center_Y = tuple(map(int, tag.center))
