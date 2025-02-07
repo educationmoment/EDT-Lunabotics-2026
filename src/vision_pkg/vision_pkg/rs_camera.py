@@ -115,6 +115,8 @@ class CameraNode( Node ):
 
         #####################################
         # TODO: IMU -- Publish Accel/Gyro   #
+        #   Requires testing to ensure data #
+        #   is published correctly          #
         #####################################
 
         # Pack and Publish Accelerometer Data 

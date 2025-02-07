@@ -1,1 +1,10 @@
-# EDT-Lunabotics-2025
+<h1>EDT-Lunabotics-2025</h1>
+<hr>
+<h2>Packages</h2>
+    <ul>
+        <li>aegis_bringup</li>
+        <li>controller_pkg</li>
+        <li>vision_pkg</li>
+        <li>webgui_pkg</li>
+    </ul>
+<h2>Installation</h2>
