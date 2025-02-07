@@ -91,7 +91,6 @@ class CameraNode( Node ):
 
             # Collect Corner and Center Locations
             center = tuple(map(int, result[0].center))
-            corner = tuple(map(list,result[0].corners))
 
             cv.putText(np_image, "",center, cv.FONT_HERSHEY_SIMPLEX, 1, (50, 255, 40), 4)
             
@@ -99,9 +98,8 @@ class CameraNode( Node ):
             center_x, center_y = center
 
             # Draw Corners and Center onto image 
-            for i in range(4):
-                cv.circle(np_image, (int(corner[i][0]), int(corner[i][1]) ), 10, (255, 0, 0), 10)
-            cv.circle(np_image, (center_x, center_y), 5, (255, 0, 255), 4)
+            np_image = self.overlay_tag_corners(np_image, result[0])
+            np_image = self.overlay_tag_center(np_image,  result[0])
             
             # Get Distance to Center
             # ISSUE: The grayscale image used to detect the april tag appears to have a different resolution
@@ -124,6 +122,8 @@ class CameraNode( Node ):
         # Populate Depth Message
         depth_msg.header.stamp = self.get_clock().now().to_msg()
         depth_msg.encoding = "16UC1"
+
+
         # depth_msg.height = depth_frame.shape[0]
         # depth_msg.width  = depth_frame.shape[1]
 
@@ -189,6 +189,45 @@ class CameraNode( Node ):
         )
         self.get_logger().info(f"[ Camera.INIT_COMP_PUBLISHER ] Depth publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
         return
+
+    # Print Corners on AprilTag
+    def overlay_tag_corners(self, np_image, tag):
+        
+        # Determine of the tag passed is REALLY a tag:
+        #   If NONE, then passed tag does not exist 
+        if tag == None or np_image.size == 0:
+            return np.zeros(1)
+
+        # Tag is real, what do we do now?
+        else:
+            # Collect Corners
+            corners = tuple(map(list, tag.corners))
+
+            # Print Corners to Image
+            for i in range(4):
+                cv.circle(np_image, ( int(corners[i][0]), int(corners[i][1]) ), 10, (255, 0, 0), 10)
+            
+            # Return Image (Find out if it is possible to modify by reference)
+            return np_image
+
+    # Print Center on AprilTag
+    def overlay_tag_center(self, np_image, tag):
+        # Determine of the tag passed is REALLY a tag:
+        #   If NONE, then passed tag does not exist 
+        if tag == None or np_image.size == 0:
+            return np.zeros(1)
+
+        # Tag is real, what do we do now?
+        else:
+            # Collect Center
+            center_X, center_Y = tuple(map(int, tag.center))
+
+            # Print Center to Image
+            cv.circle(np_image, (center_X, center_Y), 5, (255, 0, 255), 5)
+
+            # Return Image (Find out if it is possible to modify by reference)
+            return np_image        
+
 
 
 # Main Function
