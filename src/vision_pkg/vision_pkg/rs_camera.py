@@ -14,15 +14,21 @@
                 Name                        Type                            Oneline-Description
             rs_node/compressed_video    sensor_msgs/msg/CompressedImage     Used to publish RGB uint8 video feed
             rs_node/depth_video         sensor_msgs/msg/Image               Used to publish depth camera footage
-            rs_node/accel_data          std_msgs/msg/Float32MultiArray      Used to publish x,y,z acceleration data
-            rs_node/gyro_data           std_msgs/msg/Float32MultiArray      Used to publish roll, pitch, yaw gyroscope data
+            rs_node/imu/accel_data      std_msgs/msg/Float32MultiArray      Used to publish x,y,z acceleration data
+            rs_node/imu/gyro_data       std_msgs/msg/Float32MultiArray      Used to publish roll, pitch, yaw gyroscope data
 """
 
 ### Import Dependencies
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from sensor_msgs.msg import Image
-from example_interfaces.msg import Float32MultiArray
+
+########################################
+# TODO: Replace w/ interface type geometry_msgs/msg/AccelStamped
+# from example_interfaces.msg import Float32MultiArray
+from geometry_msgs.msg import AccelStamped
+########################################
+
 import numpy as np
 import rclpy
 import pyrealsense2 as rs
@@ -45,8 +51,9 @@ class CameraNode( Node ):
 
         ## Initiallize Publisher
         self.init_node_publisher(
-            rgb_topic_name="rs_node/compressed_video",      # Consider changing to rs_node/camera/rgb_video
-            depth_topic_name="rs_node/depth_video",         # Consider changing to rs_node/camera/depth_video
+            rgb_topic_name="rs_node/camera/compressed_video",      # Consider changing to rs_node/camera/rgb_video
+            depth_topic_name="rs_node/camera/depth_video",         # Consider changing to rs_node/camera/depth_video
+            imu_topic_name="rs_node/imu",
             imu_accel_topic_name="rs_node/imu/accel_info",
             imu_gyro_topic_name="rs_node/imu/gyro_info"
         )
@@ -56,6 +63,7 @@ class CameraNode( Node ):
 
         ## Initialize Timer
         self.timer_counter = 0
+        self.start_time = self.get_clock().now()
         self.init_timer(period=poll_period_sec)
         return
 
@@ -103,48 +111,55 @@ class CameraNode( Node ):
         gyro_frame = frames.first_or_default(rs.stream.gyro)
         accl_frame = frames.first_or_default(rs.stream.accel)
 
-        if gyro_frame.is_motion_frame() : self.get_logger().warn("[ CALLBACK ] Collected Gyro Frame")
-        if accl_frame.is_motion_frame(): self.get_logger().warn("[ CALLBACK ] Collected Accel Frame")
+        # if gyro_frame.is_motion_frame() : self.get_logger().warn("[ CALLBACK ] Collected Gyro Frame")
+        # if accl_frame.is_motion_frame(): self.get_logger().warn("[ CALLBACK ] Collected Accel Frame")
 
                 
         accl_data = accl_frame.as_motion_frame().get_motion_data()
         gyro_data = gyro_frame.as_motion_frame().get_motion_data()
-        self.get_logger().info(f"""
-            Accel Frame:
-                X: {accl_data.x}
-                Y: {accl_data.y}
-                Z: {accl_data.z}
-            ------------------------
-        """)
-        self.get_logger().info(f"""
-            Gyro Frame:
-                X: {gyro_data.x}
-                Y: {gyro_data.y}
-                Z: {gyro_data.z}
-            ------------------------
-        """)
+        # self.get_logger().info(f"""
+        #     Accel Frame:
+        #         X: {accl_data.x}
+        #         Y: {accl_data.y}
+        #         Z: {accl_data.z}
+        #     ------------------------
+        # """)
+        # self.get_logger().info(f"""
+        #     Gyro Frame:
+        #         X: {gyro_data.x}
+        #         Y: {gyro_data.y}
+        #         Z: {gyro_data.z}
+        #     ------------------------
+        # """)
 
         #####################################
 
         #####################################
-        # TODO: IMU -- Publish Accel/Gyro   #
+        # DONE: IMU -- Publish Accel/Gyro   #
         #   Requires testing to ensure data #
         #   is published correctly          #
         #####################################
 
-        ## Pack and Publish Accelerometer Data 
-        data = Float32MultiArray()
-        data.data = [accl_data.x, accl_data.y, accl_data.z]
-        self.pub_accel.publish(msg=data)
+        ### Pack and Publish IMU Data
+        ######################################
+        data = AccelStamped()
+        data.header.stamp.nanosec = self.get_clock().now().seconds_nanoseconds()[0]
+        data.header.frame_id = ""
 
-        ## Pack and Publish Gyroscope Data
-        data = Float32MultiArray()
-        data.data = [gyro_data.x, gyro_data.y, gyro_data.z]
-        self.pub_gyro.publish(msg=data)
-        #####################################
+        data.accel.linear.x = accl_data.x
+        data.accel.linear.y = accl_data.y
+        data.accel.linear.z = accl_data.z
+        
+        data.accel.angular.x = gyro_data.x
+        data.accel.angular.y = gyro_data.y
+        data.accel.angular.z = gyro_data.z
+
+        self.pub_imu.publish(msg=data)
+        ######################################
 
 
         ## Collect AprilTag Location
+        ######################################
         np_grayscale = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2GRAY )
         result = self.detector.detect(np_grayscale)
         if len(result) == 0:
@@ -170,28 +185,39 @@ class CameraNode( Node ):
             if ( 0 <= center_x and center_x < depth_frame.get_width() ) and (0 <= center_y and center_y < depth_frame.get_height()):
                 distance_center = depth_frame.get_distance( int(center_x), int(center_y) )
                 cv.putText(np_image, f"{distance_center:0.3f}", (center_x - 20, center_y - 20), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 128, 40), 2)
-                # self.get_logger().warn(f"Distance: {distance_center}")
+        ######################################
 
         ## Generate Message
+        ######################################
         rgb_msg = CompressedImage()
         depth_msg = Image()
+        ######################################
 
         ## Populate RGB Message
+        ######################################
         rgb_msg.header.stamp = self.get_clock().now().to_msg()
         rgb_msg.format = "jpeg"
+        ######################################
+
 
         ## Populate Depth Message
+        ######################################
         depth_msg.header.stamp = self.get_clock().now().to_msg()
         depth_msg.encoding = "16UC1"
+        ######################################
+
 
         ## Pack Image Data
+        ######################################
         rgb_msg.data = cv.imencode( ".jpg", np_image )[1].tobytes() # ChatGPT Suggested Fix
+        ######################################
 
         ## Send Messages
+        ######################################
         self.pub_rgb.publish(msg=rgb_msg)
         self.pub_depth.publish(msg=depth_msg)
+        ######################################
 
-        ## Frames Collected
         return
 
     ### CameraNode: Initiallizers       ###
@@ -249,11 +275,7 @@ class CameraNode( Node ):
 
     ##########
     # Initiallize Compressed Image Publisher
-    def init_node_publisher(self, rgb_topic_name: str, depth_topic_name: str, imu_accel_topic_name: str, imu_gyro_topic_name: str) -> None:
-        # self.get_logger().info("[ Camera.init_node_publisher ] Starting Compressed Image Publisher")
-        # self.get_logger().info(f"[ Camera.init_node_publisher ] RGB publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
-        # self.get_logger().info(f"[ Camera.init_node_publisher ] Depth publisher On \033[31m/{rgb_topic_name}\033[0m Initiallized")
-        
+    def init_node_publisher(self, rgb_topic_name: str, depth_topic_name: str, imu_topic_name: str, imu_accel_topic_name: str="", imu_gyro_topic_name: str="") -> None:
         ##########
         # Initiallize the RGB Camera Publisher
         #       Type == Compressed Image
@@ -264,7 +286,6 @@ class CameraNode( Node ):
             topic = rgb_topic_name,
             qos_profile = 3
         )
-        
 
         ##########
         # Initiallize the Depth Camera Publisher
@@ -277,26 +298,39 @@ class CameraNode( Node ):
             qos_profile = 3
         )
 
+        # DEPRECATED
         ##########
         # Initiallize the IMU Accelerometer Publisher
         #       Type == 32-bit Float Array
         #       Topic == Specified in Function Call
         #       Quality of Service == 5 frames
-        self.pub_accel = self.create_publisher(
-            msg_type    = Float32MultiArray,
-            topic       = imu_accel_topic_name,
-            qos_profile = 5    
-        )
+        # self.pub_accel = self.create_publisher(
+            # msg_type    = Float32MultiArray,
+            # topic       = imu_accel_topic_name,
+            # qos_profile = 5    
+        # )
 
+        # DEPRECATED
         ##########
         # Initiallize the IMU Gyroscope Publisher
         #       Type == 32-bit Float Array
         #       Topic == Specified in Function Call
         #       Quality of Service == 5 frames
-        self.pub_gyro = self.create_publisher(
-            msg_type    = Float32MultiArray,
-            topic       = imu_gyro_topic_name,
-            qos_profile = 5
+        # self.pub_gyro = self.create_publisher(
+            # msg_type    = Float32MultiArray,
+            # topic       = imu_gyro_topic_name,
+            # qos_profile = 5
+        # )
+
+        ##########
+        # Initiallize the Generallized IMU Publisher
+        #       Type == Acceleration Frame w/ Time Stamp
+        #       Topic == Specified in Function Call
+        #       Quality of Service == 5 frames
+        self.pub_imu = self.create_publisher(
+            msg_type    = AccelStamped,
+            topic       = imu_topic_name,
+            qos_profile= 5
         )
         return
 
