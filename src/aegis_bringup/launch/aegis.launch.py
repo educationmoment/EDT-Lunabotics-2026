@@ -24,6 +24,12 @@ def generate_launch_description() -> LaunchDescription:
         executable="rs_camera"
     )
 
+    # Add Localization Node
+    localization_module = Node(
+        package="localization_pkg",
+        executable="localization_node"
+    )
+
     # Add Hardware Controller
     hardware_controller_module = Node(
         package="controller_pkg",
@@ -49,6 +55,7 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(web_user_interface)
     ld.add_action(rs_camera_module)
     ld.add_action(hardware_controller_module)
+    ld.add_action(localization_module)
     return ld
 
 

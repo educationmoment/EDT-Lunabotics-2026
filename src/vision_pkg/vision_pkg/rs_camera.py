@@ -163,7 +163,8 @@ class CameraNode( Node ):
         np_grayscale = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2GRAY )
         result = self.detector.detect(np_grayscale)
         if len(result) == 0:
-            self.get_logger().warn("[ CameraNode.timer ] No tag detected")
+            # self.get_logger().warn("[ CameraNode.timer ] No tag detected")
+            pass
         else:
             self.get_logger().info(f"[ CameraNode.timer ]Tag ID: {result[0].tag_id}")
 
@@ -330,7 +331,7 @@ class CameraNode( Node ):
         self.pub_imu = self.create_publisher(
             msg_type    = AccelStamped,
             topic       = imu_topic_name,
-            qos_profile= 5
+            qos_profile = 2
         )
         return
 
