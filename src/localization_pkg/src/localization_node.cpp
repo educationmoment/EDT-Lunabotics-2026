@@ -1,9 +1,14 @@
 #include    "rclcpp/rclcpp.hpp"
-// #include    "std_msgs/msg/Float32MultiArray"
 #include    "geometry_msgs/msg/accel_stamped.hpp"
+
+// Debug
+#include    "geometry_msgs/msg/accel.hpp"
+#include    "std_msgs/msg/string.hpp"
+
 #include    "rclcpp/time.hpp"
 #include    <iostream>
 #include    <memory>
+#include    <cmath>
 
 
 // typedef unsigned long time_t;    // Size of time_t: 64 bis (8-Bytes)
@@ -20,6 +25,16 @@ public:
         RCLCPP_WARN( this->get_logger(), "\tFLOAT: %lu", sizeof(float));
         RCLCPP_WARN( this->get_logger(), "\tDOUBLE: %lu", sizeof(double));
 
+
+        // Debug
+        this->debug_stream  = this->create_publisher<std_msgs::msg::String>(
+            "debug_stream", 10
+        );
+        this->debug_state   = this->create_publisher<geometry_msgs::msg::Accel>(
+            "debug_state", 10
+        );
+
+
         // Create Subscriber to IMU Data
         //////////////////////////////////////
         this->imu_subscription = this->create_subscription<geometry_msgs::msg::AccelStamped>(
@@ -28,6 +43,11 @@ public:
             std::bind(&LocalizationNode::imu_callback, this, std::placeholders::_1)
         );
         RCLCPP_INFO( this->get_logger(), "Initiallized Subscription to IMU");
+
+        this->timer = this->create_wall_timer(
+            std::chrono::milliseconds(250),
+            std::bind(&LocalizationNode::timer_callback, this)
+        );
         //////////////////////////////////////
         return;
     }
@@ -37,6 +57,9 @@ private:
     ////////////////////
     rclcpp::Subscription<geometry_msgs::msg::AccelStamped>::SharedPtr imu_subscription;
 
+    // Debug Stream
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr debug_stream;
+    rclcpp::Publisher<geometry_msgs::msg::Accel>::SharedPtr debug_state;
 
     // Structure to hold acceleration and gyroscope data 
     ////////////////////
@@ -55,8 +78,10 @@ private:
         struct {
             double x, y, z;
         } linear_disp, angular_disp;
-        time_t time_stamp;
+        time_t time_stamp;  // Possible Redundant (I think it is unused)
     } state, past_state;
+
+    rclcpp::TimerBase::SharedPtr timer;
 
     // Static Variable to hold old timestamp
     ////////////////////
@@ -66,12 +91,12 @@ private:
     ////////////////////////////////////////
     void imu_callback( const geometry_msgs::msg::AccelStamped::SharedPtr msg ) {
         rclcpp::Time current_time = msg->header.stamp;
-        double dt = (current_time - old_time).seconds();
-
+        
         if ( ! old_time.nanoseconds() ) {
             old_time = current_time;
             return;
         } 
+        double dt = (current_time - old_time).seconds();
         
         // Calculate Linear Velocity
         trapezoidal_rule( this->state.linear_vel.x, this->past_state.linear_accel.x, msg->accel.linear.x, dt );
@@ -93,18 +118,43 @@ private:
         return;
     }
     
-
     // Trapezoidal Method
     ////////////////////
     void trapezoidal_rule( double& stream, double  val_a, double val_b, double dt) {
-        if( dt <= 0.0 ) { return; }
+        static unsigned int debug_count = 0;
 
-        // RCLCPP_INFO( this->get_logger(), "\033[104mVal A: \t%0.3lf\033[0m", val_a );
-        // RCLCPP_INFO( this->get_logger(), "\033[104mVal B: \t%0.3lf\033[0m", val_b );
-        // RCLCPP_INFO( this->get_logger(), "\033[104mDel T: \t%u\033[0m", dt );
-        // RCLCPP_INFO( this->get_logger(), "\033[106mVal A: \t%0.3lf\033[0m", 0.5 * ( val_a + val_b) * static_cast<double>(dt) / 1E9 );
+        RCLCPP_INFO(this->get_logger(), "Count: %u", debug_count++);
+        if( dt <= 0.0 || dt >= 1.0 ) { return; }
 
+        RCLCPP_WARN( this->get_logger(), "Integrating -- DT == %0.3lf", dt);
         stream += 0.5 * (val_b + val_a) * dt;
+        return;
+    }
+
+    // Timer Callback
+    ////////////////////
+    void timer_callback() {
+        // RCLCPP_INFO( this->get_logger(), "Timer Tick");
+        // RCLCPP_INFO( this->get_logger(), "Velocity X\t|\tVelocity Y\t|\tVelocity Z");
+        // RCLCPP_INFO( this->get_logger(), "X Accel: %0.3lf", state.linear_accel.x);
+        // RCLCPP_INFO( this->get_logger(), "X Veloc: %0.3lf", state.linear_vel.x);
+        // RCLCPP_INFO( this->get_logger(), "%0.3lf\t\t|\t%0.3lf\t\t|\t%0.3lf", state.linear_vel.x, state.linear_vel.y, state.linear_vel.z);
+        // RCLCPP_INFO( this->get_logger(), "%0.3lf\t\t|\t%0.3lf\t\t|\t%0.3lf", state.angular_vel.x, state.angular_vel.y, state.angular_vel.z);
+        // std_msgs::msg::String msg;
+        geometry_msgs::msg::Accel msg;
+        msg.linear.x = this->state.linear_vel.x;
+        msg.linear.y = this->state.linear_vel.y;
+        msg.linear.z = this->state.linear_vel.z;
+        msg.angular.x = this->state.angular_vel.x;
+        msg.angular.y = this->state.angular_vel.y;
+        msg.angular.z = this->state.angular_vel.z;
+
+        // msg.data = "Hello World!";
+
+        this->debug_state->publish(msg);
+
+        
+        // RCLCPP_INFO( this->get_logger(), "Speed: %0.2f", std::sqrt( state.linear_vel.x * state.linear_vel.x + state.linear_vel.y * state.linear_vel.y + state.linear_vel.z * state.linear_vel.z ));
         return;
     }
 

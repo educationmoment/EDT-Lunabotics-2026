@@ -143,7 +143,8 @@ class CameraNode( Node ):
         ### Pack and Publish IMU Data
         ######################################
         data = AccelStamped()
-        data.header.stamp.nanosec = self.get_clock().now().seconds_nanoseconds()[0]
+        data.header.stamp.nanosec = self.get_clock().now().seconds_nanoseconds()[1]
+        data.header.stamp.sec = self.get_clock().now().seconds_nanoseconds()[0]
         data.header.frame_id = ""
 
         data.accel.linear.x = accl_data.x
@@ -380,7 +381,7 @@ class CameraNode( Node ):
 # Main Function
 def main() -> int:
     rclpy.init()
-    node = CameraNode(0.017)        
+    node = CameraNode(poll_period_sec=0.0166666666667)        
     try:
         rclpy.spin(node=node)
         rclpy.shutdown()
