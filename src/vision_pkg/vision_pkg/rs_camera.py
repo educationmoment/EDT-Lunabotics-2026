@@ -332,7 +332,7 @@ class CameraNode( Node ):
         self.pub_imu = self.create_publisher(
             msg_type    = AccelStamped,
             topic       = imu_topic_name,
-            qos_profile = 2
+            qos_profile = 10
         )
         return
 
