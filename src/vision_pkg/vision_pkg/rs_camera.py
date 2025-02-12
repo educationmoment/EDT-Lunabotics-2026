@@ -381,7 +381,8 @@ class CameraNode( Node ):
 # Main Function
 def main() -> int:
     rclpy.init()
-    node = CameraNode(poll_period_sec=0.0166666666667)        
+    node = CameraNode(poll_period_sec=0.0166666666667)
+            
     try:
         rclpy.spin(node=node)
         rclpy.shutdown()
