@@ -30,7 +30,6 @@ from geometry_msgs.msg import AccelStamped
 
 # TODO: Implement IMU interface to connect to Madgwick Filter Node 
 from sensor_msgs.msg import Imu
-from sensor_msgs.msg import MagneticField
 ########################################
 
 import numpy as np
@@ -83,13 +82,13 @@ class CameraNode( Node ):
         return
 
     ### CameraNode: CALLBACK FUNCTIONS  ###
-
     ##########
     # Timer Callback Function
     def callback_timer(self) -> None:
         self.timer_counter += 1
 
         ## Collect Frames + Error Handling
+        ######################################
         try:
             frames = self.pipeline.wait_for_frames()
         except Exception as e:
@@ -97,14 +96,22 @@ class CameraNode( Node ):
             return
         video_frame = frames.get_color_frame()
         depth_frame = frames.get_depth_frame()
+        ######################################
+
 
         ## If Empty, Return
+        ######################################
         if not video_frame: return
         if not depth_frame: return
+        ######################################
+
 
         ## Collect Data
+        ######################################
         image = video_frame.as_frame().get_data()
         np_image = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2RGB)
+        ######################################
+
 
         #####################################
         # DONE: Implement Depth Frame      #
@@ -114,31 +121,14 @@ class CameraNode( Node ):
         #####################################
         # DONE: IMU -- Needs documentation  #
         #####################################
+
+        ######################################
         gyro_frame = frames.first_or_default(rs.stream.gyro)
         accl_frame = frames.first_or_default(rs.stream.accel)
 
-        # if gyro_frame.is_motion_frame() : self.get_logger().warn("[ CALLBACK ] Collected Gyro Frame")
-        # if accl_frame.is_motion_frame(): self.get_logger().warn("[ CALLBACK ] Collected Accel Frame")
-
-                
         accl_data = accl_frame.as_motion_frame().get_motion_data()
         gyro_data = gyro_frame.as_motion_frame().get_motion_data()
-        # self.get_logger().info(f"""
-        #     Accel Frame:
-        #         X: {accl_data.x}
-        #         Y: {accl_data.y}
-        #         Z: {accl_data.z}
-        #     ------------------------
-        # """)
-        # self.get_logger().info(f"""
-        #     Gyro Frame:
-        #         X: {gyro_data.x}
-        #         Y: {gyro_data.y}
-        #         Z: {gyro_data.z}
-        #     ------------------------
-        # """)
-
-        #####################################
+        ######################################
 
         #####################################
         # DONE: IMU -- Publish Accel/Gyro   #
@@ -146,25 +136,8 @@ class CameraNode( Node ):
         #   is published correctly          #
         #####################################
 
-        # DEPRECATED (Change to Imu interface type)
-        ### Pack and Publish IMU Data
+        ## Send IMU data over Imu interface to Madgwick's Filter node
         ######################################
-        # data = AccelStamped()
-        # data.header.stamp.nanosec = self.get_clock().now().seconds_nanoseconds()[1]
-        # data.header.stamp.sec = self.get_clock().now().seconds_nanoseconds()[0]
-        # data.header.frame_id = ""
-        # 
-        # data.accel.linear.x = accl_data.x
-        # data.accel.linear.y = accl_data.y
-        # data.accel.linear.z = accl_data.z
-        # 
-        # data.accel.angular.x = gyro_data.x
-        # data.accel.angular.y = gyro_data.y
-        # data.accel.angular.z = gyro_data.z
-        # 
-        # self.pub_imu.publish(msg=data)
-        ######################################
-
         (seconds, nano_seconds) = self.get_clock().now().seconds_nanoseconds()
         data = Imu()
         data.header.stamp.nanosec   = nano_seconds
@@ -181,12 +154,8 @@ class CameraNode( Node ):
         data.linear_acceleration.z  = accl_data.z
         data.linear_acceleration_covariance[0] = -1
         self.pub_imu.publish(msg=data)
+        ######################################
 
-        data = MagneticField()
-        data.header.stamp.nanosec   = nano_seconds
-        data.header.stamp.sec       = seconds
-        data.header.frame_id        = f"{self.timer_counter}"
-        self.pub_imu_mag.publish(msg=data)
 
         ## Collect AprilTag Location
         ######################################
@@ -248,8 +217,7 @@ class CameraNode( Node ):
         self.pub_rgb.publish(msg=rgb_msg)
         self.pub_depth.publish(msg=depth_msg)
         ######################################
-
-        return
+        return None
 
     ### CameraNode: Initiallizers       ###
 
@@ -261,7 +229,7 @@ class CameraNode( Node ):
         ## Initiallize the AprilTag detector object
         self.detector = apriltag.Detector()
         self.get_logger().info("[ CameraNode.init_detector ] Detector Initiallized")
-        return
+        return None
 
     ##########
     # Initiallize Timer
@@ -280,7 +248,7 @@ class CameraNode( Node ):
             callback=self.callback_timer
         )
         self.get_logger().info("[ Camera.INIT_TIMER ] Timer Initiallized")
-        return
+        return None
 
     ##########
     # Initiallize Camera Pipeline
@@ -289,20 +257,28 @@ class CameraNode( Node ):
         self.get_logger().info("[ Camera.INIT_CAMERA ] Starting IMU")
 
         ## Initiallize Camera Pipeline
+        ######################################
         self.pipeline = rs.pipeline()
         config = rs.config()
+        ######################################
+
 
         ## Select, Configure, and Enable Streams in Pipeline configuration
+        ######################################
         config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 30)
         config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16,  30)
         config.enable_stream(rs.stream.accel)
         config.enable_stream(rs.stream.gyro)
+        ######################################
 
         ## Send Configuration to Pipeline
+        ######################################
         self.pipeline.start( config )
         self.get_logger().info("[ Camera.INIT_CAMERA ] Camera Initiallized")
         self.get_logger().info("[ Camera.INIT_CAMERA ] IMU Initiallized")
-        return
+        ######################################
+        
+        return None
 
     ##########
     # Initiallize Compressed Image Publisher
@@ -312,6 +288,7 @@ class CameraNode( Node ):
         #       Type == Compressed Image
         #       Topic == Specified in Function Call
         #       Quality of Service == 3 frames
+        ######################################
         self.pub_rgb = self.create_publisher(
             msg_type = CompressedImage,
             topic = rgb_topic_name,
@@ -323,110 +300,84 @@ class CameraNode( Node ):
         #       Type == Normal Image
         #       Topic == Specified in Function Call
         #       Quality of Service == 3 frames
+        ######################################
         self.pub_depth = self.create_publisher(
             msg_type = Image,
             topic = depth_topic_name,
             qos_profile = 3
         )
 
-        # DEPRECATED
-        ##########
-        # Initiallize the IMU Accelerometer Publisher
-        #       Type == 32-bit Float Array
-        #       Topic == Specified in Function Call
-        #       Quality of Service == 5 frames
-        # self.pub_accel = self.create_publisher(
-            # msg_type    = Float32MultiArray,
-            # topic       = imu_accel_topic_name,
-            # qos_profile = 5    
-        # )
-
-        # DEPRECATED
-        ##########
-        # Initiallize the IMU Gyroscope Publisher
-        #       Type == 32-bit Float Array
-        #       Topic == Specified in Function Call
-        #       Quality of Service == 5 frames
-        # self.pub_gyro = self.create_publisher(
-            # msg_type    = Float32MultiArray,
-            # topic       = imu_gyro_topic_name,
-            # qos_profile = 5
-        # )
-
-        # DEPRECATED
-        ##########
-        # Initiallize the Generallized IMU Publisher
-        #       Type == Acceleration Frame w/ Time Stamp
-        #       Topic == Specified in Function Call
-        #       Quality of Service == 5 frames
-        # self.pub_imu = self.create_publisher(
-        #     msg_type    = AccelStamped,
-        #     topic       = imu_topic_name,
-        #     qos_profile = 10
-        # )
-
         ##########
         # Initiallize IMU Publisher
         #       Type == sensor_msgs/msg/Imu
         #       Topic == imu_topic_name
         #       Quality of Service == 5 frames
+        ######################################
         self.pub_imu = self.create_publisher(
             msg_type    = Imu,
             topic       = imu_topic_name,
             qos_profile = 5
         )
-
-        ##########
-        # Initiallize IMU/Mag Publisher
-        #       Type == sensor_msgs/msg/MagneticField
-        #       Topic == Hard Coded
-        #       Quality of Service == 5 frames
-        self.pub_imu_mag = self.create_publisher(
-            msg_type    = MagneticField,
-            topic       = "imu/mag",
-            qos_profile = 5
-        )
-        return
+        return None
 
     ##########
     # Print Corners on AprilTag
-    def overlay_tag_corners(self, np_image, tag):
+    def overlay_tag_corners(self, np_image, tag) -> np.array:
         
-        ## Determine of the tag passed is REALLY a tag:
-        #   If NONE, then passed tag does not exist 
-        if tag == None or np_image.size == 0:
-            return np.zeros(1)
+        try:
+            ## Determine of the tag passed is REALLY a tag:
+            #   If NONE, then passed tag does not exist 
+            ######################################
+            if tag == None or np_image.size == 0:
+                return np.zeros(1)
+            ######################################
 
-        ## Tag is real, what do we do now?
-        else:
-            # Collect Corners
-            corners = tuple(map(list, tag.corners))
 
-            # Print Corners to Image
-            for i in range(4):
-                cv.circle(np_image, ( int(corners[i][0]), int(corners[i][1]) ), 10, (255, 0, 0), 10)
-            
-            # Return Image (Find out if it is possible to modify by reference)
-            return np_image
+            ## Tag is real, what do we do now?
+            ######################################
+            else:
+                # Collect Corners
+                corners = tuple(map(list, tag.corners))
+
+                # Print Corners to Image
+                for i in range(4):
+                    cv.circle(np_image, ( int(corners[i][0]), int(corners[i][1]) ), 10, (255, 0, 0), 10)
+
+                # Return Image (Find out if it is possible to modify by reference)
+                return np_image
+            ######################################
+        except BaseException as exc:
+            self.get_logger().error(f"Error: {exc}")
+        return np.zeros(1)
 
     ##########
     # Print Center on AprilTag
     def overlay_tag_center(self, np_image, tag):
-        ## Determine of the tag passed is REALLY a tag:
-        #   If NONE, then passed tag does not exist 
-        if tag == None or np_image.size == 0:
-            return np.zeros(1)
+        try:
+            ## Determine of the tag passed is REALLY a tag:
+            #   If NONE, then passed tag does not exist 
+            ######################################
+            if tag == None or np_image.size == 0:
+                return np.zeros(1)
+            ######################################
 
-        ## Tag is real, what do we do now?
-        else:
-            # Collect Center
-            center_X, center_Y = tuple(map(int, tag.center))
 
-            # Print Center to Image
-            cv.circle(np_image, (center_X, center_Y), 5, (255, 0, 255), 5)
+            ## Tag is real, what do we do now?
+            ######################################
+            else:
+                # Collect Center
+                center_X, center_Y = tuple(map(int, tag.center))
 
-            # Return Image (Find out if it is possible to modify by reference)
-            return np_image        
+                # Print Center to Image
+                cv.circle(np_image, (center_X, center_Y), 5, (255, 0, 255), 5)
+
+                # Return Image (Find out if it is possible to modify by reference)
+                return np_image    
+            ######################################
+        except BaseException as exc:
+            self.get_logger().error(f"Error: {exc}")
+        return np.zeros(1)
+            
 
 
 #####################################
