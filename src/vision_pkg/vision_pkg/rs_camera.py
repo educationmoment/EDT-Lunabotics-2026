@@ -29,8 +29,8 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import AccelStamped
 
 # TODO: Implement IMU interface to connect to Madgwick Filter Node 
-# from sensor_msgs.msg import Imu
-
+from sensor_msgs.msg import Imu
+from sensor_msgs.msg import MagneticField
 ########################################
 
 import numpy as np
@@ -55,11 +55,13 @@ class CameraNode( Node ):
 
         ## Initiallize Publisher
         self.init_node_publisher(
-            rgb_topic_name="rs_node/camera/compressed_video",      # Consider changing to rs_node/camera/rgb_video
-            depth_topic_name="rs_node/camera/depth_video",         # Consider changing to rs_node/camera/depth_video
-            imu_topic_name="rs_node/imu",
-            imu_accel_topic_name="rs_node/imu/accel_info",
-            imu_gyro_topic_name="rs_node/imu/gyro_info"
+            rgb_topic_name      = "rs_node/camera/compressed_video",      # Consider changing to rs_node/camera/rgb_video
+            depth_topic_name    = "rs_node/camera/depth_video",         # Consider changing to rs_node/camera/depth_video
+            # imu_topic_name="rs_node/imu",
+            imu_topic_name      = "imu/data_raw",
+
+            imu_accel_topic_name= "rs_node/imu/accel_info",
+            imu_gyro_topic_name = "rs_node/imu/gyro_info"
         )
 
         ## Initiallize AprilTag Detector
@@ -144,24 +146,47 @@ class CameraNode( Node ):
         #   is published correctly          #
         #####################################
 
+        # DEPRECATED (Change to Imu interface type)
         ### Pack and Publish IMU Data
         ######################################
-        data = AccelStamped()
-        data.header.stamp.nanosec = self.get_clock().now().seconds_nanoseconds()[1]
-        data.header.stamp.sec = self.get_clock().now().seconds_nanoseconds()[0]
-        data.header.frame_id = ""
-
-        data.accel.linear.x = accl_data.x
-        data.accel.linear.y = accl_data.y
-        data.accel.linear.z = accl_data.z
-        
-        data.accel.angular.x = gyro_data.x
-        data.accel.angular.y = gyro_data.y
-        data.accel.angular.z = gyro_data.z
-
-        self.pub_imu.publish(msg=data)
+        # data = AccelStamped()
+        # data.header.stamp.nanosec = self.get_clock().now().seconds_nanoseconds()[1]
+        # data.header.stamp.sec = self.get_clock().now().seconds_nanoseconds()[0]
+        # data.header.frame_id = ""
+        # 
+        # data.accel.linear.x = accl_data.x
+        # data.accel.linear.y = accl_data.y
+        # data.accel.linear.z = accl_data.z
+        # 
+        # data.accel.angular.x = gyro_data.x
+        # data.accel.angular.y = gyro_data.y
+        # data.accel.angular.z = gyro_data.z
+        # 
+        # self.pub_imu.publish(msg=data)
         ######################################
 
+        (seconds, nano_seconds) = self.get_clock().now().seconds_nanoseconds()
+        data = Imu()
+        data.header.stamp.nanosec   = nano_seconds
+        data.header.stamp.sec       = seconds
+        data.header.frame_id        = f"{self.timer_counter}"
+
+        data.angular_velocity.x     = gyro_data.x
+        data.angular_velocity.y     = gyro_data.y
+        data.angular_velocity.z     = gyro_data.z
+        data.angular_velocity_covariance[0] = -1    # We have no estimate for Covariance
+
+        data.linear_acceleration.x  = accl_data.x
+        data.linear_acceleration.y  = accl_data.y
+        data.linear_acceleration.z  = accl_data.z
+        data.linear_acceleration_covariance[0] = -1
+        self.pub_imu.publish(msg=data)
+
+        data = MagneticField()
+        data.header.stamp.nanosec   = nano_seconds
+        data.header.stamp.sec       = seconds
+        data.header.frame_id        = f"{self.timer_counter}"
+        self.pub_imu_mag.publish(msg=data)
 
         ## Collect AprilTag Location
         ######################################
@@ -328,15 +353,38 @@ class CameraNode( Node ):
             # qos_profile = 5
         # )
 
+        # DEPRECATED
         ##########
         # Initiallize the Generallized IMU Publisher
         #       Type == Acceleration Frame w/ Time Stamp
         #       Topic == Specified in Function Call
         #       Quality of Service == 5 frames
+        # self.pub_imu = self.create_publisher(
+        #     msg_type    = AccelStamped,
+        #     topic       = imu_topic_name,
+        #     qos_profile = 10
+        # )
+
+        ##########
+        # Initiallize IMU Publisher
+        #       Type == sensor_msgs/msg/Imu
+        #       Topic == imu_topic_name
+        #       Quality of Service == 5 frames
         self.pub_imu = self.create_publisher(
-            msg_type    = AccelStamped,
+            msg_type    = Imu,
             topic       = imu_topic_name,
-            qos_profile = 10
+            qos_profile = 5
+        )
+
+        ##########
+        # Initiallize IMU/Mag Publisher
+        #       Type == sensor_msgs/msg/MagneticField
+        #       Topic == Hard Coded
+        #       Quality of Service == 5 frames
+        self.pub_imu_mag = self.create_publisher(
+            msg_type    = MagneticField,
+            topic       = "imu/mag",
+            qos_profile = 5
         )
         return
 

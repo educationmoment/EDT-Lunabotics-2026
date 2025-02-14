@@ -1,8 +1,10 @@
 #include    "rclcpp/rclcpp.hpp"
 #include    "geometry_msgs/msg/accel_stamped.hpp"
+#include    "sensor_msgs/msg/imu.hpp"
 
 // Debug
 #include    "geometry_msgs/msg/accel.hpp"
+
 #include    "std_msgs/msg/string.hpp"
 
 #include    "rclcpp/time.hpp"
@@ -34,11 +36,20 @@ public:
             "debug_state", 1
         );
 
+        // DEPRECATED
+        // Create Subscriber to IMU Data
+        //////////////////////////////////////
+        // this->imu_subscription = this->create_subscription<geometry_msgs::msg::AccelStamped>(
+            // "rs_node/imu",
+            // 10,
+            // std::bind(&LocalizationNode::imu_callback, this, std::placeholders::_1)
+        // );
+        // RCLCPP_INFO( this->get_logger(), "Initiallized Subscription to IMU");
 
         // Create Subscriber to IMU Data
         //////////////////////////////////////
-        this->imu_subscription = this->create_subscription<geometry_msgs::msg::AccelStamped>(
-            "rs_node/imu",
+        this->imu_subscription = this->create_subscription<sensor_msgs::msg::Imu>(
+            "imu/data",
             10,
             std::bind(&LocalizationNode::imu_callback, this, std::placeholders::_1)
         );
@@ -55,7 +66,8 @@ public:
 private:
     // Variables
     ////////////////////
-    rclcpp::Subscription<geometry_msgs::msg::AccelStamped>::SharedPtr imu_subscription;
+    // rclcpp::Subscription<geometry_msgs::msg::AccelStamped>::SharedPtr imu_subscription;
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscription;
 
     // Debug Stream
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr debug_stream;
@@ -97,7 +109,7 @@ private:
 
     // Callback function: Handles received IMU frames
     ////////////////////////////////////////
-    void imu_callback( const geometry_msgs::msg::AccelStamped::SharedPtr msg ) {
+    void imu_callback( const sensor_msgs::msg::Imu::SharedPtr msg ) {
         rclcpp::Time current_time = msg->header.stamp; 
 
         RCLCPP_WARN( this->get_logger(), "Old Time: %0.3lf seconds", old_time.seconds() );
@@ -105,25 +117,30 @@ private:
         
         if( ! this->gravity.defined ) {
             old_time = current_time;
-            this->gravity.x = msg->accel.linear.x;
-            this->gravity.y = msg->accel.linear.y;
-            this->gravity.z = msg->accel.linear.z;
+            // this->gravity.x = msg->accel.linear.x;
+            // this->gravity.y = msg->accel.linear.y;
+            // this->gravity.z = msg->accel.linear.z;
+            this->gravity = { msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z };
+
             this->gravity.magnitude = std::sqrt(
-                msg->accel.linear.x * msg->accel.linear.x +
-                msg->accel.linear.y * msg->accel.linear.y +
-                msg->accel.linear.z * msg->accel.linear.z
+                msg->linear_acceleration.x * msg->linear_acceleration.x +
+                msg->linear_acceleration.y * msg->linear_acceleration.y +
+                msg->linear_acceleration.z * msg->linear_acceleration.z
             );
             this->gravity.defined = true;
             return;
         }
 
-
         RCLCPP_INFO( this->get_logger(), "Acceleration due to Gravity: %0.2lf", this->gravity.magnitude );
 
-        // Calculate Linear Velocity
-        trapezoidal_rule( this->state.linear_vel.x, this->past_state.linear_accel.x - this->gravity.x, msg->accel.linear.x - this->gravity.x, dt );
-        trapezoidal_rule( this->state.linear_vel.y, this->past_state.linear_accel.y - this->gravity.y, msg->accel.linear.y - this->gravity.y, dt );
-        trapezoidal_rule( this->state.linear_vel.z, this->past_state.linear_accel.z - this->gravity.z, msg->accel.linear.z - this->gravity.z, dt );
+        // Calculate Linear Velocity 
+        trapezoidal_rule( this->state.linear_vel.x, this->past_state.linear_accel.x - this->gravity.x, msg->linear_acceleration.x - this->gravity.x, dt );
+        trapezoidal_rule( this->state.linear_vel.y, this->past_state.linear_accel.y - this->gravity.y, msg->linear_acceleration.y - this->gravity.y, dt );
+        trapezoidal_rule( this->state.linear_vel.z, this->past_state.linear_accel.z - this->gravity.z, msg->linear_acceleration.z - this->gravity.z, dt );
+        
+        //If abs(this - past) < 0.00001
+        //Set all gains to 0 meow
+
         this->past_state.linear_accel.x = this->state.linear_accel.x; 
         this->past_state.linear_accel.y = this->state.linear_accel.y;
         this->past_state.linear_accel.z = this->state.linear_accel.z;
