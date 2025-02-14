@@ -27,6 +27,10 @@ from sensor_msgs.msg import Image
 # TODO: Replace w/ interface type geometry_msgs/msg/AccelStamped
 # from example_interfaces.msg import Float32MultiArray
 from geometry_msgs.msg import AccelStamped
+
+# TODO: Implement IMU interface to connect to Madgwick Filter Node 
+# from sensor_msgs.msg import Imu
+
 ########################################
 
 import numpy as np

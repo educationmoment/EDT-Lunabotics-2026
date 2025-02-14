@@ -4,3 +4,6 @@ log
 src/vision_pkg/vision_pkg/__pycache__
 .devcontainer/devcontainer.json
 .devcontainer/Dockerfile
+calibration.bin
+calibration.json
+rs-imu-calibration.py
