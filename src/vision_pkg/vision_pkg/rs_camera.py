@@ -43,7 +43,7 @@ import apriltag
 class CameraNode( Node ):
     ##########
     # Initiallize Node
-    def __init__(self, poll_period_sec: float=0.250) -> None:
+    def __init__(self, poll_period_sec: float) -> None:
         
         ## Initiallize Camera Node 
         super().__init__("camera_node")
@@ -54,13 +54,12 @@ class CameraNode( Node ):
 
         ## Initiallize Publisher
         self.init_node_publisher(
-            rgb_topic_name      = "rs_node/camera/compressed_video",      # Consider changing to rs_node/camera/rgb_video
+            rgb_topic_name      = "rs_node/camera/compressed_video",    # Consider changing to rs_node/camera/rgb_video
             depth_topic_name    = "rs_node/camera/depth_video",         # Consider changing to rs_node/camera/depth_video
-            # imu_topic_name="rs_node/imu",
             imu_topic_name      = "imu/data_raw",
 
-            imu_accel_topic_name= "rs_node/imu/accel_info",
-            imu_gyro_topic_name = "rs_node/imu/gyro_info"
+            imu_accel_topic_name= "rs_node/imu/accel_info",             # DEPRECATED
+            imu_gyro_topic_name = "rs_node/imu/gyro_info"               # DEPRECATED
         )
 
         ## Initiallize AprilTag Detector
@@ -265,10 +264,33 @@ class CameraNode( Node ):
 
         ## Select, Configure, and Enable Streams in Pipeline configuration
         ######################################
-        config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 30)
-        config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16,  30)
-        config.enable_stream(rs.stream.accel)
-        config.enable_stream(rs.stream.gyro)
+        config.enable_stream(
+            stream_type = rs.stream.color, 
+            width       = 640, 
+            height      = 480, 
+            format      = rs.format.rgb8, 
+            framerate  = 30
+        )
+
+        config.enable_stream(
+            stream_type = rs.stream.depth, 
+            width       = 640, 
+            height      = 480, 
+            format      = rs.format.z16,  
+            framerate  = 30
+        )
+
+        config.enable_stream(
+            stream_type = rs.stream.accel
+            # format = rs.format.xyz32f,
+            # framerate  = 30
+        )
+
+        config.enable_stream(
+            stream_type = rs.stream.gyro
+            # format = rs.format.xyz32f,
+            # framerate  = 30
+        )
         ######################################
 
         ## Send Configuration to Pipeline
@@ -384,15 +406,16 @@ class CameraNode( Node ):
 # Main Function
 def main() -> int:
     rclpy.init()
-    node = CameraNode(poll_period_sec=0.0166666666667)
+    node = CameraNode(poll_period_sec=0.03334)
             
     try:
         rclpy.spin(node=node)
-        rclpy.shutdown()
     except KeyboardInterrupt:
         print("\n\033[100m[ Main.MAIN ] Keyboard Interrupt Pressed", end='\033[0m\n')
+    finally:
+        rclpy.shutdown()
+
     return 0
 
 if __name__ == "__main__":
-    # exit( main() )
-    main()      # Maybe this will solve the Seg fault
+    exit( main() )

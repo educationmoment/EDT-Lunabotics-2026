@@ -20,7 +20,8 @@ def generate_launch_description() -> LaunchDescription:
         parameters = [{
             "use_mag": False,
             "remove_gravity_vector": True,
-            "gain": 0.0025
+            "gain": 0.0025,
+            "frequency": 800
         }]
     )
 

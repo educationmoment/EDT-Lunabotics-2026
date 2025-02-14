@@ -107,52 +107,44 @@ private:
         bool defined;
     } gravity;
 
+
     // Callback function: Handles received IMU frames
     ////////////////////////////////////////
     void imu_callback( const sensor_msgs::msg::Imu::SharedPtr msg ) {
         rclcpp::Time current_time = msg->header.stamp; 
 
-        RCLCPP_WARN( this->get_logger(), "Old Time: %0.3lf seconds", old_time.seconds() );
+        // RCLCPP_WARN( this->get_logger(), "Old Time: %0.3lf seconds", old_time.seconds() );
         double dt = (current_time - old_time).seconds();
         
-        if( ! this->gravity.defined ) {
+        // If Old Time is not assigned, seed old time with 
+        // current time and return.
+        if( this->old_time.nanoseconds() == 0 ) {
             old_time = current_time;
-            // this->gravity.x = msg->accel.linear.x;
-            // this->gravity.y = msg->accel.linear.y;
-            // this->gravity.z = msg->accel.linear.z;
-            this->gravity = { msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z };
-
-            this->gravity.magnitude = std::sqrt(
-                msg->linear_acceleration.x * msg->linear_acceleration.x +
-                msg->linear_acceleration.y * msg->linear_acceleration.y +
-                msg->linear_acceleration.z * msg->linear_acceleration.z
-            );
-            this->gravity.defined = true;
             return;
         }
 
-        RCLCPP_INFO( this->get_logger(), "Acceleration due to Gravity: %0.2lf", this->gravity.magnitude );
+        // RCLCPP_INFO( this->get_logger(), "Acceleration due to Gravity: %0.2lf", this->gravity.magnitude );
 
         // Calculate Linear Velocity 
-        trapezoidal_rule( this->state.linear_vel.x, this->past_state.linear_accel.x - this->gravity.x, msg->linear_acceleration.x - this->gravity.x, dt );
-        trapezoidal_rule( this->state.linear_vel.y, this->past_state.linear_accel.y - this->gravity.y, msg->linear_acceleration.y - this->gravity.y, dt );
-        trapezoidal_rule( this->state.linear_vel.z, this->past_state.linear_accel.z - this->gravity.z, msg->linear_acceleration.z - this->gravity.z, dt );
-        
-        //If abs(this - past) < 0.00001
-        //Set all gains to 0 meow
-
+        trapezoidal_rule( this->state.linear_vel.x, this->past_state.linear_accel.x, msg->linear_acceleration.x, dt );
+        trapezoidal_rule( this->state.linear_vel.y, this->past_state.linear_accel.y, msg->linear_acceleration.y, dt );
+        trapezoidal_rule( this->state.linear_vel.z, this->past_state.linear_accel.z, msg->linear_acceleration.z, dt );
         this->past_state.linear_accel.x = this->state.linear_accel.x; 
         this->past_state.linear_accel.y = this->state.linear_accel.y;
         this->past_state.linear_accel.z = this->state.linear_accel.z;
+
+        //If abs(this - past) < 0.00001
+        //Set all gains to 0 meow  
    
         // Calculate Angular Velocity
-        // trapezoidal_rule( this->state.angular_vel.x, this->past_state.angular_accel.x, msg->accel.angular.x, dt );
-        // trapezoidal_rule( this->state.angular_vel.y, this->past_state.angular_accel.y, msg->accel.angular.y, dt );
-        // trapezoidal_rule( this->state.angular_vel.z, this->past_state.angular_accel.z, msg->accel.angular.z, dt );
-        // this->past_state.angular_accel.x = this->state.angular_accel.x;
-        // this->past_state.angular_accel.y = this->state.angular_accel.y;
-        // this->past_state.angular_accel.z = this->state.angular_accel.z;
+        trapezoidal_rule( this->state.angular_vel.x, this->past_state.angular_accel.x, msg->angular_velocity.x, dt );
+        trapezoidal_rule( this->state.angular_vel.y, this->past_state.angular_accel.y, msg->angular_velocity.y, dt );
+        trapezoidal_rule( this->state.angular_vel.z, this->past_state.angular_accel.z, msg->angular_velocity.z, dt );
+        this->past_state.angular_accel.x = this->state.angular_accel.x;
+        this->past_state.angular_accel.y = this->state.angular_accel.y;
+        this->past_state.angular_accel.z = this->state.angular_accel.z;
 
+        // Store Current time in Past
         old_time = current_time;
         return;
     }
@@ -163,7 +155,9 @@ private:
         static unsigned int debug_count = 0;
 
         RCLCPP_INFO(this->get_logger(), "Count: %u\t\t%0.3lf", debug_count++, dt);
+
         if( dt <= 0.0 || dt >= 1.0 ) { return; }
+        if( std::abs(val_b) < 0.5 ) { return; }
 
         RCLCPP_WARN( this->get_logger(), "Integrating -- DT == %0.3lf", dt);
         stream += 0.5 * (val_b + val_a) * dt;
@@ -174,9 +168,13 @@ private:
     ////////////////////
     void timer_callback() {
         geometry_msgs::msg::Accel msg;
+
+        // Collect and Publish Linear Velocity
         msg.linear.x = this->state.linear_vel.x;
         msg.linear.y = this->state.linear_vel.y;
         msg.linear.z = this->state.linear_vel.z;
+
+        // Collect and Publish Angular Position
         msg.angular.x = this->state.angular_vel.x;
         msg.angular.y = this->state.angular_vel.y;
         msg.angular.z = this->state.angular_vel.z;
