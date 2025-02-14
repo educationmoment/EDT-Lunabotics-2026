@@ -4,9 +4,7 @@
 
 // Debug
 #include    "geometry_msgs/msg/accel.hpp"
-
 #include    "std_msgs/msg/string.hpp"
-
 #include    "rclcpp/time.hpp"
 #include    <iostream>
 #include    <memory>
@@ -98,7 +96,7 @@ private:
     // Static Variable to hold old timestamp
     ////////////////////
     static rclcpp::Time old_time;
-    
+
     // Variable to hold initial acceleration (if stationary, assumed gravity)
     ////////////////////////////////////////
     struct {
@@ -113,17 +111,14 @@ private:
     void imu_callback( const sensor_msgs::msg::Imu::SharedPtr msg ) {
         rclcpp::Time current_time = msg->header.stamp; 
 
-        // RCLCPP_WARN( this->get_logger(), "Old Time: %0.3lf seconds", old_time.seconds() );
         double dt = (current_time - old_time).seconds();
         
         // If Old Time is not assigned, seed old time with 
         // current time and return.
         if( this->old_time.nanoseconds() == 0 ) {
-            old_time = current_time;
+            this->old_time = current_time;
             return;
         }
-
-        // RCLCPP_INFO( this->get_logger(), "Acceleration due to Gravity: %0.2lf", this->gravity.magnitude );
 
         // Calculate Linear Velocity 
         trapezoidal_rule( this->state.linear_vel.x, this->past_state.linear_accel.x, msg->linear_acceleration.x, dt );
@@ -137,9 +132,9 @@ private:
         //Set all gains to 0 meow  
    
         // Calculate Angular Velocity
-        trapezoidal_rule( this->state.angular_vel.x, this->past_state.angular_accel.x, msg->angular_velocity.x, dt );
-        trapezoidal_rule( this->state.angular_vel.y, this->past_state.angular_accel.y, msg->angular_velocity.y, dt );
-        trapezoidal_rule( this->state.angular_vel.z, this->past_state.angular_accel.z, msg->angular_velocity.z, dt );
+        trapezoidal_rule( this->state.angular_vel.x, this->past_state.angular_accel.x, msg->angular_velocity.x  , dt );
+        trapezoidal_rule( this->state.angular_vel.y, this->past_state.angular_accel.y, msg->angular_velocity.y  , dt );
+        trapezoidal_rule( this->state.angular_vel.z, this->past_state.angular_accel.z, msg->angular_velocity.z  , dt );
         this->past_state.angular_accel.x = this->state.angular_accel.x;
         this->past_state.angular_accel.y = this->state.angular_accel.y;
         this->past_state.angular_accel.z = this->state.angular_accel.z;
@@ -153,13 +148,7 @@ private:
     ////////////////////
     void trapezoidal_rule( double& stream, double  val_a, double val_b, double dt) {
         static unsigned int debug_count = 0;
-
-        RCLCPP_INFO(this->get_logger(), "Count: %u\t\t%0.3lf", debug_count++, dt);
-
         if( dt <= 0.0 || dt >= 1.0 ) { return; }
-        if( std::abs(val_b) < 0.5 ) { return; }
-
-        RCLCPP_WARN( this->get_logger(), "Integrating -- DT == %0.3lf", dt);
         stream += 0.5 * (val_b + val_a) * dt;
         return;
     }
@@ -178,6 +167,13 @@ private:
         msg.angular.x = this->state.angular_vel.x;
         msg.angular.y = this->state.angular_vel.y;
         msg.angular.z = this->state.angular_vel.z;
+
+        RCLCPP_INFO( this->get_logger(), "Frame @ time %0.3lf", old_time.seconds() );
+        RCLCPP_INFO( this->get_logger(), "---------" );
+        RCLCPP_INFO( this->get_logger(), "\tX: %0.8lf", msg.angular.x );
+        RCLCPP_INFO( this->get_logger(), "\tY: %0.8lf", msg.angular.y );
+        RCLCPP_INFO( this->get_logger(), "\tZ: %0.8lf", msg.angular.z );
+
 
         this->debug_state->publish(msg);
         return;
