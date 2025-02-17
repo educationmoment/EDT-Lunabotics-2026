@@ -27,7 +27,8 @@ app = Flask(
 ## Route to HOME 
 @app.route('/', methods=['GET'])
 def get_main():
-    return """<h1>Main Route</h1><ul><li>/pilot</li><li>/engineer</li><li>/networking</li></ul>"""
+    return render_template('index.html')
+    # return """<h1>Main Route</h1><ul><li>/pilot</li><li>/engineer</li><li>/networking</li></ul>"""
 
 ## Route to PILOT GUI
 @app.route('/pilot', methods=['GET'])
@@ -35,14 +36,16 @@ def get_pilot():
     return render_template('pilot.html')
 
 ## Route to ENGINEER GUI
-@app.route('/engineer', methods=['GET'])
+@app.route('/internal_systems', methods=['GET'])
 def get_engineer():
-    return """<h1>Engineer</h1><hr><p>Not Yet Started</p>"""
+    return render_template('internal_systems.html')
+    # return """<h1>Engineer</h1><hr><p>Not Yet Started</p>"""
 
 ## Route to NETWORKING GUI
 @app.route('/networking', methods=['GET'])
 def get_networking():
-    return """<h1>Network</h1><hr><p>Not Yet Started</p>"""
+    return render_template('networking.html')
+    # return """<h1>Network</h1><hr><p>Not Yet Started</p>"""
 ##################################################
 
 
