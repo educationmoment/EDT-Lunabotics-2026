@@ -7,3 +7,5 @@ src/vision_pkg/vision_pkg/__pycache__
 calibration.bin
 calibration.json
 rs-imu-calibration.py
+src/webgui_pkg/webgui_pkg/static/images
+src/webgui_pkg/webgui_pkg/static/objects

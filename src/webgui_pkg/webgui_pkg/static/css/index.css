@@ -1,0 +1,50 @@
+body {
+    background-color: rgb(41, 41, 43);
+}
+
+img {
+    position: fixed;
+    z-index: -3;
+}
+
+.header-div {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: rgb(255, 255, 255);
+
+
+    border-bottom: double 2px rgb(137, 134, 134);
+    
+    width: auto;
+    height: 7vh;
+    z-index: 3;
+}
+
+.body-div {
+    position: relative;
+    
+    display: grid;
+    grid-template-rows: 1fr 1fr 1fr;
+
+    height: 70vh;
+    bottom: 0;
+    /* gap: 33%; */
+
+    background-color: rgb(200, 200, 200);
+ 
+    margin-top: 10vh;
+    margin-left: 5vw;
+    margin-right: 5vw;
+}
+
+.links {
+    background-color:  rgb(156, 153, 153);
+    display: flex;
+
+    align-content: center;
+    justify-content: center;
+
+    margin: 5px;
+}
