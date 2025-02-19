@@ -1,23 +1,20 @@
-console.log("[ INIT ] Gathering objects from DOM");
-
 // Gather Inner Overlayed Objects
 ////////////////////////////////////////////////////////////////////////////////////////
-const quest_canvas = document.getElementById("quest-arrow");
-const dgtTwin_canvas = document.getElementById("digital-twin");
-const fctIndicators_div = document.getElementById("function-indicators");
-const outLogs_div = document.getElementById("output-logs");
+// const dgtTwin_canvas = document.getElementById("digital-twin");
+// const fctIndicators_div = document.getElementById("function-indicators");
+// const outLogs_div = document.getElementById("output-logs");
 const img = document.getElementById("camera-output");
 ////////////////////////////////////////////////////////////////////////////////////////
 
 
 
-
+////////////////////////////////////////////////////////////////////////////////////////
 
 
 // DEBUG: Prove Objects Source Correctly
-console.log("[ INIT ] Demonstrating Connectivity to DOM");
-fctIndicators_div.textContent += "   Hello World";
-outLogs_div.textContent += "   Hello World";
+// console.log("[ INIT ] Demonstrating Connectivity to DOM");
+// fctIndicators_div.textContent += "   Hello World";
+// outLogs_div.textContent += "   Hello World";
 
 
 
@@ -73,8 +70,16 @@ function publishGamepadMessage() {
 
 // Animation Loop
 ////////////////////////////////////////////////////////////////////////////////////////
+var rot_y = 0.0;
 function animationLoop() {
     console.log("[ ANIMATION-LOOP ] Running");
+
+
+    rot_y += 0.01;
+
+    // Update Renders
+    render_quest_arrow( rot_y * Math.PI / 2);
+    render_twin(rot_y);
     requestAnimationFrame(animationLoop);
     return;
 }
@@ -83,11 +88,17 @@ function animationLoop() {
 
 // Main Code
 ////////////////////////////////////////////////////////////////////////////////////////
+console.log("[ Main ] Running");
 function main() {
-    setInterval(publishGamepadMessage, 50);
-    animationLoop();
+    console.log("[ Main ] Running");
+    try {
+        setInterval(publishGamepadMessage, 50);
+    } catch (error) {
+        console.error('An error occurred while attempting to publish the gamepad message: ', error);
+    }
+    
+    requestAnimationFrame(animationLoop);
     return;
 }
 ////////////////////////////////////////////////////////////////////////////////////////
-
-main()
+main();

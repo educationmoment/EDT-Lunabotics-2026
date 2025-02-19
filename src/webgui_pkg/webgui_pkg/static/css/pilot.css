@@ -1,6 +1,5 @@
 html {
     background-color: black;
-
 }
 
 /* Class: outer-box */
@@ -12,21 +11,32 @@ html {
         -- Indicates if Video feed cuts out by becoming visible to user
 */
 .outer-box {
-    display: flex;
-    justify-content: center;
-
-    align-content: center;
-    
     background-color: rgb(192, 192, 192);
     position: fixed;
 
-    width: 110vw;
-    height: 110vh;
+    /* width: 110vw; */
+    /* height: 110vh; */
 
+    width: 100vw;
+    height: 100vh;
+
+    justify-self: center;
+    align-self: center;
+    
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 30%;
+    grid-template-columns: 1fr 5fr 5fr 1fr;
+    grid-template-rows: 1fr 3fr 5fr 3fr 1fr;
+    
+    /* grid-auto-columns: 33vw; */
+
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    gap: 0;
+    padding: 0%;
+    margin: 0%;
 
     z-index: 0;
 
@@ -46,28 +56,128 @@ html {
             > SHows animated Digital Twin, indicates actuator positions
 */
 .inner-div {
-    /* background-color: blue; */
+    background-color: rgba( 0, 0, 0, 0.39);
+    
+    /* width: 100%; */
+    /* height: 15vh; */
+    
+    justify-self: center;
+    align-self: center;
+    justify-content: center;
+    align-content: center;
+    
+    border: solid 1px black;
+    /* border-radius: 20px; */
+    
     z-index: 3;
 
-    width: 30vw;
+    margin: 0;
+}
+
+.inner-quad-1 {
+    /* grid-column: 1 4; */
+
+    background-color: rgba( 0, 0, 0, 0.0);
+
+    grid-column: 2 / 4;
+
+    /* column-span: 2; */
+    grid-row: 3 / 4;
+    
+    padding: 2px;
+    width: 100%;
+    height: 100%;
+
+    /* border-radius: 0px 0px 0px 20px; */
+    /* border-right: 0px; */
+    border: 0px;
+    margin: 1px;
+}
+
+#quest-arrow {
+    width: 100%;
+    height: 100%;
+}
+
+.inner-quad-3 {
+    grid-column: 1;
+    grid-row: 4;
+
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: 1fr;
+    
     height: 30vh;
-
-    border: solid 1px black;
-
+    width: 30vw;
 
     justify-content: center;
     align-content: center;
 
-    border-radius: 20px;
+    padding-left: 5%;
+    padding-right: 5%;
 
-    background-color: rgba( 0, 0, 0, 0.39);
+    border-top-right-radius: 20px;
+    border-bottom: 0px;
 }
 
-.inner-quad-1 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr;
-    background-color: rgba(0, 0, 0, 0.3);
+#left {
+    /* background-color: white; */
+    grid-column: 1;
+    grid-row: 1;
+
+    width: 100%;
+    height: 100%;
+
+    justify-content: center;
+    align-content: center;
+
+    padding: 2%;
+    border-radius: 20px;
+    /* border: 1px solid black; */
+}
+
+#digital-twin {
+    background-color: rgba(0, 0,0, 0.25);
+
+    width: 100%;
+    height: 100%;
+}
+
+#right {
+    background-color: white;
+    grid-column: 2;
+    grid-row: 1;
+
+    width: 100%;
+    height: 100%;
+
+    justify-content: center;
+    align-content: center;
+
+    padding: 10%;
+    border-radius: 20px;
+    border: 1px solid black;
+}
+
+.inner-quad-4 {
+    grid-column: 4;
+    grid-row-start: 1;
+    grid-row-end: 3;
+    /* height: 30vh; */
+    
+    height: 100%;
+    width: 30vw;
+
+    border-bottom-left-radius: 20px;
+}
+
+.inner-bottom {
+    width: 100%;
+    height: 100%;
+
+    grid-column: 1 / 5;
+    grid-row: 5 / 5;
 }
 
 .camera-feed {
@@ -84,4 +194,16 @@ html {
 img {
     width: 100vw;
     height: 100vh;
+
+    /* align-self: center; */
+    /* justify-self: center; */
+
+
+    padding: 0;
+    /* border: solid 20px black; */
+    margin: 0;
+}
+
+* {
+    box-sizing: border-box;
 }

@@ -1,0 +1,24 @@
+<!-- HTML: index -->
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Page</title>
+     <!-- <link rel="stylesheet" href="../static/css/index.css"/> -->
+     <link rel="stylesheet" href="{{url_for('static', filename='css/index.css')}}">
+
+
+ </head>
+ <body>
+    <!-- <img src="../static/images/background.jpg"/> -->
+    <div class="header-div">
+        <p>Home Page</p>
+    </div>
+    <div class="body-div" style="display: grid; grid-template-rows: repeat(1fr, 3);">
+        <div class="links"><a href="/pilot">Pilot GUI</a></div>
+        <div class="links"><a class="links" href="/internal_systems">Internal Systems</a></div>
+        <div class="links"><a class="links" href="/networking">Networking</a></div>
+    </div>
+ </body>
+ </html>

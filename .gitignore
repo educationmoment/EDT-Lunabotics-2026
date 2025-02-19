@@ -8,3 +8,5 @@ calibration.bin
 calibration.json
 rs-imu-calibration.py
 test.py
+src/webgui_pkg/webgui_pkg/static/images
+src/webgui_pkg/webgui_pkg/static/objects
