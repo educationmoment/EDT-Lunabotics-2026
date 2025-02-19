@@ -7,7 +7,7 @@ setup(
     version='0.0.0',
     # packages=find_packages(exclude=['test']),
     packages=['webgui_pkg'],
-    package_data={'webgui_pkg': ['templates/*', 'static/**/*']},
+    package_data={'webgui_pkg': ['templates/*', 'static/**/*', 'static/**/**/*']},
 
     data_files=[
         ('share/ament_index/resource_index/packages',

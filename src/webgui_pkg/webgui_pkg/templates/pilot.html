@@ -9,33 +9,41 @@
         <!-- ROSJS External Libraries -->
         <!-- -> Must be Sourced First -->
 
-        <!-- <script src="{{url_for('static', filename='js/roslib.min.js')}}"></script> -->
-        <!-- <script src="{{url_for('static', filename='js/eventemitter2.min.js')}}"></script> -->
-        <script src="../static/js/resources/roslib.min.js"></script>
-        <script src="../static/js/resources/eventemitter2.min.js"></script>
+        <script src="{{url_for('static', filename='js/resources/roslib.min.js')}}"></script>
+        <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
+        <!-- <script src="../static/js/resources/roslib.min.js"></script> -->
+        <!-- <script src="../static/js/resources/eventemitter2.min.js"></script> -->
 
         <!-- Global ROS Setup Code -->
-        <!-- <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script> -->
-        <script src="../static/js/ros_setup.js"></script>
+        <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
+        <!-- <script src="../static/js/ros_setup.js"></script> -->
 
         <!-- Pilot GUI Specific Setup Code -->
 
-        <!-- <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script> -->
-        <script src="../static/js/gamepad_setup.js"></script>
+        <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
+        <!-- <script src="../static/js/gamepad_setup.js"></script> -->
 
         <!-- <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>  -->
-        <script src="../static/js/animation/quest_arrow.js" defer></script>
-        <script src="../static/js/animation/digital_twin.js" defer></script>
-        <script src="../static/js/pilot.js" defer></script>
+        <!-- <script src="../static/js/animation/quest_arrow.js" defer></script> -->
+        <!-- <script src="../static/js/animation/digital_twin.js" defer></script> -->
+        <!-- <script src="../static/js/pilot.js" defer></script> -->
+
+        <script src="{{url_for('static', filename='js/animation/quest_arrow.js')}}" defer></script>
+        <script src="{{url_for('static', filename='js/animation/digital_twin.js')}}" defer></script>
+        <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
+
+        <script src="{{url_for('static', filename='js/resources/three.min.js')}}"></script>
+        <script src="{{url_for('static', filename='js/resources/DRACOLoader.js')}}"></script>
+        <script src="{{url_for('static', filename='js/resources/GLTFLoader.js')}}"></script>
 
         <!-- Directional Arrow Specific Setup Code -->
         <!-- <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script> -->
         <!-- <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/DRACOLoader.js"></script> -->
         <!-- <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/GLTFLoader.js"></script> -->
 
-        <script src="../static/js/resources/three.min.js"></script>
-        <script src="../static/js/resources/DRACOLoader.js"></script>
-        <script src="../static/js/resources/GLTFLoader.js"></script>
+        <!-- <script src="../static/js/resources/three.min.js"></script> -->
+        <!-- <script src="../static/js/resources/DRACOLoader.js"></script> -->
+        <!-- <script src="../static/js/resources/GLTFLoader.js"></script> -->
     </head>
     <body>
         <div class="outer-box">
