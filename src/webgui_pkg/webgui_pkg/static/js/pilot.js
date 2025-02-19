@@ -9,9 +9,53 @@ const outLogs_div = document.getElementById("output-logs");
 const img = document.getElementById("camera-output");
 ////////////////////////////////////////////////////////////////////////////////////////
 
+// Create Quest Arrow Object
+////////////////////////////////////////////////////////////////////////////////////////
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, quest_canvas.clientWidth / quest_canvas.clientHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    canvas: quest_canvas,
+    alpha: true
+});
+
+renderer.setSize(quest_canvas.clientWidth, quest_canvas.clientHeight);
+renderer.domElement.className = "viewport";
+
+// Add Light
+const light = new THREE.DirectionalLight(0x00FF00, 1);
+light.position.set(0, 0, 5);
+
+// Add Cube
+const geometry = new THREE.BoxGeometry();
+const material = new THREE.MeshBasicMaterial({ color: 0xFFFFFF});
+const cube = new THREE.Mesh(geometry, material);
+cube.position.x = 0;
+cube.position.y = 0;
+cube.position.z = 0;
 
 
 
+// Add Grid Helper
+const gridHelper = new THREE.GridHelper(100, 100);
+
+// Add Axes Helper
+const axesHelper = new THREE.AxesHelper(5);
+
+// Add Objects to Scene
+scene.add(light);
+scene.add(cube);
+scene.add(gridHelper);
+scene.add(axesHelper);
+
+// Set Camera Position
+camera.position.x = 2.5;
+camera.position.y = 1.25;
+camera.position.z = 2.5;
+camera.lookAt( new THREE.Vector3(0,0,0) );
+
+renderer.render(scene, camera);
+////////////////////////////////////////////////////////////////////////////////////////
 
 
 // DEBUG: Prove Objects Source Correctly
