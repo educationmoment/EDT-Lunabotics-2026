@@ -78,7 +78,7 @@ function animationLoop() {
     rot_y += 0.01;
 
     // Update Renders
-    render_quest_arrow(rot_y);
+    render_quest_arrow( rot_y * Math.PI / 2);
     render_twin(rot_y);
     requestAnimationFrame(animationLoop);
     return;

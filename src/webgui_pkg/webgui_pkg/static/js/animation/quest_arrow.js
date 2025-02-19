@@ -13,7 +13,7 @@ const quest_renderer = new THREE.WebGLRenderer({
 quest_renderer.setSize(quest_canvas.clientWidth, quest_canvas.clientHeight);
 quest_renderer.domElement.className = "viewport";
 
-const quest_camera   = new THREE.PerspectiveCamera(4, quest_canvas.clientWidth / quest_canvas.clientHeight, 0.1, 100);
+const quest_camera   = new THREE.PerspectiveCamera(30, quest_canvas.clientWidth / quest_canvas.clientHeight, 0.1, 100);
 
 // Set Camera Position
 quest_camera.position.x = 5.0;
@@ -35,7 +35,7 @@ dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.146.0/examples/
 
 
 // Add Grid/Axis Helpers
-const quest_gridHelper = new THREE.GridHelper(100, 100);
+const quest_gridHelper = new THREE.GridHelper(5, 5);
 const quest_axesHelper = new THREE.AxesHelper(10);
 
 // Load GLTF/GLB Model
@@ -60,14 +60,14 @@ quest_scene.add(light_x);
 quest_scene.add(light_y);
 quest_scene.add(light_z);
 
-quest_scene.add(quest_gridHelper);
-quest_scene.add(quest_axesHelper);
+// quest_scene.add(quest_gridHelper);
+// quest_scene.add(quest_axesHelper);
 
 // Final Renderer
 // quest_renderer.render(quest_scene, quest_camera);
 function render_quest_arrow( time ) {
-    quest_camera.position.x = 5.0 * Math.cos( time * 0.05 );
-    quest_camera.position.z = 5.0 * Math.sin( time * 0.05 );
+    quest_camera.position.x = 5.0 * Math.cos( time );
+    quest_camera.position.z = 5.0 * Math.sin( time );
     quest_camera.lookAt( new THREE.Vector3( 0, 0, 0) );
     quest_renderer.render( quest_scene, quest_camera );
     return;
