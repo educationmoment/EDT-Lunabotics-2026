@@ -32,6 +32,10 @@ from geometry_msgs.msg import AccelStamped
 from sensor_msgs.msg import Imu
 ########################################
 
+# TODO: Implement Depth Camera Info Topic
+from sensor_msgs.msg import CameraInfo
+########################################
+
 import numpy as np
 import rclpy
 import pyrealsense2 as rs
@@ -54,12 +58,10 @@ class CameraNode( Node ):
 
         ## Initiallize Publisher
         self.init_node_publisher(
-            rgb_topic_name      = "rs_node/camera/compressed_video",    # Consider changing to rs_node/camera/rgb_video
-            depth_topic_name    = "rs_node/camera/depth_video",         # Consider changing to rs_node/camera/depth_video
-            imu_topic_name      = "imu/data_raw",
-
-            imu_accel_topic_name= "rs_node/imu/accel_info",             # DEPRECATED
-            imu_gyro_topic_name = "rs_node/imu/gyro_info"               # DEPRECATED
+            camera_info_name    = "rs_node/camera/camera_info",         # Publishes Camera Info: Used by depthimage_to_laserscan node
+            rgb_topic_name      = "rs_node/camera/compressed_video",    # Publishes Compressed RGB Image: Used by WebGUI
+            depth_topic_name    = "rs_node/camera/depth_video",         # Publishes Depth Image: Used by depthimage_to_laserscan node
+            imu_topic_name      = "imu/data_raw",                       # Publishes IMU Data: Used by Madgwick Filter Node
         )
 
         ## Initiallize AprilTag Detector
@@ -154,6 +156,21 @@ class CameraNode( Node ):
         data.linear_acceleration_covariance[0] = -1
         self.pub_imu.publish(msg=data)
         ######################################
+
+
+        ## Create Camera Info Message
+        ######################################
+        self.cam_info_data = CameraInfo()
+        self.cam_info_data.header.stamp = self.get_clock().now().to_msg()
+        self.cam_info_data.header.frame_id = "camera_frame"
+        self.cam_info_data.height = 480
+        self.cam_info_data.width = 640
+        self.cam_info_data.distortion_model = "plumb_bob"
+
+        self.cam_info_data.D = [0.0, 0.0, 0.0, 0.0, 0.0]
+        self.cam_info_data.K = [[1.88, 0, ],
+                                [],
+                                []]
 
 
         ## Collect AprilTag Location
@@ -304,7 +321,19 @@ class CameraNode( Node ):
 
     ##########
     # Initiallize Compressed Image Publisher
-    def init_node_publisher(self, rgb_topic_name: str, depth_topic_name: str, imu_topic_name: str, imu_accel_topic_name: str="", imu_gyro_topic_name: str="") -> None:
+    def init_node_publisher(self, camera_info_name: str, rgb_topic_name: str, depth_topic_name: str, imu_topic_name: str ) -> None:
+        ##########
+        # Initiallize the Camera Info Publisher
+        #       Type == Compressed Image
+        #       Topic == Specified in Function Call
+        #       Quality of Service == 3 frames
+        ######################################
+        self.pub_cam_info = self.create_publisher(
+            msg_type    = CameraInfo,
+            topic       = camera_info_name,
+            qos_profile = 5
+        )
+
         ##########
         # Initiallize the RGB Camera Publisher
         #       Type == Compressed Image

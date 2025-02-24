@@ -27,12 +27,14 @@ def generate_launch_description() -> LaunchDescription:
 
     # Add Webgui
     web_user_interface = Node(
+        name="webgui_node",
         package     = "webgui_pkg",
         executable  = "webgui_server"
     )
     
     # Add Realsense Camera
     rs_camera_module = Node(
+        name="camera_node",
         package="vision_pkg",
         executable="rs_camera"
     )
@@ -45,8 +47,24 @@ def generate_launch_description() -> LaunchDescription:
 
     # Add Hardware Controller
     hardware_controller_module = Node(
+        name="controller_node",
         package="controller_pkg",
         executable="controller_node"
+    )
+
+    # Add Depth-To-Laserscan Node
+    depth_to_laserscan_module = Node(
+        name="depth_to_laserscan_node",
+        package="depth_to_laserscan",
+        executable="depth_to_laserscan_node",
+        remappings=[
+            ('depth', '/camera/depth/image_raw'),
+            ('depth_camera_info', '/camera/depth_camera_info')
+        ],
+
+        parameters=[
+            {''}
+        ]
     )
 
 
