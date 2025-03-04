@@ -23,6 +23,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
 from sensor_msgs.msg import Image
 
+
+
 ########################################
 # TODO: Replace w/ interface type geometry_msgs/msg/AccelStamped
 # from example_interfaces.msg import Float32MultiArray
@@ -31,6 +33,14 @@ from geometry_msgs.msg import AccelStamped
 # TODO: Implement IMU interface to connect to Madgwick Filter Node 
 from sensor_msgs.msg import Imu
 ########################################
+
+# TODO: Implement /scan topic
+from sensor_msgs.msg import LaserScan
+########################################
+
+
+
+
 
 # TODO: Implement Depth Camera Info Topic
 from sensor_msgs.msg import CameraInfo
@@ -62,6 +72,7 @@ class CameraNode( Node ):
             rgb_topic_name      = "rs_node/camera/compressed_video",    # Publishes Compressed RGB Image: Used by WebGUI
             depth_topic_name    = "rs_node/camera/depth_video",         # Publishes Depth Image: Used by depthimage_to_laserscan node
             imu_topic_name      = "imu/data_raw",                       # Publishes IMU Data: Used by Madgwick Filter Node
+            scan_topic_name     = "scan"                               # Publishes Laser Scan Data: Used by Navigation Node
         )
 
         ## Initiallize AprilTag Detector
@@ -98,7 +109,7 @@ class CameraNode( Node ):
         video_frame = frames.get_color_frame()
         depth_frame = frames.get_depth_frame()
         ######################################
-
+        
 
         ## If Empty, Return
         ######################################
@@ -319,9 +330,30 @@ class CameraNode( Node ):
         
         return None
 
+
+    ##########
+    # Process Frames
+    def process_frames(self, rs_frame: rs.composite_frame ) -> tuple:
+        ## Collect Frames
+        video_frame = rs_frame.first_or_default( rs.stream.color ).as_video_frame()
+        depth_frame = rs_frame.first_or_default( rs.stream.depth ).as_depth_frame()
+        accel_frame = rs_frame.first_or_default( rs.stream.accel ).as_motion_frame()
+        gyro_frame = rs_frame.first_or_default( rs.stream.gyro ).as_motion_frame()
+
+        ## Check for Empty Frames
+        #   If any frame is empty, return None
+        #   Else, return tuple of frames
+        if not video_frame or not depth_frame or not accel_frame or not gyro_frame:
+            return None
+        else:
+            accel_data = accel_frame.get_motion_data()
+            gyro_data = gyro_frame.get_motion_data()
+            return ( video_frame, depth_frame, accel_data, gyro_data )
+
+
     ##########
     # Initiallize Compressed Image Publisher
-    def init_node_publisher(self, camera_info_name: str, rgb_topic_name: str, depth_topic_name: str, imu_topic_name: str ) -> None:
+    def init_node_publisher(self, camera_info_name: str, rgb_topic_name: str, depth_topic_name: str, imu_topic_name: str, laser_scan_topic: str ) -> None:
         ##########
         # Initiallize the Camera Info Publisher
         #       Type == Compressed Image
@@ -367,6 +399,18 @@ class CameraNode( Node ):
         self.pub_imu = self.create_publisher(
             msg_type    = Imu,
             topic       = imu_topic_name,
+            qos_profile = 5
+        )
+
+        ##########
+        # Initiallize Scan Publisher
+        #       Type == sensor_msgs/msg/LaserScan
+        #       Topic == laser_scan_topic
+        #       Quality of Service == 5 frames
+        ######################################
+        self.pub_scan = self.create_publisher(
+            msg_type    = LaserScan,
+            topic       = laser_scan_topic,
             qos_profile = 5
         )
         return None
