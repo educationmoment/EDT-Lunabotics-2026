@@ -85,7 +85,7 @@ class CameraNode( Node ):
         return
 
     ##########
-    # Destructor
+    # DONE: Destructor
     def __del__(self) -> None:
         self.get_logger().info("[ Camera.DEL ] Destroying Camera Node")
 
@@ -95,7 +95,7 @@ class CameraNode( Node ):
 
     ### CameraNode: CALLBACK FUNCTIONS  ###
     ##########
-    # Timer Callback Function
+    # In-Progress: Timer Callback Function
     def callback_timer(self) -> None:
         self.timer_counter += 1
 
@@ -106,82 +106,20 @@ class CameraNode( Node ):
         except Exception as e:
             self.get_logger().error(f"[ Camera.CALLBACK_TIMER ] Error: {e}")
             return
-        video_frame = frames.get_color_frame()
-        depth_frame = frames.get_depth_frame()
+
+        ## Process Frames
         ######################################
+        ( video_frame, depth_frame, accl_data, gyro_data ) = self.process_frames( rs_frame=frames )
         
-
-        ## If Empty, Return
-        ######################################
-        if not video_frame: return
-        if not depth_frame: return
-        ######################################
-
-
-        ## Collect Data
-        ######################################
+        ## Get NP Image out from Video Frame
         image = video_frame.as_frame().get_data()
         np_image = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2RGB)
-        ######################################
 
-
-        #####################################
-        # DONE: Implement Depth Frame      #
-        #####################################
-
-
-        #####################################
-        # DONE: IMU -- Needs documentation  #
-        #####################################
-
-        ######################################
-        gyro_frame = frames.first_or_default(rs.stream.gyro)
-        accl_frame = frames.first_or_default(rs.stream.accel)
-
-        accl_data = accl_frame.as_motion_frame().get_motion_data()
-        gyro_data = gyro_frame.as_motion_frame().get_motion_data()
-        ######################################
-
-        #####################################
-        # DONE: IMU -- Publish Accel/Gyro   #
-        #   Requires testing to ensure data #
-        #   is published correctly          #
-        #####################################
 
         ## Send IMU data over Imu interface to Madgwick's Filter node
         ######################################
-        (seconds, nano_seconds) = self.get_clock().now().seconds_nanoseconds()
-        data = Imu()
-        data.header.stamp.nanosec   = nano_seconds
-        data.header.stamp.sec       = seconds
-        data.header.frame_id        = f"{self.timer_counter}"
-
-        data.angular_velocity.x     = gyro_data.x
-        data.angular_velocity.y     = gyro_data.y
-        data.angular_velocity.z     = gyro_data.z
-        data.angular_velocity_covariance[0] = -1    # We have no estimate for Covariance
-
-        data.linear_acceleration.x  = accl_data.x
-        data.linear_acceleration.y  = accl_data.y
-        data.linear_acceleration.z  = accl_data.z
-        data.linear_acceleration_covariance[0] = -1
-        self.pub_imu.publish(msg=data)
+        self.send_imu_message( accel_data=accl_data, gyro_data=gyro_data )
         ######################################
-
-
-        ## Create Camera Info Message
-        ######################################
-        self.cam_info_data = CameraInfo()
-        self.cam_info_data.header.stamp = self.get_clock().now().to_msg()
-        self.cam_info_data.header.frame_id = "camera_frame"
-        self.cam_info_data.height = 480
-        self.cam_info_data.width = 640
-        self.cam_info_data.distortion_model = "plumb_bob"
-
-        self.cam_info_data.D = [0.0, 0.0, 0.0, 0.0, 0.0]
-        self.cam_info_data.K = [[1.88, 0, ],
-                                [],
-                                []]
 
 
         ## Collect AprilTag Location
@@ -213,44 +151,17 @@ class CameraNode( Node ):
                 distance_center = depth_frame.get_distance( int(center_x), int(center_y) )
                 cv.putText(np_image, f"{distance_center:0.3f}", (center_x - 20, center_y - 20), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 128, 40), 2)
         ######################################
-
-        ## Generate Message
-        ######################################
-        rgb_msg = CompressedImage()
-        depth_msg = Image()
-        ######################################
-
-        ## Populate RGB Message
-        ######################################
-        rgb_msg.header.stamp = self.get_clock().now().to_msg()
-        rgb_msg.format = "jpeg"
-        ######################################
-
-
-        ## Populate Depth Message
-        ######################################
-        depth_msg.header.stamp = self.get_clock().now().to_msg()
-        depth_msg.encoding = "16UC1"
-        ######################################
-
-
-        ## Pack Image Data
-        ######################################
-        rgb_msg.data = cv.imencode( ".jpg", np_image )[1].tobytes() # ChatGPT Suggested Fix
-        ######################################
-
-        ## Send Messages
-        ######################################
-        self.pub_rgb.publish(msg=rgb_msg)
-        self.pub_depth.publish(msg=depth_msg)
+        
+        self.send_rgb_message(video_frame=video_frame, depth_frame=depth_frame)
+        self.send_depth_message(depth_frame=depth_frame)
         ######################################
         return None
 
     ### CameraNode: Initiallizers       ###
 
     ##########
-    # Initiallize AprilTag Detector
-    def init_detector(self) -> None:
+    # DONE: Initiallize AprilTag Detector
+    def init_detector( self ) -> None:
         self.get_logger().info("[ CameraNode.init_detector ] Initiallizing Detector")
         
         ## Initiallize the AprilTag detector object
@@ -259,8 +170,8 @@ class CameraNode( Node ):
         return None
 
     ##########
-    # Initiallize Timer
-    def init_timer(self, period: float) -> None:
+    # DONE: Initiallize Timer
+    def init_timer( self, period: float ) -> None:
         self.get_logger().info(f"[ Camera.INIT_TIMER ] Starting Timer, Period={period}")
         
         ## Initiallize the Timer Object
@@ -278,8 +189,8 @@ class CameraNode( Node ):
         return None
 
     ##########
-    # Initiallize Camera Pipeline
-    def init_camera(self) -> None:
+    # DONE: Initiallize Camera Pipeline
+    def init_camera( self ) -> None:
         self.get_logger().info("[ Camera.INIT_CAMERA ] Starting Camera")
         self.get_logger().info("[ Camera.INIT_CAMERA ] Starting IMU")
 
@@ -327,33 +238,11 @@ class CameraNode( Node ):
         self.get_logger().info("[ Camera.INIT_CAMERA ] Camera Initiallized")
         self.get_logger().info("[ Camera.INIT_CAMERA ] IMU Initiallized")
         ######################################
-        
         return None
 
-
     ##########
-    # Process Frames
-    def process_frames(self, rs_frame: rs.composite_frame ) -> tuple:
-        ## Collect Frames
-        video_frame = rs_frame.first_or_default( rs.stream.color ).as_video_frame()
-        depth_frame = rs_frame.first_or_default( rs.stream.depth ).as_depth_frame()
-        accel_frame = rs_frame.first_or_default( rs.stream.accel ).as_motion_frame()
-        gyro_frame = rs_frame.first_or_default( rs.stream.gyro ).as_motion_frame()
-
-        ## Check for Empty Frames
-        #   If any frame is empty, return None
-        #   Else, return tuple of frames
-        if not video_frame or not depth_frame or not accel_frame or not gyro_frame:
-            return None
-        else:
-            accel_data = accel_frame.get_motion_data()
-            gyro_data = gyro_frame.get_motion_data()
-            return ( video_frame, depth_frame, accel_data, gyro_data )
-
-
-    ##########
-    # Initiallize Compressed Image Publisher
-    def init_node_publisher(self, camera_info_name: str, rgb_topic_name: str, depth_topic_name: str, imu_topic_name: str, laser_scan_topic: str ) -> None:
+    # DONE: Initiallize Compressed Image Publisher
+    def init_node_publisher( self, camera_info_name: str, rgb_topic_name: str, depth_topic_name: str, imu_topic_name: str, scan_topic_name: str ) -> None:
         ##########
         # Initiallize the Camera Info Publisher
         #       Type == Compressed Image
@@ -410,14 +299,14 @@ class CameraNode( Node ):
         ######################################
         self.pub_scan = self.create_publisher(
             msg_type    = LaserScan,
-            topic       = laser_scan_topic,
+            topic       = scan_topic_name,
             qos_profile = 5
         )
         return None
 
     ##########
-    # Print Corners on AprilTag
-    def overlay_tag_corners(self, np_image, tag) -> np.array:
+    # DONE: Print Corners on AprilTag
+    def overlay_tag_corners( self, np_image, tag) -> np.array:
         
         try:
             ## Determine of the tag passed is REALLY a tag:
@@ -446,8 +335,8 @@ class CameraNode( Node ):
         return np.zeros(1)
 
     ##########
-    # Print Center on AprilTag
-    def overlay_tag_center(self, np_image, tag):
+    # DONE: Print Center on AprilTag
+    def overlay_tag_center( self, np_image, tag):
         try:
             ## Determine of the tag passed is REALLY a tag:
             #   If NONE, then passed tag does not exist 
@@ -473,21 +362,165 @@ class CameraNode( Node ):
             self.get_logger().error(f"Error: {exc}")
         return np.zeros(1)
             
+    ##########
+    # DONE: Process Frames
+    def process_frames( self, rs_frame: rs.composite_frame ) -> tuple:
+        ## Collect Frames
+        video_frame = rs_frame.first_or_default( rs.stream.color ).as_video_frame()
+        depth_frame = rs_frame.first_or_default( rs.stream.depth ).as_depth_frame()
+        accel_frame = rs_frame.first_or_default( rs.stream.accel ).as_motion_frame()
+        gyro_frame = rs_frame.first_or_default( rs.stream.gyro ).as_motion_frame()
 
+        ## Check for Empty Frames
+        #   If any frame is empty, return None
+        #   Else, return tuple of frames
+        if not video_frame or not depth_frame or not accel_frame or not gyro_frame:
+            return None
+        else:
+            video_frame.as_frame()
+            accel_data = accel_frame.get_motion_data()
+            gyro_data = gyro_frame.get_motion_data()
+            return ( video_frame, depth_frame, accel_data, gyro_data )
+        return None
+
+    ##########
+    # DONE: Send IMU Message
+    def send_imu_message( self, accel_data: rs.vector, gyro_data: rs.vector ) -> None:
+        ## Collect IMU Data
+        (seconds, nano_seconds) = self.get_clock().now().seconds_nanoseconds()
+        data = Imu()
+
+        ## Populate IMU Header
+        data.header.stamp.nanosec   = nano_seconds
+        data.header.stamp.sec       = seconds
+        data.header.frame_id        = f"{self.timer_counter}"
+
+        ## Populate IMU Data: Angular Velocity
+        data.angular_velocity.x     = gyro_data.x
+        data.angular_velocity.y     = gyro_data.y
+        data.angular_velocity.z     = gyro_data.z
+        data.angular_velocity_covariance[0] = -1
+
+        ## Populate IMU Data: Linear Acceleration
+        data.linear_acceleration.x  = accel_data.x
+        data.linear_acceleration.y  = accel_data.y
+        data.linear_acceleration.z  = accel_data.z
+        data.linear_acceleration_covariance[0] = -1
+
+        ## Publish IMU Data
+        self.pub_imu.publish(msg=data)
+        return None
+
+    ########
+    # DONE: Send RGB Frame
+    def send_rgb_message( self, video_frame: rs.frame, depth_frame: rs.frame ) -> None:
+        ## Collect Image Data, Convert to NP Image
+        image = video_frame.as_frame().get_data()
+        np_image = cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2RGB)
+
+        ## Collect AprilTag Location
+        grayscale_image =  cv.cvtColor( np.asanyarray(image) , cv.COLOR_BGR2GRAY )
+
+        ## Detect AprilTag
+        #   - If no tag detected, return
+        #   - Else, collect tag ID and center location
+        #   - Draw corners and center onto image
+        #   - Get distance to center
+        result = self.detector.detect(grayscale_image)
+        if len(result) == 0:
+            self.get_logger().warn("[ CameraNode.timer ] No tag detected")
+        else:
+            self.get_logger().info(f"[ CameraNode.timer ]Tag ID: {result[0].tag_id}")
+
+            # Collect Corner and Center Locations
+            center = tuple(map(int, result[0].center))
+
+            # Unpack Center Location
+            center_x, center_y = center
+
+            # Draw Corners and Center onto image 
+            np_image = self.overlay_tag_corners(np_image, result[0])
+            np_image = self.overlay_tag_center(np_image,  result[0])
+
+            # Get Distance to Center
+            # ISSUE: The grayscale image used to detect the april tag appears to have a different resolution
+            #           than the depth frame.
+            self.get_logger().info(f"[ DEBUG ] {center_x},{center_y}")
+            if ( 0 <= center_x and center_x < depth_frame.get_width() ) and (0 <= center_y and center_y < depth_frame.get_height()):
+                distance_center = depth_frame.get_distance( int(center_x), int(center_y) )
+                cv.putText(np_image, f"{distance_center:0.3f}", (center_x - 20, center_y - 20), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 128, 40), 2)
+
+
+        ## Create Message
+        rgb_msg = CompressedImage()
+        rgb_msg.header.stamp = self.get_clock().now().to_msg()
+        rgb_msg.format = "jpeg"
+        rgb_msg.data = cv.imencode( ".jpg", np_image )[1].tobytes()
+
+        ## Publish Message
+        self.pub_rgb.publish(msg=rgb_msg)
+        return None
+
+    ########
+    # DONE: Send Depth Frame
+    def send_depth_message( self, depth_frame: rs.frame ) -> None:
+
+        ## Create Publisher Message
+        depth_msg = Image()
+
+        ## Populate Message
+        depth_msg.header.stamp = self.get_clock().now().to_msg()
+        depth_msg.header.frame_id = "camera_depth_frame"
+        depth_msg.encoding = "16UC1"
+        depth_msg.height = depth_frame.get_height()
+        depth_msg.width = depth_frame.get_width()
+        depth_msg.step = depth_msg.width * 2
+        depth_msg.data = np.asanyarray(depth_frame.get_data()).tobytes()
+
+        ## Publish Message
+        self.pub_depth.publish(msg=depth_msg)
+        return None
+
+    ##########
+    # TODO: Send Scan Message
+    def send_scan_message(self) -> None:
+
+        ## Create Publisher Message
+        scan_msg = LaserScan()
+
+        ## Populate Message
+        scan_msg.header.stamp = self.get_clock().now().to_msg()
+        scan_msg.header.frame_id = "camera_depth_frame"
+        scan_msg.angle_min = -3.14159
+        scan_msg.angle_max = 3.14159
+        scan_msg.angle_increment = 0.01
+        scan_msg.time_increment = 0.01
+        scan_msg.scan_time = 0.01
+        scan_msg.range_min = 0.0
+        scan_msg.range_max = 10.0
+
+        # TODO: Implement Laser Scan Data
+        scan_msg.ranges = np.zeros(628)
+        scan_msg.intensities = np.zeros(628)
+
+        ## Publish Message
+        self.pub_scan.publish(msg=scan_msg)
+        return None
 
 #####################################
 # Main Function
 def main() -> int:
     rclpy.init()
     node = CameraNode(poll_period_sec=0.03334)
-            
+
+
+    ## Run Node   
     try:
         rclpy.spin(node=node)
     except KeyboardInterrupt:
         print("\n\033[100m[ Main.MAIN ] Keyboard Interrupt Pressed", end='\033[0m\n')
     finally:
-        rclpy.shutdown()
-
+        node.__del__()
     return 0
 
 if __name__ == "__main__":
