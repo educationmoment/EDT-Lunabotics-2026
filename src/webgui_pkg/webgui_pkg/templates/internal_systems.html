@@ -4,9 +4,19 @@
  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="{{url_for('static', filename='js/resources/roslib.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
+    <script src="{{url_for('static', filename='js/internal_systems.js')}}" defer></script>
+    <link rel="stylesheet" href="{{url_for('static', filename='css/internal_systems.css')}}">
     <title>Internal Systems</title>
  </head>
  <body>
     <div class="header"><h1>Internal Systems</h1></div>
+    <div class="outer-box">
+      <div class="top-left">Top-Left</div>
+      <div class="bottom-left">bottom-left</div>
+      <div class="node-list" id="active-nodes-div">Node-list</div>
+    </div>
  </body>
  </html>

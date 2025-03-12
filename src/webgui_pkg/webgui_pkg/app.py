@@ -1,5 +1,6 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
+import subprocess
 
 # Get Current Working Directory
 # -- Set Paths for Templates and Static Files
@@ -45,17 +46,43 @@ def get_engineer():
 @app.route('/networking', methods=['GET'])
 def get_networking():
     return render_template('networking.html')
-    # return """<h1>Network</h1><hr><p>Not Yet Started</p>"""
 ##################################################
 
+@app.route('/get_active_nodes', methods=['GET'])
+def get_active_nodes():
+    
+    # Get Active Nodes
+    active_nodes = subprocess.run(
+        ['ros2', 'node', 'list'],
+        stdout=subprocess.PIPE
+    )
 
-### Debugging: Issue - Flask server served to default ip. 127.0.0.1 on 5000
-#   Issue appears to be resolved as of February 7
-##################################################
-# print('----------')
-# print('\033[104m' + f"{__name__}" + '\033[0m')
-# print('----------')
-##################################################
+    # Get Active Topics
+    active_topics = subprocess.run(
+        ['ros2', 'topic', 'list'],
+        stdout=subprocess.PIPE
+    )
+
+    # Get Active Services
+    active_services = subprocess.run(
+        ['ros2', 'service', 'list'],
+        stdout=subprocess.PIPE
+    )
+
+    # Decode and Split Output
+    active_nodes = active_nodes.stdout.decode('utf-8').strip('\n').split('\n')
+    active_topics = active_topics.stdout.decode('utf-8').strip('\n').split('\n')
+    active_services = active_services.stdout.decode('utf-8').strip('\n').split('\n')
+
+    # Return JSON
+    return jsonify({
+        "number_nodes": len(active_nodes),
+        "number_topics": len(active_topics),
+        "number_services": len(active_services), 
+        "active_nodes": active_nodes,
+        "active_topics": active_topics,
+        "active_services": active_services
+    })
 
 
 ## Start Application:
