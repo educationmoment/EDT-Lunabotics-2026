@@ -8,11 +8,13 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(librealsense2 REQUIRED)
+find_package(realsense2 REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 add_executable(rs_camera_node src/rs_camera_node.cpp)
 
-ament_target_dependencies(rs_camera_node rclcpp librealsense2)
+target_link_libraries(rs_camera_node ${realsense2_LIBRARY})
+ament_target_dependencies(rs_camera_node rclcpp realsense2 sensor_msgs)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
