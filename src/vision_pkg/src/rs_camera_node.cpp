@@ -1,12 +1,10 @@
 #include    <list>
 #include    <iomanip>
+#include    <thread>
 #include    "rclcpp/rclcpp.hpp"
 #include    "librealsense2/rs.hpp"
 #include    "std_msgs/msg/string.hpp"
-
-// #include "sensor_msgs/msg/compressed_image.hpp"
-
-
+#include    "sensor_msgs/msg/compressed_image.hpp"
 
 
 /*******************************************************************************
@@ -30,6 +28,7 @@ Class: Camera
 *******************************************************************************/
 class Camera : public rclcpp::Node {
 public:
+
     /****************************************
     Constructor: Camera()
         Parameters: None
@@ -40,11 +39,19 @@ public:
         (void)enumerate_cameras();
         (void)init_publishers();
         (void)init_timers();
+
+
+        // Initialize all cameras
+        for( auto device : this->devices ) {
+            rs2::pipeline pipe = init_camera(device);
+            // while (true) {
+                // (void)camera_runtime( pipe );
+            // }
+        }
         return;
     }
     
 private:
-
     ////////////////////////////////////////
     // Variable Declarations
     //      - ctx: Realsense Context
@@ -55,13 +62,14 @@ private:
     std::list<rs2::device> devices;
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _string_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr _rgb_camera_pub_;
 
     /****************************************
     Function: init_publishers()
         Parameters: None
         Description: Initialize all publishers
     *****************************************/
-    void init_publishers() {
+    void init_publishers(std::list<std::string> topics = {}) {
         RCLCPP_WARN( this->get_logger(), "Initializing Publishers...");
 
         // Initialize String Publisher
@@ -70,12 +78,30 @@ private:
         );
 
         // TODO: Implement RGB Image Publisher (Use Compressed Image Topic)
+        this->_rgb_camera_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(
+            "camera/rgb/image_raw", 10
+        );
 
         // TODO: Implement Depth Image Publisher (Use Image Topic)
 
         // TODO: Implemenet IMU Data Publisher (Use geometry_msgs::msg::AccelStamped Topic)
-
         return;
+    }
+
+    rs2::pipeline init_camera( rs2::device& device ) {
+        RCLCPP_WARN( this->get_logger(), "Initializing Camera %s", device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) );
+        rs2::config cfg;
+        rs2::pipeline pipe;
+        try {
+            cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
+            cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
+            cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F, 62);
+            cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F, 200);
+            pipe.start(cfg);    
+        } catch( const rs2::error& e ) {
+            RCLCPP_ERROR( this->get_logger(), "Error: %s", e.what() );
+        }
+        return pipe;
     }
 
     /****************************************
@@ -123,14 +149,18 @@ private:
         RCLCPP_INFO( this->get_logger(), "Timer Callback");
     }
 
+    void camera_runtime( rs2::pipeline& pipe ) {
+        rs2::frameset frames = pipe.wait_for_frames();
+        
 
+        rs2::frame color_frame = frames.get_color_frame();
+        
+        // Publish RGB Image
 
+        // Publish Depth Image
 
-
-
-
-
-
+        // Publish IMU Data
+    }
 };
 
 
