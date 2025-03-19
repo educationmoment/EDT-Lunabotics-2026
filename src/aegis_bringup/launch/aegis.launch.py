@@ -34,7 +34,7 @@ def generate_launch_description() -> LaunchDescription:
     # Add Realsense Camera
     rs_camera_module = Node(
         package="vision_pkg",
-        executable="rs_camera"
+        executable="rs_camera_node"
     )
 
     # Add Localization Node

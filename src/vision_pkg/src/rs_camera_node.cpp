@@ -7,7 +7,9 @@
 
 #include    "librealsense2/rs.hpp"
 #include    "std_msgs/msg/string.hpp"
+#include    "geometry_msgs/msg/accel_stamped.hpp"
 #include    "sensor_msgs/msg/compressed_image.hpp"
+#include    "sensor_msgs/msg/image.hpp"
 
 
 /*******************************************************************************
@@ -41,16 +43,23 @@ public:
         RCLCPP_WARN( this->get_logger(), "Enumerating Cameras...");
         (void)enumerate_cameras();
         (void)init_publishers();
-        (void)init_timers();
-
-
+        
+        
         // Initialize all cameras
         for( auto device : this->devices ) {
             this->pipe = init_camera(device);
             // while (true) {
-                // (void)camera_runtime( pipe );
+            // (void)camera_runtime( pipe );
             // }
         }
+        (void)init_timers();
+        return;
+    }
+
+    ~Camera() {
+        RCLCPP_WARN( this->get_logger(), "Shutting Down Camera Node...");
+        this->pipe.stop();
+        this->devices.clear();
         return;
     }
     
@@ -67,6 +76,8 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _string_pub_;
     rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr _rgb_camera_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr _depth_camera_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::AccelStamped>::SharedPtr _imu_accel_pub_, _imu_gyro_pub_;
 
     /****************************************
     Function: init_publishers()
@@ -81,12 +92,15 @@ private:
             "camera_info", 10
         );
 
-        // TODO: Implement RGB Image Publisher (Use Compressed Image Topic)
+        // DONE: Implement RGB Image Publisher (Use Compressed Image Topic)
         this->_rgb_camera_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(
             "rs_node/camera/compressed_video", 10
         );
 
         // TODO: Implement Depth Image Publisher (Use Image Topic)
+        this->_depth_camera_pub_ = this->create_publisher<sensor_msgs::msg::Image>(
+            "rs_node/camera/depth", 10
+        );
 
         // TODO: Implemenet IMU Data Publisher (Use geometry_msgs::msg::AccelStamped Topic)
         return;
@@ -97,7 +111,7 @@ private:
         rs2::config cfg;
         rs2::pipeline pipe;
         try {
-            cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_BGR8);
+            cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
             // cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
             // cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
             // cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F, 62);
@@ -117,7 +131,7 @@ private:
     void init_timers() {
         RCLCPP_WARN( this->get_logger(), "Initializing Timer...");
         this->timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(100),
+            std::chrono::milliseconds(33),
             std::bind(&Camera::timer_callback, this)
         );
         return;
@@ -163,6 +177,16 @@ private:
         } 
 
 
+        // Send the RGB Image
+        (void)send_RGB(color_frame);
+        return;
+    }
+
+    void send_RGB( rs2::frame& color_frame ) {
+        std::vector<uchar> buffer;
+        std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 80};
+        std::shared_ptr<sensor_msgs::msg::CompressedImage> rgb_msg = std::make_shared<sensor_msgs::msg::CompressedImage>();
+        
         // Convert the RealSense Frame to OpenCV Mat
         cv::Mat rgb_frame(
             cv::Size(color_frame.as<rs2::video_frame>().get_width(), color_frame.as<rs2::video_frame>().get_height()),
@@ -170,17 +194,14 @@ private:
             (void*)color_frame.get_data(),
             cv::Mat::AUTO_STEP
         );
-
+        
         // Encode the Image as JPEG
-        std::vector<uchar> buffer;
-        std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 80};
         if( ! cv::imencode( ".jpg", rgb_frame, buffer, params ) ) {
             RCLCPP_ERROR( this->get_logger(), "Error Encoding Image");
             return;
         }
 
         // Populate the Compressed Image Message
-        std::shared_ptr<sensor_msgs::msg::CompressedImage> rgb_msg = std::make_shared<sensor_msgs::msg::CompressedImage>();
         rgb_msg->header.stamp = this->now();
         rgb_msg->header.frame_id = "camera_rgb_optical_frame";
         rgb_msg->format = "jpeg";
@@ -190,7 +211,7 @@ private:
         this->_rgb_camera_pub_->publish(*rgb_msg);
         RCLCPP_INFO( this->get_logger(), "Published RGB Image");
         return;
-    }
+    } 
 
     void camera_runtime( rs2::pipeline& pipe ) {
         rs2::frameset frames = pipe.wait_for_frames();
