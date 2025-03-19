@@ -36,7 +36,7 @@ def generate_launch_description() -> LaunchDescription:
     rs_camera_module = Node(
         name="camera_node",
         package="vision_pkg",
-        executable="rs_camera"
+        executable="rs_camera_node"
     )
 
     # Add Localization Node
