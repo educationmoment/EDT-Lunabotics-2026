@@ -2,6 +2,9 @@
 #include    <iomanip>
 #include    <thread>
 #include    "rclcpp/rclcpp.hpp"
+
+#include    "opencv2/opencv.hpp"
+
 #include    "librealsense2/rs.hpp"
 #include    "std_msgs/msg/string.hpp"
 #include    "sensor_msgs/msg/compressed_image.hpp"
@@ -43,7 +46,7 @@ public:
 
         // Initialize all cameras
         for( auto device : this->devices ) {
-            rs2::pipeline pipe = init_camera(device);
+            this->pipe = init_camera(device);
             // while (true) {
                 // (void)camera_runtime( pipe );
             // }
@@ -59,6 +62,7 @@ private:
     //      - timer_: Timer Object
     //      - _string_pub_: String Publisher
     rs2::context ctx;
+    rs2::pipeline pipe;
     std::list<rs2::device> devices;
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _string_pub_;
@@ -79,7 +83,7 @@ private:
 
         // TODO: Implement RGB Image Publisher (Use Compressed Image Topic)
         this->_rgb_camera_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(
-            "camera/rgb/image_raw", 10
+            "rs_node/camera/compressed_video", 10
         );
 
         // TODO: Implement Depth Image Publisher (Use Image Topic)
@@ -93,10 +97,11 @@ private:
         rs2::config cfg;
         rs2::pipeline pipe;
         try {
-            cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
-            cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
-            cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F, 62);
-            cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F, 200);
+            cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_BGR8);
+            // cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
+            // cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
+            // cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F, 62);
+            // cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F, 200);
             pipe.start(cfg);    
         } catch( const rs2::error& e ) {
             RCLCPP_ERROR( this->get_logger(), "Error: %s", e.what() );
@@ -147,6 +152,44 @@ private:
         msg.data = "Hello World!";
         this->_string_pub_->publish(msg);
         RCLCPP_INFO( this->get_logger(), "Timer Callback");
+
+        // Wait for Frames
+        rs2::frameset frames = this->pipe.wait_for_frames();
+        rs2::frame color_frame = frames.get_color_frame();
+
+        if( ! color_frame ) {
+            RCLCPP_WARN( this->get_logger(), "No Color Frame Detected");
+            return;
+        } 
+
+
+        // Convert the RealSense Frame to OpenCV Mat
+        cv::Mat rgb_frame(
+            cv::Size(color_frame.as<rs2::video_frame>().get_width(), color_frame.as<rs2::video_frame>().get_height()),
+            CV_8UC3,
+            (void*)color_frame.get_data(),
+            cv::Mat::AUTO_STEP
+        );
+
+        // Encode the Image as JPEG
+        std::vector<uchar> buffer;
+        std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 80};
+        if( ! cv::imencode( ".jpg", rgb_frame, buffer, params ) ) {
+            RCLCPP_ERROR( this->get_logger(), "Error Encoding Image");
+            return;
+        }
+
+        // Populate the Compressed Image Message
+        std::shared_ptr<sensor_msgs::msg::CompressedImage> rgb_msg = std::make_shared<sensor_msgs::msg::CompressedImage>();
+        rgb_msg->header.stamp = this->now();
+        rgb_msg->header.frame_id = "camera_rgb_optical_frame";
+        rgb_msg->format = "jpeg";
+        rgb_msg->data = buffer;
+
+        // Publish the Compressed Image
+        this->_rgb_camera_pub_->publish(*rgb_msg);
+        RCLCPP_INFO( this->get_logger(), "Published RGB Image");
+        return;
     }
 
     void camera_runtime( rs2::pipeline& pipe ) {
