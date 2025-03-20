@@ -1,216 +1,152 @@
+// pilot_node.cpp
+#include "SparkMax.hpp"  // Assumes SparkMax.hpp is available in your include path
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
 #include "sensor_msgs/msg/joy.hpp"
-#include <memory>
-#include <iostream>
+#include <cmath>
+#include <string>
 
-// Test Importing SparkCan -- 
-// Note: SparkMax.hpp and SparkBase.hpp should be located in src/<package-name>/include/<package-name>/
-#include "SparkMax.hpp"
-
-/* Class: ControllerNode
- *  Methods:
- *      ControllerNode()
- *      topic_callback()
- *      joy_callback()
- *******************************************/
-
- /* Standard CAN IDs    ID      Motor-Type
-  *     Left-Motor:     1       Brushless
-  *     Right-Motor:    2       Brushless
-  *     Left-Tilt:      3       Brushed?
-  *     Right-Tilt:     4       Brushed?
-  *     Tilt:           5       Burshed?
-  *     Vibrator:       6       Brushed?
-  *******************************************/
-class ControllerNode : public rclcpp::Node {
-public: 
-    
-    /* ControllerNode::ControllerNode() - Constructor
-     *   
-     *  Description:
-     *
-     *
-     */
-    ControllerNode() : Node("controller_node") {
-        // Begin Initiallizing Node
-        /////////////////////////////////////////////////////////////////////////////////
-        RCLCPP_INFO( this->get_logger(), "Hello RCLCPP" );
-
-
-        // DONE: Create Subscription to /example_interface Topic
-        /////////////////////////////////////////////////////////////////////////////////
-        RCLCPP_INFO( this->get_logger(), "Initiallizing Subscription");
-        subscription = this->create_subscription<std_msgs::msg::String>(
-            "example_interface",
-            10,
-            std::bind(&ControllerNode::topic_callback, this, std::placeholders::_1)
-        );
-        RCLCPP_INFO( this->get_logger(), "Subscription Initiallized");
-
-        // TODO: Initiallize Motor Controllers
-        /////////////////////////////////////////////////////////////////////////////////
-        RCLCPP_INFO( this->get_logger(), "Initiallizing Motor Controllers" );
-        // motor = std::make_shared<SparkMax>("can0", 47);
-        init_motors();
-        RCLCPP_INFO( this->get_logger(), "Motor Controllers Initiallized" );
-
-
-        // DONE: Create Subscription to /joy Topic
-        /////////////////////////////////////////////////////////////////////////////////
-        RCLCPP_INFO( this->get_logger(), "Initiallizing Joy Subscription");
-        joySubscription = this->create_subscription<sensor_msgs::msg::Joy>(
-            "joy",
-            3,
-            std::bind(&ControllerNode::joy_callback, this, std::placeholders::_1)
-        );
-        RCLCPP_INFO( this->get_logger(), "Joy Subscription Initiallized");
-
-        // DONE: Create Publisher to /heartbeat Topic
-        /////////////////////////////////////////////////////////////////////////////////
-        RCLCPP_INFO( this->get_logger(), "Initiallizing /heartbeat Publisher" );
-        heartbeatPub = this->create_publisher<std_msgs::msg::String>("/heartbeat", 10); 
-        RCLCPP_INFO( this->get_logger(), "Initiallized /hearbeat Publisher" );
-
-        // DONE: Create Timer for Heartbeat
-        /////////////////////////////////////////////////////////////////////////////////
-        RCLCPP_INFO( this->get_logger(), "Initiallizing Timer");
-        timer = this->create_wall_timer(
-            std::chrono::milliseconds(1000),
-            std::bind(&ControllerNode::publish_heartbeat, this)
-        );
-        RCLCPP_INFO( this->get_logger(), "Timer Initiallized");
-
-
-        return;
-    }
-
-private:
-    // Subscription Callback
-    ///////////////////////////
-    void topic_callback(const std_msgs::msg::String::SharedPtr msg) {
-        RCLCPP_INFO(this->get_logger(), "Received: '%s'", msg->data.c_str());
-        return;
-    }
-
-    /* Joystick Callback
-     *
-     * Description:
-     *      
-     *
-     **********************/
-    void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        // Get Axis 1 and 3
-        //      >> Axis 1: Top-Left Joystick
-        //      >> Axis 3: Bottom-Right Joystick
-        //      >> Button 4: Left Bumpter
-        //      >> Button 5: Right Bumper
-        ///////////////////////////////////////////////////
-        float 
-            axis1 = msg->axes[1],
-            axis3 = msg->axes[3];
-        bool
-            bumper_left  = msg->buttons[4],
-            bumper_right = msg->buttons[5];
-        
-
-        // Scale Duty-Cycle (control.cpp example uses 0.05, use 0.05 and -0.05 as maximum/minimum limits)
-        RCLCPP_INFO( this->get_logger(), "Axis 3: %0.3f", axis3);\
-        float
-            pwm_output_1 = axis1,
-            pwm_output_3 = axis3;
-
-
-        // If Left-Bumper Pressed
-        if ( bumper_left ) {
-            pwm_output_1 *= 0.12;
-        } else {
-            pwm_output_1 *= 0.06;
-        }
-
-        // If Right-Bumper Pressed
-        if ( bumper_right ) {
-            pwm_output_3 *= 0.65;
-        } else {
-            pwm_output_3 *= 0.33;
-        }
-
-        // RCLCPP_INFO( this->get_logger(), "[\033[104m\t%0.3f\t|\t%0.3f\t\033[0m]", pwm_output_1, pwm_output_3 );
-
-        // Set Motor Output
-        this->motor->Heartbeat();
-        this->motor->SetDutyCycle(pwm_output_1);
-
-        // Set Actuator Output
-        this->actuator->Heartbeat();
-        this->actuator->SetDutyCycle(pwm_output_3);
-
-        RCLCPP_INFO( this->get_logger(), "Sending: %0.3f to motor", pwm_output_1);
-        RCLCPP_INFO( this->get_logger(), "Sending: %0.3f to actuator", pwm_output_3);
-        
-        return;
-    }
-
-    // Publisher Callback
-    ///////////////////////////
-    void publish_heartbeat() {
-        auto message = std_msgs::msg::String();
-        message.data = "[ controller_node ] Heartbeat";
-
-        heartbeatPub->publish(message);
-        RCLCPP_INFO(this->get_logger(), "Published: %s", message.data.c_str());
-    
-    }
-
-
-    // Initiallize Motors
-    ///////////////////////////
-    void init_motors() {
-        // Configure Motor Interface
-        motor = std::make_shared<SparkMax>("can0", 1);
-        this->motor->SetIdleMode(IdleMode::kBrake);
-        this->motor->SetMotorType(MotorType::kBrushless);
-        this->motor->BurnFlash();
-
-        // Configure Actuator Interface
-        actuator = std::make_shared<SparkMax>("can0", 3);
-        this->actuator->SetIdleMode(IdleMode::kBrake);
-        this->actuator->SetMotorType(MotorType::kBrushless);
-        this->actuator->BurnFlash();
-        return;
-    }
-
-    // Subscriber Variables
-    ///////////////////////////
-    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription;
-    rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joySubscription;
-
-    // Publisher Variable
-    ///////////////////////////
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr heartbeatPub;
-
-    // Timer Variable
-    ///////////////////////////
-    rclcpp::TimerBase::SharedPtr timer;
-
-    // Motor Object
-    // SparkMax motor;
-    std::shared_ptr<SparkMax> motor;
-    std::shared_ptr<SparkMax> actuator;
-    // std::shared_ptr<SparkMax> motor = new SparkMax("can0", 47);
-   
+// Define CAN IDs for our devices (vibrator is omitted)
+enum CAN_IDs {
+  LEFT_MOTOR  = 1,
+  RIGHT_MOTOR = 2,
+  LEFT_LIFT   = 3,
+  RIGHT_LIFT  = 4,
+  TILT        = 5
 };
 
+class PilotNode : public rclcpp::Node
+{
+public:
+  PilotNode(const std::string & can_interface)
+  : Node("pilot_node"),
+    leftMotor(can_interface, LEFT_MOTOR),
+    rightMotor(can_interface, RIGHT_MOTOR),
+    leftLift(can_interface, LEFT_LIFT),
+    rightLift(can_interface, RIGHT_LIFT),
+    tilt(can_interface, TILT)
+  {
+    // --- Configure Drive Motors (Brushless with Hall Sensor) ---
+    leftMotor.SetIdleMode(IdleMode::kBrake);
+    rightMotor.SetIdleMode(IdleMode::kBrake);
+    leftMotor.SetMotorType(MotorType::kBrushless);
+    rightMotor.SetMotorType(MotorType::kBrushless);
+    leftMotor.SetSensorType(SensorType::kHallSensor);
+    rightMotor.SetSensorType(SensorType::kHallSensor);
 
+    // --- Configure Lift Motors (Brushed with Encoder) ---
+    leftLift.SetIdleMode(IdleMode::kBrake);
+    rightLift.SetIdleMode(IdleMode::kBrake);
+    leftLift.SetMotorType(MotorType::kBrushed);
+    rightLift.SetMotorType(MotorType::kBrushed);
+    leftLift.SetSensorType(SensorType::kEncoder);
+    rightLift.SetSensorType(SensorType::kEncoder);
 
-/* Function: main()
- *  
- *  Description:
- *
- **/
-int main( int argc, char *argv[] ){
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<ControllerNode>());
-    rclcpp::shutdown();
-    return 0;
+    // --- Configure Tilt (Brushed with Encoder) ---
+    tilt.SetIdleMode(IdleMode::kBrake);
+    tilt.SetMotorType(MotorType::kBrushed);
+    tilt.SetSensorType(SensorType::kEncoder);
+
+    // --- Invert All Motors ---
+    leftMotor.SetInverted(false);
+    rightMotor.SetInverted(true);
+    leftLift.SetInverted(true);
+    rightLift.SetInverted(true);
+    tilt.SetInverted(true);
+
+    // Optionally, burn these parameters to flash.
+    leftMotor.BurnFlash();
+    rightMotor.BurnFlash();
+    leftLift.BurnFlash();
+    rightLift.BurnFlash();
+    tilt.BurnFlash();
+
+    // Create subscription to the /joy topic.
+    joy_subscriber_ = this->create_subscription<sensor_msgs::msg::Joy>(
+      "/joy", 10,
+      std::bind(&PilotNode::joy_callback, this, std::placeholders::_1)
+    );
+
+    RCLCPP_INFO(this->get_logger(), "PilotNode initialized on CAN interface: %s", can_interface.c_str());
+  }
+
+private:
+  // Motor controller objects using SparkMax.
+  SparkMax leftMotor;
+  SparkMax rightMotor;
+  SparkMax leftLift;
+  SparkMax rightLift;
+  SparkMax tilt;
+
+  rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscriber_;
+
+  // Helper: returns +0.25 or -0.25 if the axis input exceeds a deadband; else 0.
+  float computeDutyFromAxis(float axisValue, float deadband = 0.1f)
+  {
+    if (std::fabs(axisValue) < deadband) {
+      return 0.0f;
+    }
+    return (axisValue > 0) ? 0.25f : -0.25f;
+  }
+
+  void joy_callback(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
+  {
+    if (joy_msg->axes.size() < 2 || joy_msg->buttons.size() < 8) {
+      RCLCPP_WARN(this->get_logger(), "Insufficient axes/buttons in Joy message");
+      return;
+    }
+
+    // --- Drive Motors ---
+    // Use the left joystick vertical axis (axes[1]) for drive.
+    // Invert so that pushing forward (normally negative) yields a positive command.
+    float raw_drive = -joy_msg->axes[1];
+    float drive_duty = computeDutyFromAxis(raw_drive);
+
+    // --- Lift Motors (Actuators) ---
+    // Instead of a single trigger, use both triggers:
+    // Right trigger (button index 7) yields +0.5 duty cycle.
+    // Left trigger (button index 6) yields -0.5 duty cycle.
+    float lift_duty = 0.0f;
+    if (joy_msg->buttons[7] > 0) {
+      lift_duty = 0.5f;
+    } else if (joy_msg->buttons[6] > 0) {
+      lift_duty = -0.5f;
+    }
+
+    try {
+      // Send heartbeat to maintain communication.
+      leftMotor.Heartbeat();
+      rightMotor.Heartbeat();
+      leftLift.Heartbeat();
+      rightLift.Heartbeat();
+      //tilt.Heartbeat();
+
+      // Command drive motors.
+      leftMotor.SetDutyCycle(drive_duty);
+      rightMotor.SetDutyCycle(drive_duty);
+
+      // Command lift motors.
+      leftLift.SetDutyCycle(lift_duty);
+      rightLift.SetDutyCycle(lift_duty);
+
+      // Command tilt (here, no command; adjust as needed).
+      //tilt.SetDutyCycle(0.0f);
+    } catch (const std::exception & ex) {
+      RCLCPP_ERROR(this->get_logger(), "Error sending CAN command: %s", ex.what());
+    }
+  }
+};
+
+int main(int argc, char ** argv)
+{
+  rclcpp::init(argc, argv);
+
+  std::string can_interface = "can0";
+  auto temp_node = rclcpp::Node::make_shared("pilot_param_node");
+  temp_node->declare_parameter<std::string>("can_interface", "can0");
+  temp_node->get_parameter("can_interface", can_interface);
+
+  auto node = std::make_shared<PilotNode>(can_interface);
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
 }
