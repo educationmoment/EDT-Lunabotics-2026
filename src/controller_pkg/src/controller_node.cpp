@@ -5,6 +5,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include <cassert>
 
 #define DRIVE_MOTOR_SCALE 0.25
 #define LIFT_MOTOR_SCALE 0.5
@@ -84,8 +85,18 @@ private:
     {
         if (std::fabs(axisValue) < deadband)
         {
+            RCLCPP_WARN( this->get_logger(), "Axos value is below deadband: %f", axisValue);
             return 0.0f;
         }
+        RCLCPP_INFO(this->get_logger(), "Axis value: %f", axisValue);
+        float scaled_value = axisValue * scale_factor;
+
+        RCLCPP_INFO(this->get_logger(), "Scaled value: %f", scaled_value);
+
+        // Test Assertions
+        assert(axisValue >= -1.0f && axisValue <= 1.0f);
+        assert(scale_factor >= 0.0f && scale_factor <= 1.0f);
+        assert(scaled_value >= -1.0f && scaled_value <= 1.0f);
         return (axisValue > 0) ? axisValue * scale_factor : -axisValue * scale_factor;
     }
 
@@ -143,23 +154,34 @@ private:
             return;
         }
 
+        // Attempt to send commands to the motors.
         try
         {
             // Send heartbeat to maintain communication.
             // this->send_heartbeat({leftMotor, rightMotor, leftLift, rightLift, tilt});
-            leftMotor.Heartbeat();
-            rightMotor.Heartbeat();
-            leftLift.Heartbeat();
-            rightLift.Heartbeat();
-            tilt.Heartbeat();
+            (void)leftMotor.Heartbeat();
+            (void)rightMotor.Heartbeat();
+            (void)leftLift.Heartbeat();
+            (void)rightLift.Heartbeat();
+            (void)tilt.Heartbeat();
 
             // --- Drive Motors ---
             // Use the left joystick vertical axis (axes[1]) for drive.
             // Invert so that pushing forward (normally negative) yields a positive command.
-            float drive_duty_left = computeDutyFromAxis(joy_msg->axes[LEFT_JOY_VERTICAL], DRIVE_MOTOR_SCALE),
-                  drive_duty_right = computeDutyFromAxis(joy_msg->axes[RIGHT_JOY_VERTICAL], DRIVE_MOTOR_SCALE);
-            leftMotor.SetDutyCycle(drive_duty_left);
-            rightMotor.SetDutyCycle(drive_duty_right);
+
+            assert( joy_msgs->axes.size() >= LEFT_JOY_VERTICAL && joy_msgs->axes.size() >= RIGHT_JOY_VERTICAL);
+
+
+            /* Implement Tank Steering of the Robot */
+            //---------------------------------------------//
+            float 
+                drive_duty_left = computeDutyFromAxis(joy_msg->axes[LEFT_JOY_VERTICAL], DRIVE_MOTOR_SCALE),
+                drive_duty_right = computeDutyFromAxis(joy_msg->axes[RIGHT_JOY_VERTICAL], DRIVE_MOTOR_SCALE);
+            //---------------------------------------------//
+            
+
+            (void)leftMotor.SetDutyCycle(drive_duty_left);
+            (void)rightMotor.SetDutyCycle(drive_duty_right);
 
             // --- Lift Motors (Actuators) ---
             // Instead of a single trigger, use both triggers:
@@ -168,6 +190,7 @@ private:
             // float lift_duty = 0.0f;
             float lift_duty = computeDutyFromAxis(joy_msg->axes[RIGHT_JOY_TRIGGER] - joy_msg->axes[LEFT_JOY_TRIGGER], LIFT_MOTOR_SCALE);
 
+            assert(joy_msg->buttons.size() >= 8);
             if (joy_msg->buttons[7] > 0)
             {
                 lift_duty = 0.5f;
@@ -178,11 +201,11 @@ private:
             }
 
             // Command lift motors.
-            leftLift.SetDutyCycle(lift_duty);
-            rightLift.SetDutyCycle(lift_duty);
+            (void)leftLift.SetDutyCycle(lift_duty);
+            (void)rightLift.SetDutyCycle(lift_duty);
 
             // Command tilt (here, no command; adjust as needed).
-            tilt.SetDutyCycle(0.0f);
+            (void)tilt.SetDutyCycle(0.0f);
         }
         catch (const std::exception &ex)
         {
