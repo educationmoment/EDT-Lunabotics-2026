@@ -51,7 +51,18 @@ def generate_launch_description() -> LaunchDescription:
         package="controller_pkg",
         executable="controller_node"
     )
-
+    # Add Depositing Sequence
+    depositing_module = Node(
+        name="depositing_node",
+        package="controller_pkg",
+        executable="depositing_node",
+    )
+    # Add Excavation Sequence
+    excavation_module = Node(
+        name="excavation_node",
+        package="controller_pkg",
+        executable="excavation_node",
+    )
     # Add Depth-To-Laserscan Node
     depth_to_laserscan_module = Node(
         name="depth_to_laserscan_node",
@@ -89,6 +100,8 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(web_user_interface)
     ld.add_action(rs_camera_module)
     ld.add_action(hardware_controller_module)
+    ld.add_action(depositing_module)
+    ld.add_action(excavation_module)
     ld.add_action(localization_module)
     return ld
 
