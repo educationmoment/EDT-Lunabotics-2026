@@ -168,12 +168,12 @@ private:
         msg.angular.y = this->state.angular_vel.y;
         msg.angular.z = this->state.angular_vel.z;
 
-        RCLCPP_INFO( this->get_logger(), "Frame @ time %0.3lf", old_time.seconds() );
+        /*RCLCPP_INFO( this->get_logger(), "Frame @ time %0.3lf", old_time.seconds() );
         RCLCPP_INFO( this->get_logger(), "---------" );
         RCLCPP_INFO( this->get_logger(), "\tX: %0.8lf", msg.angular.x );
         RCLCPP_INFO( this->get_logger(), "\tY: %0.8lf", msg.angular.y );
         RCLCPP_INFO( this->get_logger(), "\tZ: %0.8lf", msg.angular.z );
-
+*/ ///Temporarily commented out while debugging depositing
 
         this->debug_state->publish(msg);
         return;
