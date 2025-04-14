@@ -17,18 +17,19 @@ find_package(interfaces_pkg REQUIRED)
 add_executable(controller_node src/controller_node.cpp)
 add_executable(depositing_node src/depositing_node.cpp)
 add_executable(excavation_node src/excavation_node.cpp)
+add_executable(health_node src/health_node.cpp)
 # Link Dependencies
 ament_target_dependencies(controller_node rclcpp std_msgs sensor_msgs sparkcan interfaces_pkg)
 ament_target_dependencies(depositing_node rclcpp std_msgs sensor_msgs sparkcan interfaces_pkg)
 ament_target_dependencies(excavation_node rclcpp std_msgs sensor_msgs sparkcan interfaces_pkg)
-
+ament_target_dependencies(health_node rclcpp std_msgs sensor_msgs sparkcan interfaces_pkg)
 # Install the Executables
 install(TARGETS
   controller_node
   depositing_node
   excavation_node
+  health_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()
-
