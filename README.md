@@ -67,4 +67,7 @@ Configure the CAN interface using</p>
 <p>At this point, launch the robot using</p>
 
     ros2 launch aegis_bringup aegis_bringup.launch
-    
+
+<p>You can also view the health status of the robot with </p>
+
+    ros2 topic echo health_topic
