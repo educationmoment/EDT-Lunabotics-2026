@@ -9,6 +9,9 @@
 #include <cstdlib>
 #include <algorithm>
 
+const float VELOCITY_MAX = 2000.0; //rpm, after gearbox turns into 11.1 RPM
+const float VIBRATOR_OUTPUT = 0.2f; //Constant value for vibrator output 
+
 enum CAN_IDs {
   LEFT_MOTOR  = 1,
   RIGHT_MOTOR = 2,
@@ -64,21 +67,21 @@ public:
     vibrator.SetSensorType(SensorType::kEncoder);
     //Initializes the settings fro the vibrator
 
-    leftMotor.SetInverted(true);
-    rightMotor.SetInverted(false);
+    leftMotor.SetInverted(false);
+    rightMotor.SetInverted(true);
     leftLift.SetInverted(true);
     rightLift.SetInverted(true);
     tilt.SetInverted(false);
     vibrator.SetInverted(true);
     //Initializes the inverting status
 
-    leftMotor.SetP(0, 0.0f);
+    leftMotor.SetP(0, 0.0002f);
     leftMotor.SetI(0, 0.0f);
     leftMotor.SetD(0, 0.0f);
     leftMotor.SetF(0, 0.00021f);
     //PID settings for left motor
 
-    rightMotor.SetP(0, 0.0f);
+    rightMotor.SetP(0, 0.0002f);
     rightMotor.SetI(0, 0.0f);
     rightMotor.SetD(0, 0.0f);
     rightMotor.SetF(0, 0.00021f);
@@ -155,18 +158,18 @@ private:
   bool prev_alternate_button_ = false;
 
   // helper to compute stepped duty cycle (original implementation remains)
-  float computeStepDuty(float value)
+  float computeStepVelocity(float value)
   {
     float absVal = std::fabs(value);
     if (absVal < 0.25f)
-      return 0.0f;
+      return VELOCITY_MAX * 0.0f;
     else if (absVal < 0.5f)
-      return (value > 0 ? 0.25f : -0.25f);
+      return VELOCITY_MAX * (value > 0 ? 0.25f : -0.25f);
     else if (absVal < 0.75f)
-      return (value > 0 ? 0.5f : -0.5f);
+      return VELOCITY_MAX * (value > 0 ? 0.5f : -0.5f);
     else if (absVal < 1.0f)
-      return (value > 0 ? 0.75f : -0.75f);
-    return (value > 0 ? 1.0f : -1.0f);
+      return VELOCITY_MAX * (value > 0 ? 0.75f : -0.75f);
+    return VELOCITY_MAX * (value > 0 ? 1.0f : -1.0f);
   }
 
   // Sends request to depositing node and manages response.
@@ -223,7 +226,7 @@ private:
       RCLCPP_INFO(this->get_logger(), "Vibrator toggled %s", vibrator_active_ ? "ON" : "OFF");
     }
     prev_vibrator_button_ = current_vibrator_button;
-    float vibrator_duty = vibrator_active_ ? 1.0f : 0.0f;
+    float vibrator_duty = vibrator_active_ ? VIBRATOR_OUTPUT : 0.0f;
     // VIBRATOR
 
     // ACTUATORS.
@@ -304,28 +307,32 @@ private:
 
     float left_drive = 0.0;
     float right_drive = 0.0;
+    float left_drive_raw = 0.0;
+    float right_drive_raw = 0.0;
     // If alternate mode is active, assign each drivetrain motor independently.
     if (alternate_mode_active_) {
       // Left joystick vertical (axes[1]) controls left motor.
       // Right joystick vertical (axes[3]) controls right motor.
-      float leftJS = joy_msg->axes[1];
-      float rightJS = joy_msg->axes[3];
-      left_drive = (std::fabs(leftJS) < 0.25f) ? 0.0f : 0.80f * (leftJS > 0 ? 1 : -1);
-      right_drive = (std::fabs(rightJS) < 0.25f) ? 0.0f : 0.80f * (rightJS > 0 ? 1 : -1);
+      float leftJS = -joy_msg->axes[1];
+      float rightJS = -joy_msg->axes[3];
+      left_drive_raw = std::max(-1.0f, std::min(1.0f, leftJS));
+      right_drive_raw = std::max(-1.0f, std::min(1.0f, rightJS));
     }
     else
     {
       // DRIVETRAIN (Left joystick).
-      float forward = joy_msg->axes[1];
+      float forward = -joy_msg->axes[1];
       float turn = joy_msg->axes[0];
-      float left_drive_raw = forward + turn;
-      float right_drive_raw = forward - turn;
+      left_drive_raw = forward + turn;
+      right_drive_raw = forward - turn;
       left_drive_raw = std::max(-1.0f, std::min(1.0f, left_drive_raw));
       right_drive_raw = std::max(-1.0f, std::min(1.0f, right_drive_raw));
-      left_drive = computeStepDuty(left_drive_raw);
-      right_drive = computeStepDuty(right_drive_raw);
       // DRIVETRAIN (Left joystick).
     }
+
+    left_drive = computeStepVelocity(left_drive_raw);
+    right_drive = computeStepVelocity(right_drive_raw);
+
 
     if (!triggersPressed) {
         // stop all motion if no trigger is pressed.
@@ -335,8 +342,8 @@ private:
         rightLift.SetDutyCycle(0.0f);
         tilt.SetDutyCycle(0.0f);
       } else {
-        leftMotor.SetDutyCycle(left_drive);
-        rightMotor.SetDutyCycle(right_drive);
+        leftMotor.SetVelocity(left_drive);
+        rightMotor.SetVelocity(right_drive);
         leftLift.SetDutyCycle(lift_duty);
         rightLift.SetDutyCycle(lift_duty);
         tilt.SetDutyCycle(tilt_duty);
