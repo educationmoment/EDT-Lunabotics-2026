@@ -1,0 +1,254 @@
+html {
+    background-color: black;
+}
+
+/* Class: outer-box */
+/* 
+    Encompasses ALL elements of the page
+    
+    Description:
+        -- Adds a background to the webpage around the borders
+        -- Indicates if Video feed cuts out by becoming visible to user
+*/
+.outer-box {
+    background-color: rgb(192, 192, 192);
+    position: fixed;
+
+    /* width: 110vw; */
+    /* height: 110vh; */
+
+    width: 100vw;
+    height: 100vh;
+
+    justify-self: center;
+    align-self: center;
+    
+    display: grid;
+    grid-template-columns: 1fr 5fr 5fr 1fr;
+    grid-template-rows: 1fr 3fr 5fr 3fr 1fr;
+    
+    /* grid-auto-columns: 33vw; */
+
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    gap: 0;
+    padding: 0%;
+    margin: 0%;
+
+    z-index: 0;
+
+}
+
+
+/* Class: inner-div */
+/* 
+    Elements that overlay on-top of Video Feed:
+        -- Quadrant 1: Autonomous Function Indicators
+            > Show Current State of autonomous functionality
+        -- Quadrant 2: Quest Arrow
+            > Shows animated Arrow inside a canvas that points towards April Tag
+        -- Quadrant 3: ROS Logger Output
+            > Shows ROS2 Logger Output (info, warning, and errors)
+        -- Quadrant 4: Robot Digital Twin
+            > SHows animated Digital Twin, indicates actuator positions
+*/
+.inner-div {
+    background-color: rgba( 0, 0, 0, 0.39);
+    
+    /* width: 100%; */
+    /* height: 15vh; */
+    
+    justify-self: center;
+    align-self: center;
+    justify-content: center;
+    align-content: center;
+    
+    border: solid 1px black;
+    /* border-radius: 20px; */
+    
+    z-index: 3;
+
+    margin: 0;
+}
+
+.inner-quad-1 {
+    /* grid-column: 1 4; */
+
+    background-color: rgba( 0, 0, 0, 0.0);
+
+    grid-column: 2 / 4;
+
+    /* column-span: 2; */
+    grid-row: 3 / 4;
+    
+    padding: 2px;
+    width: 100%;
+    height: 100%;
+
+    /* border-radius: 0px 0px 0px 20px; */
+    /* border-right: 0px; */
+    border: 0px;
+    margin: 1px;
+}
+
+#quest-arrow {
+    width: 100%;
+    height: 100%;
+}
+
+.inner-quad-3 {
+    grid-column: 1;
+    grid-row: 4;
+
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: 1fr;
+    
+    height: 30vh;
+    width: 30vw;
+
+    justify-content: center;
+    align-content: center;
+
+    padding-left: 5%;
+    padding-right: 5%;
+
+    border-top-right-radius: 20px;
+    border-bottom: 0px;
+}
+
+#left {
+    /* background-color: white; */
+    grid-column: 1;
+    grid-row: 1;
+
+    width: 100%;
+    height: 100%;
+
+    justify-content: center;
+    align-content: center;
+
+    padding: 2%;
+    border-radius: 20px;
+    /* border: 1px solid black; */
+}
+
+#digital-twin {
+    background-color: rgba(0, 0,0, 0.25);
+
+    width: 100%;
+    height: 100%;
+}
+
+#right {
+    background-color: white;
+    grid-column: 2;
+    grid-row: 1;
+
+    width: 100%;
+    height: 100%;
+
+    justify-content: center;
+    align-content: center;
+
+    padding: 10%;
+    border-radius: 20px;
+    border: 1px solid black;
+}
+
+.inner-quad-4 {
+    grid-column: 4;
+    grid-row-start: 1;
+    grid-row-end: 3;
+    /* height: 30vh; */
+    
+    height: 100%;
+    width: 30vw;
+
+    border-bottom-left-radius: 20px;
+}
+
+.inner-bottom {
+    width: 100%;
+    height: 100%;
+
+    grid-column: 1 / 5;
+    grid-row: 5 / 5;
+}
+
+.camera-feed {
+    background-color: rgb(0, 192, 192);
+    
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    z-index: 2;
+}
+
+
+
+img {
+    width: 100vw;
+    height: 100vh;
+
+    /* align-self: center; */
+    /* justify-self: center; */
+
+
+    padding: 0;
+    /* border: solid 20px black; */
+    margin: 0;
+}
+.multi-camera-checkerboard {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    padding: 15px;
+    margin-top: 20px;
+    justify-items: center;
+}
+
+.camera-container {
+    background-color: #1a1a1a;
+    border: 2px solid #888;
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+    color: white;
+    width: 100%;
+    max-width: 480px;
+}
+
+.camera-frame {
+    width: 100%;
+    height: auto;
+    max-height: 300px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.fullscreen-button {
+    background-color: #333;
+    color: white;
+    border: 1px solid #999;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.fullscreen-button:hover {
+    background-color: #555;
+}
+
+
+
+
+* {
+    box-sizing: border-box;
+}
