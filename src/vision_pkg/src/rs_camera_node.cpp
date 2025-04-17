@@ -1,5 +1,5 @@
-//rs_camera_node.cpp
-//added low frame for d455s it works ok so fuck you
+// rs_camera_node.cpp
+// Optimized for low latency and high performance on Jetson
 
 #include <list>
 #include <vector>
@@ -59,14 +59,14 @@ public:
     }
 
     // Open USB RGB cameras explicitly
-    cap_rgb1_.open("/dev/video0");
-    cap_rgb2_.open("/dev/video8");
+    cap_rgb1_.open("/dev/video6");
+    cap_rgb2_.open("/dev/video14");
 
     if (!cap_rgb1_.isOpened()) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video0).\n");
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video6).\n");
     }
     if (!cap_rgb2_.isOpened()) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video8).\n");
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video14).\n");
     }
 
     // Publishers
