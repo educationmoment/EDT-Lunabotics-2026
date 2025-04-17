@@ -83,23 +83,29 @@
 
             <!-- Camera Feed -->
             <!-- NOTE: Using a canvas element may be better -->
-            <div class="multi-camera-box">
-                <div class="camera-container">
-                    <p>D455 Camera 1</p>
-                    <img id="camera-d455-1" class="camera-frame"/>
-            <div class="camera-container">
-                    <p>D455 Camera 2</p>
-                        <img id="camera-d455-2" class="camera-frame"/>
-                </div>
+            <div id="camera-wrapper">
+                <button onclick="toggleFullscreen()" class="fullscreen-button">🔳 Fullscreen</button>
+              
+                <div class="multi-camera-checkerboard">
+                    <div class="camera-container">
+                        <p>D455 Camera 1</p>
+                        <img id="camera-d455-1" class="camera-frame" />
+                    </div>
+                    <div class="camera-container">
+                        <p>D455 Camera 2</p>
+                        <img id="camera-d455-2" class="camera-frame" />
+                    </div>
                     <div class="camera-container">
                         <p>USB RGB Camera 1</p>
-                        <img id="camera-rgb-1" class="camera-frame"/>
+                        <img id="camera-rgb-1" class="camera-frame" />
                     </div>
                     <div class="camera-container">
                         <p>USB RGB Camera 2</p>
-                        <img id="camera-rgb-2" class="camera-frame"/>
+                        <img id="camera-rgb-2" class="camera-frame" />
                     </div>
                 </div>
+              </div>
+              
 
 
         </div>
