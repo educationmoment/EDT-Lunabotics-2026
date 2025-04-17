@@ -41,6 +41,19 @@ cameraTopics.forEach(({ id, topic }) => {
       }
   });
 });
+
+function toggleFullscreen() {
+    const elem = document.getElementById("camera-wrapper");
+
+    if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => {
+            alert(`Error attempting to enable fullscreen mode: ${err.message}`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////
 
 
