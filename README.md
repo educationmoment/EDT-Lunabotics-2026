@@ -5,10 +5,12 @@
 <hr>
 <h2>Packages</h2>
     <ul>
-        <li>aegis_bringup</li>
+        <li>neptune_bringup</li>
         <li>controller_pkg</li>
         <li>vision_pkg</li>
         <li>webgui_pkg</li>
+        <li>interfaces_pkg</li>
+        <li>localization_pkg</li>
     </ul>
 
 <h2>Description</h2>
