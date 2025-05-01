@@ -16,7 +16,34 @@
 <p>This is a GitHub repository created for the University of Illinois Chicago Engineering Design Team
 for the NASA Lunabotics 2025 competition.</p>
 
-    
+<h2>Potential Bugs and their fixes.</h2>
+<p>Video Cameras not showing (and not throwing the error: "Failed to open USB RGB camera 1 (/dev/video6)")" etc</p> 
+
+    fix: run "v4l2-ctl --list-devices" in /home/Desktop/robot_WS
+    find the webcameras, and put the top directory, itll look /dev/videox, where x is any number, and paste it into rs_camera_node.cpp in vision_pkg. this requires recompiling- colcon build --packages-select vision_pkg
+
+<p>"ROS Webbridge is overloaded- restarting in 2ms"</p>
+
+    fix: okay so we started the robot too many times on the same uptime for the jetson. The cache is overloaded- and unfourtently the only fix is to restart the Jetson entirely. This happens after starting the robot 5+ times on the same uptime.
+
+<p>/joy topic not found</p>
+
+    there should be /joy topic always, run ros topic list and look for /joy. then echo ros topic echo /joy
+    if nothing comes up, something is wrong, likely the ROS bridge being overloaded. restart the jetson.
+
+<p>Building and sourcing throwing an error.</p>
+
+    fix: build and remove cached artifiacts. colcon build --cmake-clean-cache
+
+<p>Controller not sending signals, despite /joy being up</p>
+
+    fix: you are not pressing the trigger! press right or left trigger to ensure connection is through. check ros topic echo /joy for any changes. 
+
+<p>CAN Interface not found / CAN is busy</p>
+
+    fix: sudo ip link set can0 up type can bitrate 1000000 || OR || lift E-stop (if busy).
+
+
 <h2>Installation</h2>
 <hr>
 <h3><strong>(Optional)</strong> Using Docker</h3>
