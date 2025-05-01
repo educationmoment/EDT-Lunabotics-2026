@@ -93,7 +93,7 @@ Configure the CAN interface using</p>
 
 <p>At this point, launch the robot using</p>
 
-    ros2 launch aegis_bringup aegis_bringup.launch
+    ros2 launch neptune_bringup neptune_bringup_launch.py
 
 <p>You can also view the health status of the robot with </p>
 
