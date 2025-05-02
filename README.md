@@ -70,7 +70,7 @@ you can either reattach to it using</p>
 
 <h3>Clone this Github Repo</h3>
 
-    git clone git@github.com:Cdiede2/EDT-Lunabotics-2025.git && cd EDT-Lunabotics-2025/
+    git clone git@github.com/educationmoment/EDT-Lunabotics-2025.git && cd EDT-Lunabotics-2025/
 
 <p>From within a computer running Ubuntu 22.04, run <em>install.sh</em> script with root privileges using</p>
     
