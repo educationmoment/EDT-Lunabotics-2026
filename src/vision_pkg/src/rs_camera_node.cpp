@@ -61,7 +61,7 @@ public:
     // Open USB RGB cameras explicitly
     cap_rgb1_.open("/dev/video6");
     cap_rgb2_.open("/dev/video14");
-
+    // a
     if (!cap_rgb1_.isOpened()) {
       RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video6).\n");
     }
