@@ -97,6 +97,13 @@ Configure the CAN interface using</p>
 
     ros2 launch neptune_bringup neptune_bringup_launch.py
 
+<p>The pilot can access the WebGUI by visiting</p>
+
+    http://192.168.0.139:59440/pilot
+
 <p>You can also view the health status of the robot with </p>
 
     ros2 topic echo health_topic
+<p>Before UCF and then KSC, make sure to copy over the appropriate version of odometry onto odometry_node.cpp. Also, note that the pilot needs to be clicked into the WebGUI for this to work. To run it, use</p>
+
+    ros2 run controller_pkg odometry_node
