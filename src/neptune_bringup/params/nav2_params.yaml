@@ -1,0 +1,14 @@
+robot_description:
+  footprint: [[-0.25, -0.25], [-0.25, 0.25], [0.25, 0.25], [0.25, -0.25]]  # 0.5m square robot (adjust)
+  robot_radius: 0.3  # if using circular robot for inflation_layer
+
+controller_server:
+  use_sim_time: false
+  controller_plugins: ["FollowPath"]
+  FollowPath:
+    plugin: "nav2_regulated_pure_pursuit_controller/RegulatedPurePursuitController"
+    desired_linear_vel: 0.5
+    min_lookahead_distance: 0.3
+    max_lookahead_distance: 0.6
+    lookahead_time: 1.5
+

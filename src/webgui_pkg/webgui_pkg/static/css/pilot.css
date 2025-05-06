@@ -203,6 +203,51 @@ img {
     /* border: solid 20px black; */
     margin: 0;
 }
+.multi-camera-checkerboard {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    padding: 15px;
+    margin-top: 20px;
+    justify-items: center;
+}
+
+.camera-container {
+    background-color: #1a1a1a;
+    border: 2px solid #888;
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+    color: white;
+    width: 100%;
+    max-width: 480px;
+}
+
+.camera-frame {
+    width: 100%;
+    height: auto;
+    max-height: 300px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.fullscreen-button {
+    background-color: #333;
+    color: white;
+    border: 1px solid #999;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.fullscreen-button:hover {
+    background-color: #555;
+}
+
+
+
 
 * {
     box-sizing: border-box;

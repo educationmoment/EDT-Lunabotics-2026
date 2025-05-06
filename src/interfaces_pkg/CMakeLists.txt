@@ -14,6 +14,7 @@ find_package(rosidl_default_generators REQUIRED)# uncomment the following sectio
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/DepositingRequest.srv"
   "srv/ExcavationRequest.srv"
+  "msg/MotorHealth.msg"
 )
 
 if(BUILD_TESTING)

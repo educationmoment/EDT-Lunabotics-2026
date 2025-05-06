@@ -30,9 +30,3 @@ ROS.on('error', function(error) {
 ROS.on('close', function() {
     console.log('Connection to websocket server closed.');
 });
-
-const nodesService = new ROSLIB.Service({
-    ros : ROS,
-    name : '/rosapi/nodes',
-    serviceType : 'rosapi/Nodes'
-});

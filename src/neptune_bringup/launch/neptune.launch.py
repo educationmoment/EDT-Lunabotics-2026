@@ -63,6 +63,12 @@ def generate_launch_description() -> LaunchDescription:
         package="controller_pkg",
         executable="excavation_node",
     )
+    # Add Helath Node
+    health_module = Node(
+	name="health_node",
+	package="controller_pkg",
+	executable="health_node",
+    )
     # Add Depth-To-Laserscan Node
     depth_to_laserscan_module = Node(
         name="depth_to_laserscan_node",
@@ -103,6 +109,7 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(depositing_module)
     ld.add_action(excavation_module)
     ld.add_action(localization_module)
+    ld.add_action(health_module)
     return ld
 
 
