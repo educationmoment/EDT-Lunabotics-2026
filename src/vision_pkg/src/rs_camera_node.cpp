@@ -44,37 +44,20 @@ public:
         RCLCPP_ERROR(this->get_logger(), "Error starting pipeline for D455 #1: %s", e.what());
       }
     }
-    /*
-    // Initialize RealSense pipeline for D455 #2
-    {
-      rs2::pipeline pipeline;
-      rs2::config cfg;
-      cfg.enable_device(serial2);
-      cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
-      try {
-        pipeline.start(cfg);
-        pipelines_.push_back(pipeline);
-        RCLCPP_INFO(this->get_logger(), "Started D455 pipeline on device %s", serial2.c_str());
-      } catch (const rs2::error &e) {
-        RCLCPP_ERROR(this->get_logger(), "Error starting pipeline for D455 #2: %s", e.what());
-      }
-    }
-    */
+    
     // Open USB RGB cameras explicitly
-    //cap_rgb1_.open("/dev/video6");
-    //cap_rgb2_.open("/dev/video14");
-    /*
+    cap_rgb1_.open("/dev/video0");
+    cap_rgb2_.open("/dev/video3");
+    
     if (!cap_rgb1_.isOpened()) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video6).\n");
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video0).\n");
     }
     if (!cap_rgb2_.isOpened()) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video14).\n");
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video2).\n");
     }
-      */
 
     // Publishers
     d455_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 10);
-    //d455_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/compressed_video", 10);
     rgb_cam1_pub_  = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 10);
     rgb_cam2_pub_  = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 10);
     L_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/left", 10);
@@ -90,7 +73,6 @@ private:
   cv::VideoCapture cap_rgb1_;
   cv::VideoCapture cap_rgb2_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam1_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam2_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam2_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr L_obstacle_detection_pub_;
@@ -111,19 +93,9 @@ private:
         RCLCPP_WARN(this->get_logger(), "No frame available from D455 camera 1.");
       }
     }
-    /*
-    if (pipelines_.size() >= 2) {
-      rs2::frameset frames2;
-      if (pipelines_[1].poll_for_frames(&frames2)) {
-        rs2::frame color_frame2 = frames2.get_color_frame();
-        if (color_frame2) publish_realsense_image(color_frame2, d455_cam2_pub_);
-      } else {
-        RCLCPP_WARN(this->get_logger(), "No frame available from D455 camera 2.");
-      }
-    }*/
 
-    //publish_rgb_camera(cap_rgb1_, rgb_cam1_pub_);
-    //publish_rgb_camera(cap_rgb2_, rgb_cam2_pub_);
+    publish_rgb_camera(cap_rgb1_, rgb_cam1_pub_);
+    publish_rgb_camera(cap_rgb2_, rgb_cam2_pub_);
   }
 
   void publish_realsense_image(rs2::frame & color_frame, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub) {
@@ -150,7 +122,7 @@ private:
   void publish_rgb_camera(cv::VideoCapture & cap, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub) {
     cv::Mat frame;
     if (!cap.read(frame)) {
-      RCLCPP_WARN(this->get_logger(), "Failed to capture frame from USB RGB camera.");
+      //RCLCPP_WARN(this->get_logger(), "Failed to capture frame from USB RGB camera.");
       return;
     }
     std::vector<uchar> buffer;
@@ -194,14 +166,14 @@ private:
 
         if (delta > POS_THRESHOLD){ 
           pos_count++;
-          left_count++;
+          right_count++;
         }
         else if (-delta > NEG_THRESHOLD){
           neg_count++;
-          left_count++;
+          right_count++;
         } 
       }
-    }//left side detection
+    }//right side detection
 
     for (int y = height / 2; y < height; y += 5) {
       for (int x = width / 2; x < width; x += 5) {
@@ -213,11 +185,11 @@ private:
 
         if (delta > POS_THRESHOLD){ 
           pos_count++;
-          right_count++;
+          left_count++;
         }
         else if (-delta > NEG_THRESHOLD){
           neg_count++;
-          right_count++;
+          left_count++;
         } 
       }
     }//right side detection
@@ -226,20 +198,20 @@ private:
     std_msgs::msg::Bool right_msg;
 
     if (pos_count > OBSTACLE_THRESHOLD || neg_count > OBSTACLE_THRESHOLD){
-      RCLCPP_INFO(this->get_logger(), "Obstacle Detected :3 Positive = %i, Negative = %i", pos_count, neg_count);
+      //RCLCPP_INFO(this->get_logger(), "Obstacle Detected :3 Positive = %i, Negative = %i", pos_count, neg_count);
       if (left_count >= right_count){
-        RCLCPP_INFO(this->get_logger(), "Obstacle on left side");
+        //RCLCPP_INFO(this->get_logger(), "Obstacle on left side");
         left_msg.data = true;
         right_msg.data = false;
       }
       else {
-        RCLCPP_INFO(this->get_logger(), "Obstacle on right side");
+        //RCLCPP_INFO(this->get_logger(), "Obstacle on right side");
         left_msg.data = false;
         right_msg.data = true;
       }
     }
     else {
-      RCLCPP_INFO(this->get_logger(), "Obstacle Not Detected :( Positive = %i, Negative = %i", pos_count, neg_count);
+      //RCLCPP_INFO(this->get_logger(), "Obstacle Not Detected :( Positive = %i, Negative = %i", pos_count, neg_count);
       left_msg.data = false;
       right_msg.data = false;
     }

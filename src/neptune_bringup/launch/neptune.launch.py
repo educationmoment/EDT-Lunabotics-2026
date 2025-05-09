@@ -31,7 +31,7 @@ def generate_launch_description() -> LaunchDescription:
         package     = "webgui_pkg",
         executable  = "webgui_server"
     )
-    
+
     # Add Realsense Camera
     rs_camera_module = Node(
         name="camera_node",
@@ -65,9 +65,9 @@ def generate_launch_description() -> LaunchDescription:
     )
     # Add Helath Node
     health_module = Node(
-	name="health_node",
-	package="controller_pkg",
-	executable="health_node",
+        name="health_node",
+        package="controller_pkg",
+        executable="health_node",
     )
     # Add Depth-To-Laserscan Node
     depth_to_laserscan_module = Node(
@@ -85,13 +85,13 @@ def generate_launch_description() -> LaunchDescription:
     )
 
 
-    
+
     # Example Talker/Listener Launch Description
     # talker_node = Node(
     #     package="demo_nodes_cpp",
     #     executable="talker",
     # )
-    # 
+    #
     # listener_node = Node(
     #     package="demo_nodes_py",
     #     executable="listener"
@@ -111,5 +111,3 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(localization_module)
     ld.add_action(health_module)
     return ld
-
-

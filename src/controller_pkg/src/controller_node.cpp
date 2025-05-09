@@ -128,10 +128,10 @@ public:
       std::bind(&ControllerNode::position_callback, this, std::placeholders::_1)
     );
 
-    RCLCPP_INFO(this->get_logger(), "Initializing depositing and excavation client");
+    RCLCPP_INFO(this->get_logger(), "Initializing depositing, excavation, and travel client");
     depositing_client_ = (this->create_client<interfaces_pkg::srv::DepositingRequest>("depositing_service"));
     excavation_client_ = (this->create_client<interfaces_pkg::srv::ExcavationRequest>("excavation_service"));
-    RCLCPP_INFO(this->get_logger(), "Excavation and depositing client initialized");
+    RCLCPP_INFO(this->get_logger(), "Excavation, depositing clients initialized");
 
     RCLCPP_INFO(this->get_logger(), "Initializing Heartbeat Publisher");
     heartbeatPub = this->create_publisher<std_msgs::msg::String>("/heartbeat", 10);
@@ -191,7 +191,7 @@ private:
     return (value > 0 ? 1.0f : -1.0f);
   }
 
-  // Sends request to depositing node and manages response.
+  // Sends request to depositing node and manages response
   void send_deposit_request() {
     if (!depositing_client_ || !depositing_client_->wait_for_service(std::chrono::seconds(1))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available");
@@ -209,7 +209,7 @@ private:
     });
   }
 
-  // Sends request to excavation node and manages response.
+  // Sends request to excavation node and manages response
   void send_excavation_request() {
     if (!excavation_client_ || !excavation_client_->wait_for_service(std::chrono::seconds(1))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available");
@@ -257,6 +257,7 @@ private:
     if (joy_msg->buttons[1] > 0) {
       std::system("pkill -9 -f depositing_node");
       std::system("pkill -9 -f excavation_node");
+      std::system("pkill -9 -f odometry_node");
       
       std::this_thread::sleep_for(std::chrono::seconds(2)); //Allows time for the nodes to restarted
   
@@ -380,6 +381,15 @@ private:
        send_excavation_request();
     }
     prev_excavate_button = current_excavate_button;
+
+    // TRAVEL AUTONOMY (Back)
+    bool current_travel_button = (joy_msg->buttons[8] > 0);
+    static bool prev_travel_button = false;
+    if (current_travel_button && !prev_travel_button){
+      std::system("ros2 run controller_pkg odometry_node &");
+    }
+    prev_travel_button = current_travel_button;
+
     //----------AUTONOMOUS FUNCTIONS----------//
   }
 

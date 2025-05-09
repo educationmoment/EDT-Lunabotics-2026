@@ -37,13 +37,16 @@ private:
     float initialPosition;
     bool initialized = false;
     
-    int obstacle_stage = 0; // add this as a member variable
+    int obstacle_stage = 0; 
 
     float initialPositionAvoidance;
     bool initializedAvoidance = false;
 
     bool left_obstacle_detected = false;
     bool right_obstacle_detected = false;
+    bool turn_right = false;
+
+    float obstacle_displacement_rotations = 0.0;
 
     void left_obstacle_detection(const std_msgs::msg::Bool::SharedPtr left_msg) {
       left_obstacle_detected = left_msg->data;
@@ -66,13 +69,21 @@ private:
             RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
           }
 
-          if (health_msg->left_motor_position - initialPosition <= setpointRotations){
+          if (health_msg->left_motor_position - initialPosition  <= setpointRotations + obstacle_displacement_rotations){
             leftMotor.SetVelocity(2500.0f);
             rightMotor.SetVelocity(2500.0f);
             RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
             RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
             if (left_obstacle_detected || right_obstacle_detected){
               state = TravelAutonomy::AVOID_OBSTACLE;
+              if (left_obstacle_detected){
+                turn_right = true;
+                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "OBSTACLE DETECTED ON LEFT");
+              }
+              else {
+                turn_right = false;
+                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "OBSTACLE DETECTED ON RIGHT");
+              }
             }
           }
           else {
@@ -84,69 +95,74 @@ private:
         break;
 
         case TravelAutonomy::AVOID_OBSTACLE:
+          
           if (!initializedAvoidance) {
             initialPositionAvoidance = health_msg->left_motor_position;
             initializedAvoidance = true;
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "OBSTACLE DETECTED");
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Avoidance initalized at: %f", initialPositionAvoidance);
           }
         
           switch (obstacle_stage) {
-            case 0: // rotate
-              if (health_msg->left_motor_position - initialPositionAvoidance <= (left_obstacle_detected ? -100 : 100)) {
-                leftMotor.SetVelocity((left_obstacle_detected ? -2500.0 : 2500.0));
-                rightMotor.SetVelocity((left_obstacle_detected ? 2500.0 : -2500.0));
+            case 0: // Initial rotation
+              if (health_msg->left_motor_position - initialPositionAvoidance <= (turn_right ? 40 : -40)) {
+                leftMotor.SetVelocity((turn_right ? 2500.0 : -2500.0));  
+                rightMotor.SetVelocity((turn_right ? -2500.0 : 2500.0)); 
               } else {
                 leftMotor.SetDutyCycle(0.0f);
                 rightMotor.SetDutyCycle(0.0f);
                 obstacle_stage++;
+                initialPositionAvoidance = health_msg->left_motor_position;
                 initializedAvoidance = false;
                 RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "STAGE 1 COMPLETE");
               }
               break;
         
-            case 1: // forward
-              if (health_msg->left_motor_position - initialPositionAvoidance <= 200) {
+            case 1: // Forward
+              if (health_msg->left_motor_position - initialPositionAvoidance <= 70) {
                 leftMotor.SetVelocity(2500.0f);
                 rightMotor.SetVelocity(2500.0f);
               } else {
                 leftMotor.SetDutyCycle(0.0f);
                 rightMotor.SetDutyCycle(0.0f);
                 obstacle_stage++;
+                initialPositionAvoidance = health_msg->left_motor_position;
                 initializedAvoidance = false;
                 RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "STAGE 2 COMPLETE");
               }
               break;
         
-            case 2: // rotate back
-              if (health_msg->left_motor_position - initialPositionAvoidance <= (left_obstacle_detected ? 150 : -150)) {
-                leftMotor.SetVelocity((left_obstacle_detected ? 2500.0 : -2500.0));
-                rightMotor.SetVelocity((left_obstacle_detected ? -2500.0 : 2500.0));
+            case 2: // Rotate 90 degrees
+              if (health_msg->left_motor_position - initialPositionAvoidance >= (turn_right ? -80 : 80)) {
+                leftMotor.SetVelocity((turn_right ? -2500.0 : 2500.0)); 
+                rightMotor.SetVelocity((turn_right ? 2500.0 : -2500.0));
               } else {
                 leftMotor.SetDutyCycle(0.0f);
                 rightMotor.SetDutyCycle(0.0f);
                 obstacle_stage++;
+                initialPositionAvoidance = health_msg->left_motor_position;
                 initializedAvoidance = false;
                 RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "STAGE 3 COMPLETE");
               }
               break;
         
-            case 3: // forward
-              if (health_msg->left_motor_position - initialPositionAvoidance <= 200) {
+            case 3: // Forward again
+              if (health_msg->left_motor_position - initialPositionAvoidance <= 70) {
                 leftMotor.SetVelocity(2500.0f);
                 rightMotor.SetVelocity(2500.0f);
               } else {
                 leftMotor.SetDutyCycle(0.0f);
                 rightMotor.SetDutyCycle(0.0f);
                 obstacle_stage++;
+                initialPositionAvoidance = health_msg->left_motor_position;
                 initializedAvoidance = false;
                 RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "STAGE 4 COMPLETE");
               }
               break;
         
-            case 4: // rotate final
-              if (health_msg->left_motor_position - initialPositionAvoidance <= (left_obstacle_detected ? 100 : -100)) {
-                leftMotor.SetVelocity((left_obstacle_detected ? 2500.0 : -2500.0));
-                rightMotor.SetVelocity((left_obstacle_detected ? -2500.0 : 2500.0));
+            case 4: // Final alignment :3
+              if (health_msg->left_motor_position - initialPositionAvoidance <= (turn_right ? 30 : -30)) {
+                leftMotor.SetVelocity((turn_right ? 2500.0 : -2500.0));
+                rightMotor.SetVelocity((turn_right ? -2500.0 : 2500.0));
               } else {
                 leftMotor.SetDutyCycle(0.0f);
                 rightMotor.SetDutyCycle(0.0f);
