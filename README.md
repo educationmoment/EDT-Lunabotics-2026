@@ -95,7 +95,7 @@ Configure the CAN interface using</p>
 
 <p>At this point, launch the robot using</p>
 
-    ros2 launch neptune_bringup neptune_bringup_launch.py
+    ros2 launch neptune_bringup neptune.launch.py
 
 <p>The pilot can access the WebGUI by visiting</p>
 
