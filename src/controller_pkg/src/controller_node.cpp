@@ -48,6 +48,11 @@ enum JOYSTICK_CONTROLLER {
 class ControllerNode : public rclcpp::Node
 {
 public:
+
+  /**
+   * @brief Node Constructor: flashes Sparkmax controllers, initiallizes timer, joy subscription, and depositing and excavation service calls.
+   * @param can_interface Sets the OS interface used by Sparkcan
+   *********************************************************************/
   ControllerNode(const std::string & can_interface)
   : Node("controller_node"),
     leftMotor(can_interface, LEFT_MOTOR),
