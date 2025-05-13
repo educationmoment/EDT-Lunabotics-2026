@@ -19,6 +19,18 @@ enum CAN_IDs {
   VIBRATOR    = 6
 };
 
+enum BUTTONS_CONTROLLER {
+  RIGHT_BUMPER = 5,
+  RIGHT_TRIGGER = 6,
+  LEFT_TRIGGER  = 7,
+  Y_BUTTON = 3
+  A_BUTTON = 0
+};
+enum JOYSTICK_CONTROLLER {
+  HORIZONTAL_LEFT_JOY = 0,
+  VERTICAL_LEFT_JOY = 1
+};
+
 class ControllerNode : public rclcpp::Node
 {
 public:
@@ -216,11 +228,11 @@ private:
     } 
 
     //SAFETY LOCK (Right or left trigger)//
-    bool triggersPressed = (joy_msg->buttons[6] > 0 || joy_msg->buttons[7] > 0);
+    bool triggersPressed = (joy_msg->buttons[ BUTTONS_CONTROLLER::RIGHT_TRIGGER ] > 0 || joy_msg->buttons[ BUTTONS_CONTROLLER::LEFT_TRIGGER ] > 0);
     //SAFETY LOCK (Right or left trigger)//
 
     //VIBRATOR (Right bumper, triggers)//
-    bool current_vibrator_button = (joy_msg->buttons[5] > 0);
+    bool current_vibrator_button = (joy_msg->buttons[ BUTTONS_CONTROLLER::RIGHT_BUMPER ] > 0);
     if (current_vibrator_button && !prev_vibrator_button_) {
       vibrator_active_ = !vibrator_active_;
       RCLCPP_INFO(this->get_logger(), "Vibrator toggled %s", vibrator_active_ ? "ON" : "OFF");
@@ -245,21 +257,21 @@ private:
     //ACTUATORS//
 
     //DRIVETRAIN (Left joystick)//
-    float forward = joy_msg->axes[1];
-      float turn = joy_msg->axes[0];
+    float forward = joy_msg->axes[ JOYSTICK_CONTROLLER::HORIZONTAL_LEFT_JOY ];
+    float turn = joy_msg->axes[ JOYSTICK_CONTROLLER::VERTICAL_LEFT_JOY ];
 
-      float left_drive_raw = forward + turn;
-      float right_drive_raw = forward - turn;
+    float left_drive_raw = forward + turn;
+    float right_drive_raw = forward - turn;
 
-      left_drive_raw = std::max(-1.0f, std::min(1.0f, left_drive_raw));
-      right_drive_raw = std::max(-1.0f, std::min(1.0f, right_drive_raw));
+    left_drive_raw = std::max(-1.0f, std::min(1.0f, left_drive_raw));
+    right_drive_raw = std::max(-1.0f, std::min(1.0f, right_drive_raw));
 
-      float left_drive = computeStepDuty(left_drive_raw);
-      float right_drive = computeStepDuty(right_drive_raw);
+    float left_drive = computeStepDuty(left_drive_raw);
+    float right_drive = computeStepDuty(right_drive_raw);
     //DRIVETRAIN (Left joystick)//
 
     //DEPOSIT AUTONOMY(Y button)//
-    bool current_deposit_button = (joy_msg->buttons[3] > 0);
+    bool current_deposit_button = (joy_msg->buttons[ BUTTONS_CONTROLLER::Y_BUTTON ] > 0);
     static bool prev_deposit_button = false;
 
     if (current_deposit_button && !prev_deposit_button) {
@@ -270,7 +282,7 @@ private:
     //DEPOSIT AUTONOMY(Y button)//
 
     //EXCAVATION AUTONOMY(A button)//
-    bool current_excavate_button = (joy_msg->buttons[0] > 0);
+    bool current_excavate_button = (joy_msg->buttons[ BUTTONS_CONTROLLER::A_BUTTON ] > 0);
     static bool prev_excavate_button = false;
 
     if (current_excavate_button && !prev_excavate_button) {

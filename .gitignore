@@ -11,3 +11,4 @@ test.py
 src/webgui_pkg/webgui_pkg/static/images
 src/webgui_pkg/webgui_pkg/static/objects
 .vscode/settings.json
+*.swp
