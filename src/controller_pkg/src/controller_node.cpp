@@ -26,11 +26,25 @@ enum BUTTONS_CONTROLLER {
   Y_BUTTON = 3
   A_BUTTON = 0
 };
+
 enum JOYSTICK_CONTROLLER {
   HORIZONTAL_LEFT_JOY = 0,
   VERTICAL_LEFT_JOY = 1
 };
 
+/**
+ * @class Class::ControllerNode
+ * @brief Converts controller input from /joy
+ *        into commands. Used for both manual and
+ *        automatic control.
+ * 
+ * ==================================================
+ * @details Node burns flash for sparkmax motor controllers,
+ *          handles sending heartbeats at 1 second intervals.
+ *          The node also handles handoff of automatic control between
+ *          depositing and excavation agents.
+ * 
+ *********************************************************************/
 class ControllerNode : public rclcpp::Node
 {
 public:
@@ -73,7 +87,7 @@ public:
     vibrator.SetIdleMode(IdleMode::kBrake);
     vibrator.SetMotorType(MotorType::kBrushed);
     vibrator.SetSensorType(SensorType::kEncoder);
-    //Initializes the settings fro the vibrator
+    //Initializes the settings for the vibrator
 
     leftMotor.SetInverted(true);
     rightMotor.SetInverted(false);
@@ -166,7 +180,11 @@ private:
   bool vibrator_active_;
   bool prev_vibrator_button_;
 
-  //Used to determine variable motor power during turning
+  /**
+   * @brief Used to determine variable motor power during turning
+   * @param value float
+   * 
+   *********************************************************************/
   float computeStepDuty(float value)
   {
     float absVal = std::fabs(value);
@@ -181,8 +199,12 @@ private:
     return (value > 0 ? 1.0f : -1.0f);
   } 
 
-  //Sends request to depositing node and manages response
+  /**
+   * @brief Sends request to depositing node and manages response
+   * @param None
+   *********************************************************************/
   void send_deposit_request() {
+    // Determine of the Depositing Client is Available
     if (!depositing_client_ || !depositing_client_->wait_for_service(std::chrono::seconds(1))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available");
       return;
@@ -191,6 +213,7 @@ private:
     auto request = std::make_shared<interfaces_pkg::srv::DepositingRequest::Request>();
     request->start_depositing = true;
 
+    // Send Depositing Request
     depositing_client_->async_send_request(request, [this](rclcpp::Client<interfaces_pkg::srv::DepositingRequest>::SharedFuture future) {
       auto response = future.get();
       if (response->depositing_successful) {
@@ -201,15 +224,22 @@ private:
     });
   } 
 
+  /**
+   * @brief Sends request to excavation node and manages response
+   * @param None
+   *********************************************************************/
   void send_excavation_request() {
+    // Determine if the Excavation Client is available
     if (!excavation_client_ || !excavation_client_->wait_for_service(std::chrono::seconds(1))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available");
       return;
     }
 
+
     auto request = std::make_shared<interfaces_pkg::srv::ExcavationRequest::Request>();
     request->start_excavation = true;
 
+    // Send Excavation Request
     excavation_client_->async_send_request(request, [this](rclcpp::Client<interfaces_pkg::srv::ExcavationRequest>::SharedFuture future) {
       auto response = future.get();
       if (response->excavation_successful) {
@@ -219,7 +249,12 @@ private:
       }
     });
   }
-  //Manual control
+
+  /**
+   * @brief Handler for received /joy subscription messages.
+   *        Primary source of manual/semiautomatic control.
+   * @param joy_msg sensor_msgs::msg::SharedPtr
+   *********************************************************************/
   void joy_callback(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
   {
     if (joy_msg->axes.size() < 2 || joy_msg->buttons.size() < 17) {
@@ -323,6 +358,10 @@ private:
     }
   }
 
+  /**
+   * @brief Publish string message heartbeat
+   * @param None
+   *********************************************************************/
   void publish_heartbeat()
   {
     auto msg = std_msgs::msg::String();
