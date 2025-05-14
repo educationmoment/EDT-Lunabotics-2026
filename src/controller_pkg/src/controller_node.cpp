@@ -7,8 +7,10 @@
 #include "interfaces_pkg/srv/excavation_request.hpp"
 #include <cmath>
 #include <string>
+
 #include <cstdlib>
 #include <algorithm>
+
 
 const float VELOCITY_MAX = 2500.0; //rpm, after gearbox turns into 11.1 RPM
 const float VIBRATOR_OUTPUT = 1.0f; //Constant value for vibrator output
@@ -179,6 +181,7 @@ public:
   }
 
 private:
+
   // Direct object members.
   SparkMax leftMotor;
   SparkMax rightMotor;
@@ -328,6 +331,7 @@ private:
       else {
         lift_setpoint = lift_position;
       }
+
 
       lift_setpoint = std::clamp(lift_setpoint, -7.0f, 5.0f);
       leftLift.SetPosition(lift_setpoint);
