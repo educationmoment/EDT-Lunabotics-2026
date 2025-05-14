@@ -20,40 +20,18 @@ const img = document.getElementById("camera-output");
 
 // Create a Listener on Compressed Image Topic Published by a Camera Node
 ////////////////////////////////////////////////////////////////////////////////////////
-const cameraTopics = [
-  { id: "camera-d455-1", topic: "/rs_node/camera1/compressed_video" },
-  { id: "camera-d455-2", topic: "/rs_node/camera2/compressed_video" },
-  { id: "camera-rgb-1", topic: "/rgb_cam1/compressed" },
-  { id: "camera-rgb-2", topic: "/rgb_cam2/compressed" }
-];
-
-cameraTopics.forEach(({ id, topic }) => {
-  const listener = new ROSLIB.Topic({
-      ros: ROS,
-      name: topic,
-      messageType: 'sensor_msgs/CompressedImage'
-  });
-
-  listener.subscribe((message) => {
-      const imgEl = document.getElementById(id);
-      if (imgEl) {
-          imgEl.src = "data:image/jpeg;base64," + message.data;
-      }
-  });
+var listener = new ROSLIB.Topic({
+    ros : ROS,
+    name : '/rs_node/camera/compressed_video',
+    messageType : 'sensor_msgs/CompressedImage'
 });
 
-function toggleFullscreen() {
-    const elem = document.getElementById("camera-wrapper");
+listener.subscribe(function(message) {
+    console.log('Received message on ' + listener.name);
 
-    if (!document.fullscreenElement) {
-        elem.requestFullscreen().catch(err => {
-            alert(`Error attempting to enable fullscreen mode: ${err.message}`);
-        });
-    } else {
-        document.exitFullscreen();
-    }
-}
-
+    var imageElement = document.getElementById('camera-output');
+    imageElement.src = 'data:image/jpeg;base64, ' + message.data
+});
 ////////////////////////////////////////////////////////////////////////////////////////
 
 

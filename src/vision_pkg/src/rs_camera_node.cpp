@@ -1,236 +1,168 @@
-#include    <list>
-#include    <iomanip>
-#include    <thread>
-#include    "rclcpp/rclcpp.hpp"
+// rs_camera_node.cpp
+// Optimized for low latency and high performance on Jetson
 
-#include    "opencv2/opencv.hpp"
+#include <list>
+#include <vector>
+#include <iostream>
+#include <cstring>
+#include <chrono>
+#include <thread>
+#include <opencv2/opencv.hpp>
 
-#include    "librealsense2/rs.hpp"
-#include    "std_msgs/msg/string.hpp"
-#include    "geometry_msgs/msg/accel_stamped.hpp"
-#include    "sensor_msgs/msg/compressed_image.hpp"
-#include    "sensor_msgs/msg/image.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "sensor_msgs/msg/compressed_image.hpp"
+#include "sensor_msgs/msg/image.hpp"
 
+#include "librealsense2/rs.hpp"
+#include "SparkMax.hpp"
 
-/*******************************************************************************
-Class: Camera
-    Description: 
-        Camera Class handles all instances of Intel Realsense Cameras
-        and publishes RGB, Depth, and IMU measurements to the below
-        topics:
-            - /camera/rgb/image_raw
-            - /camera/depth/image_raw
-            - /camera/imu/data
-        The Camera Class exposes the following services
-            - NaN at the moment
-        And the following parameters
-            - NaN at the moment
-        
-        Public Functions:
-            - Camera() : Constructor
+using namespace std::chrono_literals;
 
-
-*******************************************************************************/
-class Camera : public rclcpp::Node {
+class MultiCameraNode : public rclcpp::Node {
 public:
+  MultiCameraNode() : Node("multi_camera_node") {
+    RCLCPP_INFO(this->get_logger(), "Multi-camera node startup.");
 
-    /****************************************
-    Constructor: Camera()
-        Parameters: None
-        Description: Constructor for Camera Class
-    *****************************************/
-    Camera() : Node("camera_node") {
-        RCLCPP_WARN( this->get_logger(), "Enumerating Cameras...");
-        (void)enumerate_cameras();
-        (void)init_publishers();
-        
-        
-        // Initialize all cameras
-        for( auto device : this->devices ) {
-            this->pipe = init_camera(device);
-            // while (true) {
-            // (void)camera_runtime( pipe );
-            // }
-        }
-        (void)init_timers();
-        return;
+    // Known D455 serials
+    std::string serial1 = "318122303486";
+    std::string serial2 = "308222300472";
+
+    // Initialize RealSense pipeline for D455 #1
+    {
+      rs2::pipeline pipeline;
+      rs2::config cfg;
+      cfg.enable_device(serial1);
+      cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15); // Lower resolution + FPS
+      try {
+        pipeline.start(cfg);
+        pipelines_.push_back(pipeline);
+        RCLCPP_INFO(this->get_logger(), "Started D455 pipeline on device %s", serial1.c_str());
+      } catch (const rs2::error &e) {
+        RCLCPP_ERROR(this->get_logger(), "Error starting pipeline for D455 #1: %s", e.what());
+      }
     }
 
-    ~Camera() {
-        RCLCPP_WARN( this->get_logger(), "Shutting Down Camera Node...");
-        this->pipe.stop();
-        this->devices.clear();
-        return;
+    // Initialize RealSense pipeline for D455 #2
+    {
+      rs2::pipeline pipeline;
+      rs2::config cfg;
+      cfg.enable_device(serial2);
+      cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
+      try {
+        pipeline.start(cfg);
+        pipelines_.push_back(pipeline);
+        RCLCPP_INFO(this->get_logger(), "Started D455 pipeline on device %s", serial2.c_str());
+      } catch (const rs2::error &e) {
+        RCLCPP_ERROR(this->get_logger(), "Error starting pipeline for D455 #2: %s", e.what());
+      }
     }
-    
+
+    // Open USB RGB cameras explicitly
+    cap_rgb1_.open("/dev/video6");
+    cap_rgb2_.open("/dev/video14");
+    // a
+    if (!cap_rgb1_.isOpened()) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video6).\n");
+    }
+    if (!cap_rgb2_.isOpened()) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video14).\n");
+    }
+
+    // Publishers
+    d455_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 10);
+    d455_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/compressed_video", 10);
+    rgb_cam1_pub_  = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 10);
+    rgb_cam2_pub_  = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 10);
+
+    // Timer
+    timer_ = this->create_wall_timer(66ms, std::bind(&MultiCameraNode::timer_callback, this)); // ~15 FPS
+  }
+
 private:
-    ////////////////////////////////////////
-    // Variable Declarations
-    //      - ctx: Realsense Context
-    //      - devices: List of Realsense Devices
-    //      - timer_: Timer Object
-    //      - _string_pub_: String Publisher
-    rs2::context ctx;
-    rs2::pipeline pipe;
-    std::list<rs2::device> devices;
-    rclcpp::TimerBase::SharedPtr timer_;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr _string_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr _rgb_camera_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr _depth_camera_pub_;
-    rclcpp::Publisher<geometry_msgs::msg::AccelStamped>::SharedPtr _imu_accel_pub_, _imu_gyro_pub_;
+  rs2::context ctx;
+  std::vector<rs2::pipeline> pipelines_;
+  cv::VideoCapture cap_rgb1_;
+  cv::VideoCapture cap_rgb2_;
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam1_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam2_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam1_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam2_pub_;
+  rclcpp::TimerBase::SharedPtr timer_;
 
-    /****************************************
-    Function: init_publishers()
-        Parameters: None
-        Description: Initialize all publishers
-    *****************************************/
-    void init_publishers(std::list<std::string> topics = {}) {
-        RCLCPP_WARN( this->get_logger(), "Initializing Publishers...");
-
-        // Initialize String Publisher
-        this->_string_pub_ = this->create_publisher<std_msgs::msg::String>(
-            "camera_info", 10
-        );
-
-        // DONE: Implement RGB Image Publisher (Use Compressed Image Topic)
-        this->_rgb_camera_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(
-            "rs_node/camera/compressed_video", 10
-        );
-
-        // TODO: Implement Depth Image Publisher (Use Image Topic)
-        this->_depth_camera_pub_ = this->create_publisher<sensor_msgs::msg::Image>(
-            "rs_node/camera/depth", 10
-        );
-
-        // TODO: Implemenet IMU Data Publisher (Use geometry_msgs::msg::AccelStamped Topic)
-        return;
+  void timer_callback() {
+    // Use poll_for_frames to avoid blocking and stalling pipeline
+    if (pipelines_.size() >= 1) {
+      rs2::frameset frames1;
+      if (pipelines_[0].poll_for_frames(&frames1)) {
+        rs2::frame color_frame1 = frames1.get_color_frame();
+        if (color_frame1) publish_realsense_image(color_frame1, d455_cam1_pub_);
+      } else {
+        RCLCPP_WARN(this->get_logger(), "No frame available from D455 camera 1.");
+      }
     }
 
-    rs2::pipeline init_camera( rs2::device& device ) {
-        RCLCPP_WARN( this->get_logger(), "Initializing Camera %s", device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) );
-        rs2::config cfg;
-        rs2::pipeline pipe;
-        try {
-            cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
-            // cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
-            // cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
-            // cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F, 62);
-            // cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F, 200);
-            pipe.start(cfg);    
-        } catch( const rs2::error& e ) {
-            RCLCPP_ERROR( this->get_logger(), "Error: %s", e.what() );
-        }
-        return pipe;
+    if (pipelines_.size() >= 2) {
+      rs2::frameset frames2;
+      if (pipelines_[1].poll_for_frames(&frames2)) {
+        rs2::frame color_frame2 = frames2.get_color_frame();
+        if (color_frame2) publish_realsense_image(color_frame2, d455_cam2_pub_);
+      } else {
+        RCLCPP_WARN(this->get_logger(), "No frame available from D455 camera 2.");
+      }
     }
 
-    /****************************************
-    Function: init_timers()
-        Parameters: None
-        Description: Initialize all timers
-    *****************************************/
-    void init_timers() {
-        RCLCPP_WARN( this->get_logger(), "Initializing Timer...");
-        this->timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(33),
-            std::bind(&Camera::timer_callback, this)
-        );
-        return;
+    publish_rgb_camera(cap_rgb1_, rgb_cam1_pub_);
+    publish_rgb_camera(cap_rgb2_, rgb_cam2_pub_);
+  }
+
+  void publish_realsense_image(rs2::frame & color_frame, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub) {
+    std::vector<uchar> buffer;
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 40}; // Lower quality for faster encoding
+    sensor_msgs::msg::CompressedImage msg;
+    msg.header.stamp = this->now();
+    msg.header.frame_id = "camera_rgb_optical_frame";
+    msg.format = "jpeg";
+
+    cv::Mat frame(cv::Size(color_frame.as<rs2::video_frame>().get_width(),
+                           color_frame.as<rs2::video_frame>().get_height()),
+                  CV_8UC3,
+                  (void*)color_frame.get_data(),
+                  cv::Mat::AUTO_STEP);
+    if (!cv::imencode(".jpg", frame, buffer, params)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to encode RealSense image to JPEG.");
+      return;
     }
+    msg.data = buffer;
+    pub->publish(msg);
+  }
 
-    /*******************************************************************************
-    Function: enumerate_cameras()
-        Parameters: None
-        Description: 
-            Enumerate all connected cameras. Discovered cameras will be 
-            added to the devices list. The model and serial number of each camera
-            will be printed to the console.
-    ********************************************************************************/
-    void enumerate_cameras() {
-        int num_cameras = this->ctx.query_devices().size();
-        RCLCPP_WARN( this->get_logger(), "Number of Cameras: %d", num_cameras);
-        for( auto camera : this->ctx.query_devices() ) {
-            this->devices.push_back(camera);
-            RCLCPP_INFO( this->get_logger(), "Model: %s", camera.get_info(RS2_CAMERA_INFO_NAME));
-            RCLCPP_INFO( this->get_logger(), "Serial Number: %s", camera.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
-        }
-        return;
+  void publish_rgb_camera(cv::VideoCapture & cap, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr pub) {
+    cv::Mat frame;
+    if (!cap.read(frame)) {
+      RCLCPP_WARN(this->get_logger(), "Failed to capture frame from USB RGB camera.");
+      return;
     }
+    std::vector<uchar> buffer;
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 40};
+    sensor_msgs::msg::CompressedImage msg;
+    msg.header.stamp = this->now();
+    msg.header.frame_id = "rgb_camera_frame";
+    msg.format = "jpeg";
 
-    /****************************************
-    Function: timer_callback()
-        Parameters: None
-        Description: Timer Callback Function
-    *****************************************/
-    void timer_callback() {
-        std_msgs::msg::String msg;
-        msg.data = "Hello World!";
-        this->_string_pub_->publish(msg);
-        RCLCPP_INFO( this->get_logger(), "Timer Callback");
-
-        // Wait for Frames
-        rs2::frameset frames = this->pipe.wait_for_frames();
-        rs2::frame color_frame = frames.get_color_frame();
-
-        if( ! color_frame ) {
-            RCLCPP_WARN( this->get_logger(), "No Color Frame Detected");
-            return;
-        } 
-
-
-        // Send the RGB Image
-        (void)send_RGB(color_frame);
-        return;
+    if (!cv::imencode(".jpg", frame, buffer, params)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to encode USB RGB image to JPEG.");
+      return;
     }
-
-    void send_RGB( rs2::frame& color_frame ) {
-        std::vector<uchar> buffer;
-        std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 80};
-        std::shared_ptr<sensor_msgs::msg::CompressedImage> rgb_msg = std::make_shared<sensor_msgs::msg::CompressedImage>();
-        
-        // Convert the RealSense Frame to OpenCV Mat
-        cv::Mat rgb_frame(
-            cv::Size(color_frame.as<rs2::video_frame>().get_width(), color_frame.as<rs2::video_frame>().get_height()),
-            CV_8UC3,
-            (void*)color_frame.get_data(),
-            cv::Mat::AUTO_STEP
-        );
-        
-        // Encode the Image as JPEG
-        if( ! cv::imencode( ".jpg", rgb_frame, buffer, params ) ) {
-            RCLCPP_ERROR( this->get_logger(), "Error Encoding Image");
-            return;
-        }
-
-        // Populate the Compressed Image Message
-        rgb_msg->header.stamp = this->now();
-        rgb_msg->header.frame_id = "camera_rgb_optical_frame";
-        rgb_msg->format = "jpeg";
-        rgb_msg->data = buffer;
-
-        // Publish the Compressed Image
-        this->_rgb_camera_pub_->publish(*rgb_msg);
-        RCLCPP_INFO( this->get_logger(), "Published RGB Image");
-        return;
-    } 
-
-    void camera_runtime( rs2::pipeline& pipe ) {
-        rs2::frameset frames = pipe.wait_for_frames();
-        
-
-        rs2::frame color_frame = frames.get_color_frame();
-        
-        // Publish RGB Image
-
-        // Publish Depth Image
-
-        // Publish IMU Data
-    }
+    msg.data = buffer;
+    pub->publish(msg);
+  }
 };
 
-
-int main() {
-    rclcpp::init(0, nullptr);
-    rclcpp::spin(std::make_shared<Camera>());
-    rclcpp::shutdown();
-    return 0;
+int main(int argc, char ** argv) {
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<MultiCameraNode>();
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
 }

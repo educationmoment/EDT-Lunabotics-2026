@@ -5,10 +5,12 @@
 <hr>
 <h2>Packages</h2>
     <ul>
-        <li>aegis_bringup</li>
+        <li>neptune_bringup</li>
         <li>controller_pkg</li>
         <li>vision_pkg</li>
         <li>webgui_pkg</li>
+        <li>interfaces_pkg</li>
+        <li>localization_pkg</li>
     </ul>
 
 <h2>Description</h2>
@@ -16,7 +18,34 @@
 <p>This is a GitHub repository created for the University of Illinois Chicago Engineering Design Team
 for the NASA Lunabotics 2025 competition.</p>
 
-    
+<h2>Potential Bugs and their fixes.</h2>
+<p>Video Cameras not showing (and not throwing the error: "Failed to open USB RGB camera 1 (/dev/video6)")" etc</p> 
+
+    fix: run "v4l2-ctl --list-devices" in /home/Desktop/robot_WS
+    find the webcameras, and put the top directory, itll look /dev/videox, where x is any number, and paste it into rs_camera_node.cpp in vision_pkg. this requires recompiling- colcon build --packages-select vision_pkg
+
+<p>"ROS Webbridge is overloaded- restarting in 2ms"</p>
+
+    fix: okay so we started the robot too many times on the same uptime for the jetson. The cache is overloaded- and unfourtently the only fix is to restart the Jetson entirely. This happens after starting the robot 5+ times on the same uptime.
+
+<p>/joy topic not found</p>
+
+    there should be /joy topic always, run ros topic list and look for /joy. then echo ros topic echo /joy
+    if nothing comes up, something is wrong, likely the ROS bridge being overloaded. restart the jetson.
+
+<p>Building and sourcing throwing an error.</p>
+
+    fix: build and remove cached artifiacts. colcon build --cmake-clean-cache
+
+<p>Controller not sending signals, despite /joy being up</p>
+
+    fix: you are not pressing the trigger! press right or left trigger to ensure connection is through. check ros topic echo /joy for any changes. 
+
+<p>CAN Interface not found / CAN is busy</p>
+
+    fix: sudo ip link set can0 up type can bitrate 1000000 || OR || lift E-stop (if busy).
+
+
 <h2>Installation</h2>
 <hr>
 <h3><strong>(Optional)</strong> Using Docker</h3>
@@ -41,7 +70,7 @@ you can either reattach to it using</p>
 
 <h3>Clone this Github Repo</h3>
 
-    git clone git@github.com:Cdiede2/EDT-Lunabotics-2025.git && cd EDT-Lunabotics-2025/
+    git clone git@github.com/educationmoment/EDT-Lunabotics-2025.git && cd EDT-Lunabotics-2025/
 
 <p>From within a computer running Ubuntu 22.04, run <em>install.sh</em> script with root privileges using</p>
     
@@ -66,5 +95,15 @@ Configure the CAN interface using</p>
 
 <p>At this point, launch the robot using</p>
 
-    ros2 launch aegis_bringup aegis_bringup.launch
-    
+    ros2 launch neptune_bringup neptune.launch.py
+
+<p>The pilot can access the WebGUI by visiting</p>
+
+    http://192.168.0.139:59440/pilot
+
+<p>You can also view the health status of the robot with </p>
+
+    ros2 topic echo health_topic
+<p>Before UCF and then KSC, make sure to copy over the appropriate version of odometry onto odometry_node.cpp. Also, note that the pilot needs to be clicked into the WebGUI for this to work. To run it, use</p>
+
+    ros2 run controller_pkg odometry_node
