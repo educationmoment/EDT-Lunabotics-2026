@@ -22,9 +22,40 @@ enum CAN_IDs {
   VIBRATOR    = 6
 };
 
+enum BUTTONS_CONTROLLER {
+  RIGHT_BUMPER = 5,
+  RIGHT_TRIGGER = 6,
+  LEFT_TRIGGER  = 7,
+  Y_BUTTON = 3
+  A_BUTTON = 0
+};
+
+enum JOYSTICK_CONTROLLER {
+  HORIZONTAL_LEFT_JOY = 0,
+  VERTICAL_LEFT_JOY = 1
+};
+
+/**
+ * @class Class::ControllerNode
+ * @brief Converts controller input from /joy
+ *        into commands. Used for both manual and
+ *        automatic control.
+ * 
+ * ==================================================
+ * @details Node burns flash for sparkmax motor controllers,
+ *          handles sending heartbeats at 1 second intervals.
+ *          The node also handles handoff of automatic control between
+ *          depositing and excavation agents.
+ * 
+ *********************************************************************/
 class ControllerNode : public rclcpp::Node
 {
 public:
+
+  /**
+   * @brief Node Constructor: flashes Sparkmax controllers, initiallizes timer, joy subscription, and depositing and excavation service calls.
+   * @param can_interface Sets the OS interface used by Sparkcan
+   *********************************************************************/
   ControllerNode(const std::string & can_interface)
   : Node("controller_node"),
     leftMotor(can_interface, LEFT_MOTOR),
@@ -66,7 +97,7 @@ public:
     vibrator.SetIdleMode(IdleMode::kBrake);
     vibrator.SetMotorType(MotorType::kBrushed);
     vibrator.SetSensorType(SensorType::kEncoder);
-    //Initializes the settings fro the vibrator
+    //Initializes the settings for the vibrator
 
     leftMotor.SetInverted(false);
     rightMotor.SetInverted(true);
@@ -170,15 +201,14 @@ private:
   bool vibrator_active_;
   bool prev_vibrator_button_;
 
-  // Alternate control mode toggle variables.
-  bool alternate_mode_active_ = false;
-  bool prev_alternate_button_ = false;
 
-  float lift_setpoint = 0.0f; 
-  float lift_position = 0.0f;
-
-  // Helper for stepped output, in velocity control mode it is multiplied by VELOCITY_MAX
-  float computeStepOutput(float value) {
+  /**
+   * @brief Used to determine variable motor power during turning
+   * @param value float
+   * 
+   *********************************************************************/
+  float computeStepDuty(float value)
+  {
     float absVal = std::fabs(value);
     if (absVal < 0.25f)
       return 0.0f;
@@ -191,14 +221,20 @@ private:
     return (value > 0 ? 1.0f : -1.0f);
   }
 
-  // Sends request to depositing node and manages response.
+  /**
+   * @brief Sends request to depositing node and manages response
+   * @param None
+   *********************************************************************/
   void send_deposit_request() {
+    // Determine of the Depositing Client is Available
     if (!depositing_client_ || !depositing_client_->wait_for_service(std::chrono::seconds(1))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available");
       return;
     }
     auto request = std::make_shared<interfaces_pkg::srv::DepositingRequest::Request>();
     request->start_depositing = true;
+
+    // Send Depositing Request
     depositing_client_->async_send_request(request, [this](rclcpp::Client<interfaces_pkg::srv::DepositingRequest>::SharedFuture future) {
       auto response = future.get();
       if (response->depositing_successful) {
@@ -209,14 +245,24 @@ private:
     });
   }
 
-  // Sends request to excavation node and manages response.
+
+  /**
+   * @brief Sends request to excavation node and manages response
+   * @param None
+   *********************************************************************/
   void send_excavation_request() {
+    // Determine if the Excavation Client is available
     if (!excavation_client_ || !excavation_client_->wait_for_service(std::chrono::seconds(1))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available");
       return;
     }
+
+
+
     auto request = std::make_shared<interfaces_pkg::srv::ExcavationRequest::Request>();
     request->start_excavation = true;
+
+    // Send Excavation Request
     excavation_client_->async_send_request(request, [this](rclcpp::Client<interfaces_pkg::srv::ExcavationRequest>::SharedFuture future) {
       auto response = future.get();
       if (response->excavation_successful) {
@@ -227,12 +273,12 @@ private:
     });
   }
 
-  //Keeps track of position for actuator control
-  void position_callback(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
-    lift_position = health_msg->left_lift_position;
-  }
 
-  // Manual control - joy callback.
+  /**
+   * @brief Handler for received /joy subscription messages.
+   *        Primary source of manual/semiautomatic control.
+   * @param joy_msg sensor_msgs::msg::SharedPtr
+   *********************************************************************/
   void joy_callback(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
   {
     if (joy_msg->axes.size() < 2 || joy_msg->buttons.size() < 17) {
@@ -240,46 +286,14 @@ private:
       return;
     }
 
-    // HEARTBEAT SIGNALS
-    try { //Sends heartbeats
-      leftMotor.Heartbeat();
-      rightMotor.Heartbeat();
-      leftLift.Heartbeat();
-      rightLift.Heartbeat();
-      tilt.Heartbeat();
-      vibrator.Heartbeat();
 
-    } catch (const std::exception & ex) {
-      RCLCPP_ERROR(this->get_logger(), "Error sending CAN command: %s", ex.what());
-    }
+    //SAFETY LOCK (Right or left trigger)//
+    bool triggersPressed = (joy_msg->buttons[ BUTTONS_CONTROLLER::RIGHT_TRIGGER ] > 0 || joy_msg->buttons[ BUTTONS_CONTROLLER::LEFT_TRIGGER ] > 0);
+    //SAFETY LOCK (Right or left trigger)//
 
-    // CANCEL AUTONOMY (B Button)
-    if (joy_msg->buttons[1] > 0) {
-      std::system("pkill -9 -f depositing_node");
-      std::system("pkill -9 -f excavation_node");
-      
-      std::this_thread::sleep_for(std::chrono::seconds(2)); //Allows time for the nodes to restarted
-  
-      std::system("ros2 run controller_pkg excavation_node &");
-      std::system("ros2 run controller_pkg depositing_node &");
-    }
+    //VIBRATOR (Right bumper, triggers)//
+    bool current_vibrator_button = (joy_msg->buttons[ BUTTONS_CONTROLLER::RIGHT_BUMPER ] > 0);
 
-
-    // SAFETY LOCK (Right or left trigger)
-    bool triggersPressed = (joy_msg->buttons[6] > 0 || joy_msg->buttons[7] > 0);
-
-    if (!triggersPressed){
-      leftMotor.SetDutyCycle(0.0f);
-      rightMotor.SetDutyCycle(0.0f);
-      leftLift.SetDutyCycle(0.0f);
-      rightLift.SetDutyCycle(0.0f);
-      tilt.SetDutyCycle(0.0f);
-      return;
-    } 
-
-    //----------EXCAVATION SYSTEM----------//
-    // VIBRATOR TOGGLE (Right bumper)
-    bool current_vibrator_button = (joy_msg->buttons[5] > 0);
     if (current_vibrator_button && !prev_vibrator_button_) {
       vibrator_active_ = !vibrator_active_;
       RCLCPP_INFO(this->get_logger(), "Vibrator toggled %s", vibrator_active_ ? "ON" : "OFF");
@@ -332,49 +346,34 @@ private:
     }
     prev_alternate_button_ = current_alternate_button;
 
-    float left_drive = 0.0;
-    float right_drive = 0.0;
-    float left_drive_raw = 0.0;
-    float right_drive_raw = 0.0;
-    if (alternate_mode_active_) { //Left and right joystick, controlled with duty cycle
-      float leftJS = -joy_msg->axes[1]; 
-      float rightJS = -joy_msg->axes[3];
-      left_drive_raw = std::max(-1.0f, std::min(1.0f, leftJS));
-      right_drive_raw = std::max(-1.0f, std::min(1.0f, rightJS));
 
-      left_drive = computeStepOutput(left_drive_raw);
-      right_drive = computeStepOutput(right_drive_raw);
+    //DRIVETRAIN (Left joystick)//
+    float forward = joy_msg->axes[ JOYSTICK_CONTROLLER::HORIZONTAL_LEFT_JOY ];
+    float turn = joy_msg->axes[ JOYSTICK_CONTROLLER::VERTICAL_LEFT_JOY ];
 
-      leftMotor.SetDutyCycle(left_drive);
-      rightMotor.SetDutyCycle(right_drive);
-    }
-    else { //Left joystick, controlled with velocity
-      float forward = -joy_msg->axes[1];
-      float turn = fabs(joy_msg->axes[0]) > 0.25 ? joy_msg->axes[0] : 0.0f;
-      left_drive_raw = forward + turn;
-      right_drive_raw = forward - turn;
-      left_drive_raw = std::max(-1.0f, std::min(1.0f, left_drive_raw));
-      right_drive_raw = std::max(-1.0f, std::min(1.0f, right_drive_raw));
+    float left_drive_raw = forward + turn;
+    float right_drive_raw = forward - turn;
 
-      left_drive = computeStepOutput(left_drive_raw) * VELOCITY_MAX;
-      right_drive = computeStepOutput(right_drive_raw) * VELOCITY_MAX;
-      
-      leftMotor.SetVelocity(left_drive);
-      rightMotor.SetVelocity(right_drive);
-    }
-    //----------DRIVETRAIN----------//
+    left_drive_raw = std::max(-1.0f, std::min(1.0f, left_drive_raw));
+    right_drive_raw = std::max(-1.0f, std::min(1.0f, right_drive_raw));
 
-    //----------AUTONOMOUS FUNCTIONS----------//
-    // DEPOSIT AUTONOMY (Y button)
-    bool current_deposit_button = (joy_msg->buttons[3] > 0);
+    float left_drive = computeStepDuty(left_drive_raw);
+    float right_drive = computeStepDuty(right_drive_raw);
+    //DRIVETRAIN (Left joystick)//
+
+    //DEPOSIT AUTONOMY(Y button)//
+    bool current_deposit_button = (joy_msg->buttons[ BUTTONS_CONTROLLER::Y_BUTTON ] > 0);
+
     static bool prev_deposit_button = false;
     if (current_deposit_button && !prev_deposit_button) {
        send_deposit_request();
     }
     prev_deposit_button = current_deposit_button;
 
-    // EXCAVATION AUTONOMY (A button)
-    bool current_excavate_button = (joy_msg->buttons[0] > 0);
+
+    //EXCAVATION AUTONOMY(A button)//
+    bool current_excavate_button = (joy_msg->buttons[ BUTTONS_CONTROLLER::A_BUTTON ] > 0);
+
     static bool prev_excavate_button = false;
     if (current_excavate_button && !prev_excavate_button) {
        send_excavation_request();
@@ -383,7 +382,13 @@ private:
     //----------AUTONOMOUS FUNCTIONS----------//
   }
 
-  void publish_heartbeat() {
+
+  /**
+   * @brief Publish string message heartbeat
+   * @param None
+   *********************************************************************/
+  void publish_heartbeat()
+  {
     auto msg = std_msgs::msg::String();
     msg.data = "Heartbeat";
     heartbeatPub->publish(msg);
