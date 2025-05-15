@@ -1,80 +1,88 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Pilot Control Interface</title>
-        <!-- <link rel="stylesheet" href="{{url_for('static', filename='css/pilot.css')}}"> -->
-        <link rel="stylesheet" href="../static/css/pilot.css"/>
+<head>
+    <meta charset="utf-8">
+    <title>Pilot Control Interface</title>
+    <link rel="stylesheet" href="../static/css/pilot.css"/>
 
-        <!-- ROSJS External Libraries -->
-        <!-- -> Must be Sourced First -->
+    <!-- loadyourstuff -->
+    <script src="{{url_for('static', filename='js/resources/roslib.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
+    <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/animation/quest_arrow.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/animation/digital_twin.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/resources/three.min.js')}}"></script>
+    <script src="{{url_for('static', filename='js/resources/DRACOLoader.js')}}"></script>
+    <script src="{{url_for('static', filename='js/resources/GLTFLoader.js')}}"></script>
 
-        <script src="{{url_for('static', filename='js/resources/roslib.min.js')}}"></script>
-        <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
-        <!-- <script src="../static/js/resources/roslib.min.js"></script> -->
-        <!-- <script src="../static/js/resources/eventemitter2.min.js"></script> -->
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: black;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
 
-        <!-- Global ROS Setup Code -->
-        <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
-        <!-- <script src="../static/js/ros_setup.js"></script> -->
+        #camera-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
 
-        <!-- Pilot GUI Specific Setup Code -->
+        .multi-camera-checkerboard {
+            display: grid;
+            height: 100%;
+            width: 100%;
+        }
 
-        <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
-        <!-- <script src="../static/js/gamepad_setup.js"></script> -->
+        .camera-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            box-sizing: border-box;
+        }
 
-        <!-- <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>  -->
-        <!-- <script src="../static/js/animation/quest_arrow.js" defer></script> -->
-        <!-- <script src="../static/js/animation/digital_twin.js" defer></script> -->
-        <!-- <script src="../static/js/pilot.js" defer></script> -->
+        .camera-container p {
+            color: white;
+            margin: 0 0 4px 0;
+            font-size: 1em;
+        }
 
-        <script src="{{url_for('static', filename='js/animation/quest_arrow.js')}}" defer></script>
-        <script src="{{url_for('static', filename='js/animation/digital_twin.js')}}" defer></script>
-        <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
+        .camera-frame {
+            width: 100%;
+            height: auto;
+            max-height: 90%;
+            object-fit: contain;
+            background-color: #222;
+        }
 
-        <script src="{{url_for('static', filename='js/resources/three.min.js')}}"></script>
-        <script src="{{url_for('static', filename='js/resources/DRACOLoader.js')}}"></script>
-        <script src="{{url_for('static', filename='js/resources/GLTFLoader.js')}}"></script>
-
-        <!-- Directional Arrow Specific Setup Code -->
-        <!-- <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script> -->
-        <!-- <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/DRACOLoader.js"></script> -->
-        <!-- <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/GLTFLoader.js"></script> -->
-
-        <!-- <script src="../static/js/resources/three.min.js"></script> -->
-        <!-- <script src="../static/js/resources/DRACOLoader.js"></script> -->
-        <!-- <script src="../static/js/resources/GLTFLoader.js"></script> -->
-    </head>
-    <body>
-        <div class="outer-box">
-            <!-- TOP-LEFT: Quest Arrow -->
-            <!-- TO-DO: Add Canvas Element to Animate Quest Arrow -->
-
-            <!-- TOP-RIGHT: List Autonomous Functions -->
-            <!-- Overlay Indicator and Autonomous Function Name -->
-            <div class="inner-div inner-quad-1"><!--Quest Arrow-->
-                <canvas id="quest-arrow" style="z-index: 3; background-color: rgba(0, 255, 0, 0);"></canvas>
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="camera-wrapper">
+        <div class="multi-camera-checkerboard" id="grid-layout">
+            <div class="camera-container" id="container-d455-2">
+                <p>D455 Camera 1</p>
+                <img id="camera-d455-2" class="camera-frame" />
             </div>
-            
-            <!-- BOTTOM-LEFT: Limited ROS Logs -->
-            <!-- TO-DO: Add Div object with NODE logs -->
-            <!-- <div id="output-logs" style="color: white;">Output LOGS</div> -->
-            <div class="inner-div inner-quad-3">
-                <!-- <h1>Inner-Quad-3</h1> -->
-                <div id="left">
-                    <!-- Left: Digital Twin -->
-                    <canvas id="digital-twin"></canvas>
-                </div>
-                <div id="right">
-                    Right: Bucket Readout and Regolith Levels
-                </div>
-
+            <div class="camera-container" id="container-d455-1">
+                <p>D455 Camera 2</p>
+                <img id="camera-d455-1" class="camera-frame" />
             </div>
-            
-            <!-- BOTTOM-RIGHT: Digital Twin -->
-            <!-- TO-DO: Add Canvas object with Digital Twin -->
-            <div class="inner-div inner-quad-4">
-                <h1>Inner-Quad-4</h1>
+            <div class="camera-container" id="container-rgb-1">
+                <p>USB RGB Camera 1</p>
+                <img id="camera-rgb-1" class="camera-frame" />
             </div>
 
             <div class="inner-div inner-bottom">
@@ -109,5 +117,53 @@
 
 
         </div>
-    </body>
+    </div>
+
+    <script>
+        const feeds = [
+            { id: "camera-d455-2", container: "container-d455-2" },
+            { id: "camera-d455-1", container: "container-d455-1" },
+            { id: "camera-rgb-1",  container: "container-rgb-1"  },
+            { id: "camera-rgb-2",  container: "container-rgb-2"  }
+        ];
+
+        function updateCameraLayout() {
+            let activeCount = 0;
+
+            feeds.forEach(feed => {
+                const img = document.getElementById(feed.id);
+                const container = document.getElementById(feed.container);
+                if (!img || !container) return;
+
+                const wasVisible = !container.classList.contains("hidden");
+                const isActive = img.complete && img.naturalWidth > 0;
+
+                if (isActive) {
+                    container.classList.remove("hidden");
+                    activeCount++;
+                } else {
+                    container.classList.add("hidden");
+                }
+            });
+
+            const layout = document.getElementById("grid-layout");
+            if (activeCount <= 1) {
+                layout.style.gridTemplateColumns = "1fr";
+                layout.style.gridTemplateRows = "1fr";
+            } else if (activeCount === 2) {
+                layout.style.gridTemplateColumns = "1fr 1fr";
+                layout.style.gridTemplateRows = "1fr";
+            } else {
+                layout.style.gridTemplateColumns = "1fr 1fr";
+                layout.style.gridTemplateRows = "1fr 1fr";
+            }
+        }
+
+        window.addEventListener("load", () => {
+            setTimeout(updateCameraLayout, 1000);
+            setInterval(updateCameraLayout, 5000);
+        });
+    </script>
+</body>
 </html>
+

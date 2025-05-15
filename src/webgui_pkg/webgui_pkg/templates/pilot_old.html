@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Pilot Control Interface</title>
+        <!-- <link rel="stylesheet" href="{{url_for('static', filename='css/pilot.css')}}"> -->
+        <link rel="stylesheet" href="../static/css/pilot.css"/>
+
+        <!-- ROSJS External Libraries -->
+        <!-- -> Must be Sourced First -->
+
+        <script src="{{url_for('static', filename='js/resources/roslib.min.js')}}"></script>
+        <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
+        <!-- <script src="../static/js/resources/roslib.min.js"></script> -->
+        <!-- <script src="../static/js/resources/eventemitter2.min.js"></script> -->
+
+        <!-- Global ROS Setup Code -->
+        <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
+        <!-- <script src="../static/js/ros_setup.js"></script> -->
+
+        <!-- Pilot GUI Specific Setup Code -->
+
+        <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
+        <!-- <script src="../static/js/gamepad_setup.js"></script> -->
+
+        <!-- <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>  -->
+        <!-- <script src="../static/js/animation/quest_arrow.js" defer></script> -->
+        <!-- <script src="../static/js/animation/digital_twin.js" defer></script> -->
+        <!-- <script src="../static/js/pilot.js" defer></script> -->
+
+        <script src="{{url_for('static', filename='js/animation/quest_arrow.js')}}" defer></script>
+        <script src="{{url_for('static', filename='js/animation/digital_twin.js')}}" defer></script>
+        <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
+
+        <script src="{{url_for('static', filename='js/resources/three.min.js')}}"></script>
+        <script src="{{url_for('static', filename='js/resources/DRACOLoader.js')}}"></script>
+        <script src="{{url_for('static', filename='js/resources/GLTFLoader.js')}}"></script>
+
+        <!-- Directional Arrow Specific Setup Code -->
+        <!-- <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script> -->
+        <!-- <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/loaders/DRACOLoader.js"></script> -->
+        <!-- <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/GLTFLoader.js"></script> -->
+
+        <!-- <script src="../static/js/resources/three.min.js"></script> -->
+        <!-- <script src="../static/js/resources/DRACOLoader.js"></script> -->
+        <!-- <script src="../static/js/resources/GLTFLoader.js"></script> -->
+    </head>
+    <body>
+        <div class="outer-box">
+            <!-- TOP-LEFT: Quest Arrow -->
+            <!-- TO-DO: Add Canvas Element to Animate Quest Arrow -->
+
+            <!-- TOP-RIGHT: List Autonomous Functions -->
+            <!-- Overlay Indicator and Autonomous Function Name -->
+            <div class="inner-div inner-quad-1"><!--Quest Arrow-->
+                <canvas id="quest-arrow" style="z-index: 3; background-color: rgba(0, 255, 0, 0);"></canvas>
+            </div>
+            
+            <!-- BOTTOM-LEFT: Limited ROS Logs -->
+            <!-- TO-DO: Add Div object with NODE logs -->
+            <!-- <div id="output-logs" style="color: white;">Output LOGS</div> -->
+            <div class="inner-div inner-quad-3">
+                <!-- <h1>Inner-Quad-3</h1> -->
+                <div id="left">
+                    <!-- Left: Digital Twin -->
+                    <canvas id="digital-twin"></canvas>
+                </div>
+                <div id="right">
+                    Right: Bucket Readout and Regolith Levels
+                </div>
+
+            </div>
+            
+            <!-- BOTTOM-RIGHT: Digital Twin -->
+            <!-- TO-DO: Add Canvas object with Digital Twin -->
+            <div class="inner-div inner-quad-4">
+                <h1>Inner-Quad-4</h1>
+            </div>
+
+            <div class="inner-div inner-bottom">
+                <h1>Inner-Bottom</h1>
+            </div>
+
+            <!-- Camera Feed -->
+            <!-- NOTE: Using a canvas element may be better -->
+            <div class="camera-feed">
+                <img id="camera-output">
+            </div>
+
+        </div>
+    </body>
+</html>

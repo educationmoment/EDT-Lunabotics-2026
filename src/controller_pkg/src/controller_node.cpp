@@ -3,10 +3,12 @@
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "interfaces_pkg/msg/motor_health.hpp"
+#include "interfaces_pkg/msg/motor_health.hpp"
 #include "interfaces_pkg/srv/depositing_request.hpp"
 #include "interfaces_pkg/srv/excavation_request.hpp"
 #include <cmath>
 #include <string>
+
 #include <cstdlib>
 #include <algorithm>
 
@@ -22,9 +24,40 @@ enum CAN_IDs {
   VIBRATOR    = 6
 };
 
+enum BUTTONS_CONTROLLER {
+  RIGHT_BUMPER = 5,
+  RIGHT_TRIGGER = 6,
+  LEFT_TRIGGER  = 7,
+  Y_BUTTON = 3
+  A_BUTTON = 0
+};
+
+enum JOYSTICK_CONTROLLER {
+  HORIZONTAL_LEFT_JOY = 0,
+  VERTICAL_LEFT_JOY = 1
+};
+
+/**
+ * @class Class::ControllerNode
+ * @brief Converts controller input from /joy
+ *        into commands. Used for both manual and
+ *        automatic control.
+ * 
+ * ==================================================
+ * @details Node burns flash for sparkmax motor controllers,
+ *          handles sending heartbeats at 1 second intervals.
+ *          The node also handles handoff of automatic control between
+ *          depositing and excavation agents.
+ * 
+ *********************************************************************/
 class ControllerNode : public rclcpp::Node
 {
 public:
+
+  /**
+   * @brief Node Constructor: flashes Sparkmax controllers, initiallizes timer, joy subscription, and depositing and excavation service calls.
+   * @param can_interface Sets the OS interface used by Sparkcan
+   *********************************************************************/
   ControllerNode(const std::string & can_interface)
   : Node("controller_node"),
     leftMotor(can_interface, LEFT_MOTOR),
@@ -34,6 +67,9 @@ public:
     tilt(can_interface, TILT),
     vibrator(can_interface, VIBRATOR),
     vibrator_active_(false),
+    prev_vibrator_button_(false),
+    alternate_mode_active_(false),
+    prev_alternate_button_(false)
     prev_vibrator_button_(false),
     alternate_mode_active_(false),
     prev_alternate_button_(false)
@@ -57,6 +93,7 @@ public:
     leftLift.SetSensorType(SensorType::kEncoder);
     rightLift.SetSensorType(SensorType::kEncoder);
     //Initializes the settings for the lift actuators
+    //Initializes the settings for the lift actuators
 
     tilt.SetIdleMode(IdleMode::kBrake);
     tilt.SetMotorType(MotorType::kBrushed);
@@ -66,22 +103,27 @@ public:
     vibrator.SetIdleMode(IdleMode::kBrake);
     vibrator.SetMotorType(MotorType::kBrushed);
     vibrator.SetSensorType(SensorType::kEncoder);
-    //Initializes the settings fro the vibrator
+    //Initializes the settings for the vibrator
 
+    leftMotor.SetInverted(false);
+    rightMotor.SetInverted(true);
     leftMotor.SetInverted(false);
     rightMotor.SetInverted(true);
     leftLift.SetInverted(true);
     rightLift.SetInverted(true);
     tilt.SetInverted(true);
+    tilt.SetInverted(true);
     vibrator.SetInverted(true);
     //Initializes the inverting status
 
+    leftMotor.SetP(0, 0.0002f);
     leftMotor.SetP(0, 0.0002f);
     leftMotor.SetI(0, 0.0f);
     leftMotor.SetD(0, 0.0f);
     leftMotor.SetF(0, 0.00021f);
     //PID settings for left motor
 
+    rightMotor.SetP(0, 0.0002f);
     rightMotor.SetP(0, 0.0002f);
     rightMotor.SetI(0, 0.0f);
     rightMotor.SetD(0, 0.0f);
@@ -137,6 +179,7 @@ public:
     heartbeatPub = this->create_publisher<std_msgs::msg::String>("/heartbeat", 10);
     RCLCPP_INFO(this->get_logger(), "Heartbeat Publisher Initialized");
 
+
     RCLCPP_INFO(this->get_logger(), "Initializing Timer");
     timer = this->create_wall_timer(
         std::chrono::milliseconds(1000),
@@ -160,9 +203,14 @@ private:
   rclcpp::Client<interfaces_pkg::srv::ExcavationRequest>::SharedPtr excavation_client_;
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscriber_;
   rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
+  rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr heartbeatPub;
   rclcpp::TimerBase::SharedPtr timer;
 
+  //Autonomy flag
+  bool is_autonomy_active_ = false;
+
+  // Vibrator toggle
   //Autonomy flag
   bool is_autonomy_active_ = false;
 
@@ -190,9 +238,11 @@ private:
       return (value > 0 ? 0.75f : -0.75f);
     return (value > 0 ? 1.0f : -1.0f);
   }
+  }
 
   // Sends request to depositing node and manages response
   void send_deposit_request() {
+    // Determine of the Depositing Client is Available
     if (!depositing_client_ || !depositing_client_->wait_for_service(std::chrono::seconds(1))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available");
       return;
@@ -208,9 +258,11 @@ private:
       }
     });
   }
+  }
 
   // Sends request to excavation node and manages response
   void send_excavation_request() {
+    // Determine if the Excavation Client is available
     if (!excavation_client_ || !excavation_client_->wait_for_service(std::chrono::seconds(1))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available");
       return;
@@ -415,3 +467,4 @@ int main(int argc, char ** argv)
   rclcpp::shutdown();
   return 0;
 }
+
