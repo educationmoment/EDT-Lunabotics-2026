@@ -12,12 +12,11 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
-#include "std_msgs/msg/float32.hpp"
 #include "sensor_msgs/msg/compressed_image.hpp"
 #include "sensor_msgs/msg/image.hpp"
 
 #include "librealsense2/rs.hpp"
-// #include "SparkMax.hpp"
+#include "SparkMax.hpp"
 
 using namespace std::chrono_literals;
 
@@ -31,7 +30,7 @@ public:
     cfg.enable_device("318122303486");
     cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
     cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16, 15);
-
+    
     try {
       pipeline_.start(cfg);
       RCLCPP_INFO(this->get_logger(), "Started D455 pipeline.");
@@ -41,7 +40,7 @@ public:
     // Open USB RGB cameras explicitly
     cap_rgb1_.open("/dev/video0");
     cap_rgb2_.open("/dev/video8");
-
+    
     if (!cap_rgb1_.isOpened()) {
       RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video6).\n");
     }
@@ -50,12 +49,11 @@ public:
     }
 
     // Publishers
-    d455_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 5);
-    rgb_cam1_pub_  = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 5);
-    rgb_cam2_pub_  = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 5);
+    d455_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 10);
+    rgb_cam1_pub_  = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 10);
+    rgb_cam2_pub_  = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 10);
     L_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/left", 10);
     R_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/right", 10);
-    depth_detection_pub_ = this->create_publisher<std_msgs::msg::Float32>("depth_detection", 10);
 
     // Timer
     timer_ = this->create_wall_timer(66ms, std::bind(&MultiCameraNode::timer_callback, this)); // ~15 FPS
@@ -71,7 +69,6 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam2_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr L_obstacle_detection_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr R_obstacle_detection_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr depth_detection_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
 
@@ -82,7 +79,7 @@ private:
       rs2::frame color_frame = frames.get_color_frame();
       rs2::depth_frame depth_frame = frames.get_depth_frame();
       if (color_frame) publish_realsense_image(color_frame, d455_cam1_pub_);
-      if (depth_frame && depth_frame.get_data()) obstacle_detection_callback(depth_frame, L_obstacle_detection_pub_, R_obstacle_detection_pub_, depth_detection_pub_);
+      if (depth_frame && depth_frame.get_data()) obstacle_detection_callback(depth_frame, L_obstacle_detection_pub_, R_obstacle_detection_pub_);
     } else {
       RCLCPP_WARN(this->get_logger(), "No D455 frames available.");
     }
@@ -133,10 +130,10 @@ private:
     pub->publish(msg);
   }
 
-  void obstacle_detection_callback(const rs2::frame& depth_frame, rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_left,
-    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_right, rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_depth){
+  void obstacle_detection_callback(const rs2::frame& depth_frame, rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_left, 
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_right){
     const int GROUND_DEPTH_MM = 700;
-    const int POS_THRESHOLD = 250;
+    const int POS_THRESHOLD = 250; 
     const int NEG_THRESHOLD = 800;
     const int OBSTACLE_THRESHOLD = 200;
 
@@ -149,19 +146,6 @@ private:
     int left_count = 0;
     int right_count = 0;
 
-    float average_depth = 0.0;
-    for (int y = 236; y <= 244; y += 4){
-        for (int x = 420; x <= 428 ; x += 4){
-            float dist_m = depth.get_distance(x, y);
-            average_depth += dist_m;
-        }
-    }
-    average_depth = average_depth / 9; //average of 9 pixels
-    std_msgs::msg::Float32 depth_msg;
-    
-    depth_msg.data = average_depth;
-    pub_depth->publish(depth_msg);
-
     for (int y = height / 2; y < height; y += 5) {
       for (int x = 0; x < width / 2; x += 5) {
         float dist_m = depth.get_distance(x, y);
@@ -170,14 +154,14 @@ private:
         int depth_mm = static_cast<int>(dist_m * 1000);
         int delta = GROUND_DEPTH_MM - depth_mm;
 
-        if (delta > POS_THRESHOLD){
+        if (delta > POS_THRESHOLD){ 
           pos_count++;
           right_count++;
         }
         else if (-delta > NEG_THRESHOLD){
           neg_count++;
           right_count++;
-        }
+        } 
       }
     }//right side detection
 
@@ -189,16 +173,16 @@ private:
         int depth_mm = static_cast<int>(dist_m * 1000);
         int delta = GROUND_DEPTH_MM - depth_mm;
 
-        if (delta > POS_THRESHOLD){
+        if (delta > POS_THRESHOLD){ 
           pos_count++;
           left_count++;
         }
         else if (-delta > NEG_THRESHOLD){
           neg_count++;
           left_count++;
-        }
+        } 
       }
-    }//left side detection
+    }//right side detection
 
     std_msgs::msg::Bool left_msg;
     std_msgs::msg::Bool right_msg;
@@ -233,3 +217,4 @@ int main(int argc, char ** argv) {
   rclcpp::shutdown();
   return 0;
 }
+

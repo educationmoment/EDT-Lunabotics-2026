@@ -4,7 +4,7 @@
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/bool.hpp"
 
-const float VIBRATOR_DUTY = 0.2f;
+const float VIBRATOR_DUTY = 0.1f;
 const float ERROR = 0.1f;
 
 SparkMax leftDrive("can0", 1);
@@ -30,14 +30,11 @@ void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrato
     while (!((leftLiftReached && rightLiftReached) && tiltReached)){
         std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
         if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.2){
-            if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.5){
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "ACTUATORS GREATELY MISALIGNED, CANCELLING MOVEMENT");
-                rclcpp::shutdown();
+            if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.75){
+                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "WARNING: ACTUATORS GREATELY MISALIGNED");
             }
             leftLift.SetPosition(rightLift.GetPosition());
             rightLift.SetPosition(rightLift.GetPosition());
-
-            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "ACTUATORS UNALIGNED, REALIGNING BUCKET");
         } //block for lift realignment
         else {
             leftLift.SetPosition(lift_setpoint);
@@ -48,12 +45,12 @@ void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrato
         if (activate_vibrator) vibrator.SetDutyCycle(VIBRATOR_DUTY);
 
         if (drive_forward){
-            leftDrive.SetVelocity(500.0f);
-            rightDrive.SetVelocity(500.0f);
+            leftDrive.SetVelocity(1500.0f);
+            rightDrive.SetVelocity(1500.0f);
         }
 
-        if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - timer_start).count() > 10) {
-            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "ERROR: Depositing Cancelled");
+        if (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - timer_start).count() > 5) {
+            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Skipping stage...");
             break;
         } //Timer for when to quit a stage due to timeout
         
@@ -73,21 +70,33 @@ void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Requ
 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting excavation process");
 
-        MoveBucket(-2.68,-3.24, false, false);
+        MoveBucket(-2.5,-3.24, false, false);
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
-        MoveBucket(-3.4,-3.2, true, true);
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 2 complete");
+        //Stage 1 
 
-        auto dig_timer = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer).count() < 8){
+        auto dig_timer1 = std::chrono::high_resolution_clock::now();
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer1).count() < 4){
+            MoveBucket(-3.4,-3.2, true, true);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
+            leftDrive.SetVelocity(1500.0f);
+            rightDrive.SetVelocity(1500.0f);
+            vibrator.SetDutyCycle(VIBRATOR_DUTY);
+            //Keeps the drivetrain and vibrator moving even when the while loop is being skipped
+        }
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 2 complete");
+        //Stage 2
+
+        auto dig_timer2 = std::chrono::high_resolution_clock::now();
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer2).count() < 8){
             MoveBucket(-3.6,-2.2, true, true);
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
-            leftDrive.SetVelocity(500.0f);
-            rightDrive.SetVelocity(500.0f);
+            leftDrive.SetVelocity(1500.0f);
+            rightDrive.SetVelocity(1500.0f);
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
             //Keeps the drivetrain and vibrator moving even when the while loop is being skipped
         }
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 3 excavation completed, resetting bucket");
+        //Stage 3
 
         leftDrive.SetDutyCycle(0.0f);
         rightDrive.SetDutyCycle(0.0f);

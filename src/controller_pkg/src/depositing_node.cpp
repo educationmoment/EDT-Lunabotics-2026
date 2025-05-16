@@ -3,7 +3,7 @@
 #include "interfaces_pkg/srv/depositing_request.hpp"
 #include "std_msgs/msg/bool.hpp"
 
-const float VIBRATOR_DUTY = 0.1;
+const float VIBRATOR_DUTY = 0.1f;
 const float ERROR = 0.1;
 
 SparkMax leftLift("can0", 3);
@@ -58,12 +58,12 @@ void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Reque
 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting depositing process");
 
-        MoveBucket(2.7, 0.0, false); //Moves bucket up, tilts bucket
+        MoveBucket(2.9, 0.0, false); //Moves bucket up, tilts bucket
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
 
         auto jiggleout_start = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - jiggleout_start).count() < 5) {
-            MoveBucket(2.7, -0.5, true);
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - jiggleout_start).count() < 8) {
+            MoveBucket(2.9, -0.2, true);
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
         } //Vibrates sand out of bucket

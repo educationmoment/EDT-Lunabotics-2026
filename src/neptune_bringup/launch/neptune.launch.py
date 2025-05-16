@@ -12,18 +12,19 @@ def generate_launch_description() -> LaunchDescription:
         executable="rosbridge_websocket"
     )
 
-    # Madgwick's Filter Node
-    madgwick_filter = Node(
-        name            = "madgwick_node",
-        package         = "imu_filter_madgwick",
-        executable      = "imu_filter_madgwick_node",
-        parameters = [{
-            "use_mag": False,
-            "remove_gravity_vector": True,
-            "gain": 0.0025,
-            "frequency": 800
-        }]
-    )
+    # # # Unused
+    # # Madgwick's Filter Node
+    # madgwick_filter = Node(
+    #     name            = "madgwick_node",
+    #     package         = "imu_filter_madgwick",
+    #     executable      = "imu_filter_madgwick_node",
+    #     parameters = [{
+    #         "use_mag": False,
+    #         "remove_gravity_vector": True,
+    #         "gain": 0.0025,
+    #         "frequency": 800
+    #     }]
+    # )
 
     # Add Webgui
     web_user_interface = Node(
@@ -69,20 +70,22 @@ def generate_launch_description() -> LaunchDescription:
         package="controller_pkg",
         executable="health_node",
     )
-    # Add Depth-To-Laserscan Node
-    depth_to_laserscan_module = Node(
-        name="depth_to_laserscan_node",
-        package="depth_to_laserscan",
-        executable="depth_to_laserscan_node",
-        remappings=[
-            ('depth', '/camera/depth/image_raw'),
-            ('depth_camera_info', '/camera/depth_camera_info')
-        ],
 
-        parameters=[
-            {''}
-        ]
-    )
+    # # # Unused
+    # # Add Depth-To-Laserscan Node
+    # depth_to_laserscan_module = Node(
+    #     name="depth_to_laserscan_node",
+    #     package="depth_to_laserscan",
+    #     executable="depth_to_laserscan_node",
+    #     remappings=[
+    #         ('depth', '/camera/depth/image_raw'),
+    #         ('depth_camera_info', '/camera/depth_camera_info')
+    #     ],
+    # 
+    #     parameters=[
+    #         {''}
+    #     ]
+    # )
 
 
 
@@ -102,7 +105,7 @@ def generate_launch_description() -> LaunchDescription:
 
     # Add Actions to Launch Description
     ld.add_action(ros_bridge_server)
-    ld.add_action(madgwick_filter)
+    # ld.add_action(madgwick_filter)
     ld.add_action(web_user_interface)
     ld.add_action(rs_camera_module)
     ld.add_action(hardware_controller_module)
