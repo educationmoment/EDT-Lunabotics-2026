@@ -1,0 +1,61 @@
+from rclpy.node import Node
+import csv
+from interfaces_pkg.msg import MotorHealth
+import rclpy
+
+
+class LoggerNode( Node ):
+    def __init__(self):
+        super().__init__("logger_node")
+        self.get_logger().info("Hello World!")
+        
+        # Create Subscription to /motor_health
+        self.subscriber_ = self.create_subscription(
+            msg_type=MotorHealth, 
+            topic="/motor_health", 
+            callback=self.subscription_callback,
+            qos_profile=5
+        )
+        self.initial = True
+
+    def subscription_callback(self, msg) -> None:
+        self.get_logger().warn("Subscription Callback")
+        self.get_logger().warn(f"Motor Velocity: {msg.left_motor_velocity}")
+
+        if self.initial:
+            with open('~/Logger/robot_hardware.log', 'w', newline='') as csvfile:
+                csvWriter = csv.writer(
+                    csvfile=csvfile, 
+                    delimiter=' ',
+                    quotechar='|',
+                    quoting=csv.QUOTE_MINIMAL  
+                )
+                csvWriter.writerow(["left_motor_velocity", "left_motor_current", "left_motor_voltage", "left_motor_position", "right_motor_velocity", "right_motor_current", "right_motor_voltage", "right_motor_temperature", "right_motor_position", "left_lift_position", "left_lift_current", "left_lift_voltage", "right_lift_position", "right_lift_current", "right_lift_voltage", "tilt_position", "tilt_current", "tilt_voltage", "vibrator_current", "vibrator_voltage"])
+                csvWriter.writerow([msg.left_motor_velocity, msg.left_motor_current, msg.left_motor_voltage, msg.left_motor_temperature, msg.left_motor_position, msg.right_motor_velocity, msg.right_motor_current, msg.right_motor_voltage, msg.right_motor_temperature, msg.right_motor_position, msg.left_lift_position, msg.left_lift_current, msg.left_lift_voltage, msg.right_lift_position, msg.right_lift_current, msg.right_lift_voltage, msg.tilt_position, msg.tilt_current, msg.tilt_voltage, msg.vibrator_current, msg.vibrator_voltage])
+            self.initial = False
+            pass
+        else:
+            with open('~/Logger/robot_hardware.log', 'w', newline='') as csvfile:
+                csvWriter = csv.writer(
+                    csvfile=csvfile, 
+                    delimiter=' ',
+                    quotechar='|',
+                    quoting=csv.QUOTE_MINIMAL  
+                )
+                # csvWriter.writerow(["left_motor_velocity", "left_motor_current", "left_motor_voltage", "left_motor_position", "right_motor_velocity", "right_motor_current", "right_motor_voltage", "right_motor_temperature", "right_motor_position", "left_lift_position", "left_lift_current", "left_lift_voltage", "right_lift_position", "right_lift_current", "right_lift_voltage", "tilt_position", "tilt_current", "tilt_voltage", "vibrator_current", "vibrator_voltage"])
+                csvWriter.writerow([msg.left_motor_velocity, msg.left_motor_current, msg.left_motor_voltage, msg.left_motor_temperature, msg.left_motor_position, msg.right_motor_velocity, msg.right_motor_current, msg.right_motor_voltage, msg.right_motor_temperature, msg.right_motor_position, msg.left_lift_position, msg.left_lift_current, msg.left_lift_voltage, msg.right_lift_position, msg.right_lift_current, msg.right_lift_voltage, msg.tilt_position, msg.tilt_current, msg.tilt_voltage, msg.vibrator_current, msg.vibrator_voltage])
+            pass
+        return None
+
+
+
+def main() -> int:
+    rclpy.init()
+    node = LoggerNode()
+    rclpy.spin_once(node=node)
+    rclpy.shutdown()
+    return 0
+
+
+if __name__ == "__main__":
+    exit( main() )
