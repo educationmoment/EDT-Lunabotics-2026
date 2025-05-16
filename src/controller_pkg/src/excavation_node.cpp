@@ -95,7 +95,7 @@ void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Requ
         //Stage 3
 
         auto dig_timer3 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer3).count() < 8){
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer3).count() < 6){
             leftDrive.SetVelocity(1000.0f);
             rightDrive.SetVelocity(1000.0f);
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
