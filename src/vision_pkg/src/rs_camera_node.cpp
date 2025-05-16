@@ -8,7 +8,6 @@
 #include <chrono>
 #include <thread>
 #include <opencv2/opencv.hpp>
-
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -52,16 +51,16 @@ public:
       RCLCPP_ERROR(this->get_logger(), "Error starting D455 pipeline: %s", e.what());
     }
     // Open USB RGB cameras explicitly
-    cap_rgb1_.open("/dev/video1");
-    cap_rgb2_.open("/dev/video0");
+    cap_rgb1_.open("/dev/video6");
+    cap_rgb2_.open("/dev/video8");
 
     if (!cap_rgb1_.isOpened())
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video1).\n");
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video6).\n");
     }
     if (!cap_rgb2_.isOpened())
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video0).\n");
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video8).\n");
     }
 
     // Publishers
@@ -173,12 +172,19 @@ private:
     pub->publish(msg);
   }
 
-  double average_depth( const rs2::frame &depth_frame, std::pair<int, int> x_bounds, std::pair<int, int> y_bounds, int increment = 1 ) {
+  /**
+   * Function: average_depth
+   * @brief Get the average depth pixel value across a rectangular region in the depth camera. Does not provide bounds checking.
+   * 
+   * @param depth The depth frame passed by reference to the function call
+   * @param x_bounds The lower and the upper bounds in the x-direction
+   * @param y_bounds The lower and the upper bounds in the y-direction
+   * @param increment The value to increment by between pixels
+   * @returns double The average depth value across a region
+   **********************************************************************/
+  double average_depth( const rs2::depth_frame &depth, std::pair<int, int> x_bounds, std::pair<int, int> y_bounds, int increment = 1 ) {
     int numberPixels = (x_bounds.second - x_bounds.first) * (y_bounds.second - y_bounds.first) / (increment * increment); 
     double average_depth = 0.0;
-    const rs2::depth_frame depth = depth_frame.as<rs2::depth_frame>();
-
-
 
     for( int i = x_bounds.first; i <= x_bounds.second; i += increment ) {
       for( int j = y_bounds.first; j <= y_bounds.second; j += increment ) {
@@ -220,11 +226,13 @@ private:
     // }
     // double val = average_depth(depth_frame, {228, 252}, {412, 436}, 4);
 
+
+
     // average_depth = average_depth / 49; // average of 49 pixels
     std_msgs::msg::Float32 depth_msg;
 
     // depth_msg.data = average_depth;
-    depth_msg.data = average_depth(depth_frame, {235,245}, {420, 428}, 1);
+    depth_msg.data = average_depth(depth, {235,245}, {420, 428}, 1);
     pub_depth->publish(depth_msg);
 
     for (int y = height / 2; y < height; y += 5)

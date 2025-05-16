@@ -26,7 +26,7 @@ class LoggerNode( Node ):
         if self.initial:
             with open('/ssd/home/edt/Logger/robot_hardware.log', 'w', newline='') as csvfile:
                 csvWriter = csv.writer( csvfile, 
-                    delimiter='|',
+                    delimiter='\t|\t',
                     quotechar='|',
                     quoting=csv.QUOTE_MINIMAL  
                 )
@@ -37,7 +37,7 @@ class LoggerNode( Node ):
         else:
             with open('/ssd/home/edt/Logger/robot_hardware.log', 'a', newline='') as csvfile:
                 csvWriter = csv.writer( csvfile, 
-                    delimiter='|',
+                    delimiter='\t|\t',
                     quotechar='|',
                     quoting=csv.QUOTE_MINIMAL  
                 )

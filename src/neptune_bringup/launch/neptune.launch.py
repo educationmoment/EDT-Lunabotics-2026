@@ -28,53 +28,59 @@ def generate_launch_description() -> LaunchDescription:
 
     # Add Webgui
     web_user_interface = Node(
-        name="webgui_node",
+        name        ="webgui_node",
         package     = "webgui_pkg",
         executable  = "webgui_server"
     )
 
     # Add Realsense Camera
     rs_camera_module = Node(
-        name="camera_node",
-        package="vision_pkg",
-        executable="rs_camera_node"
+        name        ="camera_node",
+        package     ="vision_pkg",
+        executable  ="rs_camera_node"
     )
 
     # Add Localization Node
     localization_module = Node(
-        package="localization_pkg",
-        executable="localization_node"
+        package     ="localization_pkg",
+        executable  ="localization_node"
     )
 
     # Add Hardware Controller
     hardware_controller_module = Node(
-        name="controller_node",
-        package="controller_pkg",
-        executable="controller_node"
+        name        ="controller_node",
+        package     ="controller_pkg",
+        executable  ="controller_node"
     )
     # Add Depositing Sequence
     depositing_module = Node(
-        name="depositing_node",
-        package="controller_pkg",
-        executable="depositing_node",
+        name        ="depositing_node",
+        package     ="controller_pkg",
+        executable  ="depositing_node",
     )
     # Add Excavation Sequence
     excavation_module = Node(
-        name="excavation_node",
-        package="controller_pkg",
-        executable="excavation_node",
+        name        ="excavation_node",
+        package     ="controller_pkg",
+        executable  ="excavation_node",
     )
     # Add Helath Node
     health_module = Node(
-        name="health_node",
-        package="controller_pkg",
-        executable="health_node",
+        name        ="health_node",
+        package     ="controller_pkg",
+        executable  ="health_node",
+    )
+    #bucket sensor
+    serial_reader_module = Node(
+        name = "serial_reader_node",
+        package = "controller_pkg",
+        executable = "serial_reader_node"
     )
     # Add Logger Node
     logger_module = Node(
-        name="logger_node",
-        package="logger_pkg",
-        executable="loggerNode"
+        name        ="logger_node",
+        package     ="logger_pkg",
+        executable  ="loggerNode"
     )
 
     # # # Unused
@@ -87,7 +93,7 @@ def generate_launch_description() -> LaunchDescription:
     #         ('depth', '/camera/depth/image_raw'),
     #         ('depth_camera_info', '/camera/depth_camera_info')
     #     ],
-    # 
+    #
     #     parameters=[
     #         {''}
     #     ]
@@ -120,4 +126,5 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(localization_module)
     ld.add_action(health_module)
     ld.add_action(logger_module)
+    ld.add_action(serial_reader_module)
     return ld
