@@ -58,12 +58,18 @@ void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Reque
 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting depositing process");
 
-        MoveBucket(2.9, 0.0, false); //Moves bucket up, tilts bucket
+        auto tiltback_start = std::chrono::high_resolution_clock::now();
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - tiltback_start).count() < 2) {
+            tilt.SetDutyCycle(1.0f);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
+        } 
+
+        MoveBucket(3.5, 1.0, false); //Moves bucket up, tilts bucket
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
 
         auto jiggleout_start = std::chrono::high_resolution_clock::now();
         while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - jiggleout_start).count() < 8) {
-            MoveBucket(2.9, -0.2, true);
+            MoveBucket(3.5, 1.0, true);
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
         } //Vibrates sand out of bucket
