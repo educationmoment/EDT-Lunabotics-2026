@@ -45,6 +45,14 @@ for the NASA Lunabotics 2025 competition.</p>
 
     fix: sudo ip link set can0 up type can bitrate 1000000 || OR || lift E-stop (if busy).
 
+<p>Clock Skew</p>
+
+    fix: run "date" on the jetson. you might get a date/time that is off from the current time / date. then, run "sudo date -s "2025-05-15 10:00:00" (change the date to the current date) and run colcon build.
+
+    if you still encounter clock skew after this, you will have to "touch" all files to replace their time and date- "find . -exec touch {} +" IN THE ROOT OF THE WORKSPACE (ROBOT_WS)! !! DOING THIS OUTSIDE WILL BREAK THE JETSON!
+
+    then you may need to clear artificatsion, in robot_WS do "rm -rf build/ install/ log/" and then finally build again, "colcon build --symlink-install"
+
 
 <h2>Installation</h2>
 <hr>
