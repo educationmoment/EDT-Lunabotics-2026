@@ -7,26 +7,26 @@ import rclpy
 class LoggerNode( Node ):
     def __init__(self):
         super().__init__("logger_node")
-        self.get_logger().info("Hello World!")
+        self.get_logger().info("CSV Logger Initiallized")
         
         # Create Subscription to /motor_health
         self.subscriber_ = self.create_subscription(
             msg_type=MotorHealth, 
-            topic="/motor_health", 
+            topic="/health_topic", 
             callback=self.subscription_callback,
-            qos_profile=5
+            qos_profile=rclpy.qos.qos_profile_sensor_data
         )
         self.initial = True
 
+    # Function: Subscription Callback
+    # @brief Acts as the callback function of the /health_topic. Reads subscription and prints
+    #        in comma-separated variables format to a log file.
+    # @param msg Data to be received
     def subscription_callback(self, msg) -> None:
-        self.get_logger().warn("Subscription Callback")
-        self.get_logger().warn(f"Motor Velocity: {msg.left_motor_velocity}")
-
         if self.initial:
-            with open('~/Logger/robot_hardware.log', 'w', newline='') as csvfile:
-                csvWriter = csv.writer(
-                    csvfile=csvfile, 
-                    delimiter=' ',
+            with open('/ssd/home/edt/Logger/robot_hardware.log', 'w', newline='') as csvfile:
+                csvWriter = csv.writer( csvfile, 
+                    delimiter='|',
                     quotechar='|',
                     quoting=csv.QUOTE_MINIMAL  
                 )
@@ -35,10 +35,9 @@ class LoggerNode( Node ):
             self.initial = False
             pass
         else:
-            with open('~/Logger/robot_hardware.log', 'w', newline='') as csvfile:
-                csvWriter = csv.writer(
-                    csvfile=csvfile, 
-                    delimiter=' ',
+            with open('/ssd/home/edt/Logger/robot_hardware.log', 'a', newline='') as csvfile:
+                csvWriter = csv.writer( csvfile, 
+                    delimiter='|',
                     quotechar='|',
                     quoting=csv.QUOTE_MINIMAL  
                 )
@@ -46,14 +45,19 @@ class LoggerNode( Node ):
                 csvWriter.writerow([msg.left_motor_velocity, msg.left_motor_current, msg.left_motor_voltage, msg.left_motor_temperature, msg.left_motor_position, msg.right_motor_velocity, msg.right_motor_current, msg.right_motor_voltage, msg.right_motor_temperature, msg.right_motor_position, msg.left_lift_position, msg.left_lift_current, msg.left_lift_voltage, msg.right_lift_position, msg.right_lift_current, msg.right_lift_voltage, msg.tilt_position, msg.tilt_current, msg.tilt_voltage, msg.vibrator_current, msg.vibrator_voltage])
             pass
         return None
-
-
-
+        
 def main() -> int:
-    rclpy.init()
-    node = LoggerNode()
-    rclpy.spin_once(node=node)
-    rclpy.shutdown()
+    try:
+        rclpy.init()
+        node = LoggerNode()
+        rclpy.spin(node=node)
+        rclpy.shutdown()
+    except FileNotFoundError:
+        print("File Not Found")
+    except TypeError:
+        print("Type Error")
+    except KeyboardInterrupt:
+        print("Keyboard Interrupt")
     return 0
 
 

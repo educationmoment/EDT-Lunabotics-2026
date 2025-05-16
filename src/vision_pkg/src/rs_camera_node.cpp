@@ -52,16 +52,16 @@ public:
       RCLCPP_ERROR(this->get_logger(), "Error starting D455 pipeline: %s", e.what());
     }
     // Open USB RGB cameras explicitly
-    cap_rgb1_.open("/dev/video0");
-    cap_rgb2_.open("/dev/video8");
+    cap_rgb1_.open("/dev/video2");
+    cap_rgb2_.open("/dev/video1");
 
     if (!cap_rgb1_.isOpened())
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video6).\n");
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video2).\n");
     }
     if (!cap_rgb2_.isOpened())
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video8).\n");
+      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video1).\n");
     }
 
     // Publishers

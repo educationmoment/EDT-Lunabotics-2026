@@ -70,6 +70,12 @@ def generate_launch_description() -> LaunchDescription:
         package="controller_pkg",
         executable="health_node",
     )
+    # Add Logger Node
+    logger_module = Node(
+        name="logger_node",
+        package="logger_pkg",
+        executable="loggerNode"
+    )
 
     # # # Unused
     # # Add Depth-To-Laserscan Node
@@ -113,4 +119,5 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(excavation_module)
     ld.add_action(localization_module)
     ld.add_action(health_module)
+    ld.add_action(logger_module)
     return ld
