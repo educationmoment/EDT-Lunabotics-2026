@@ -70,13 +70,13 @@ void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Requ
 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting excavation process");
 
-        MoveBucket(-2.5,-3.24, false, false);
+        MoveBucket(-3.2,-5.3, false, false);
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
         //Stage 1 
 
         auto dig_timer1 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer1).count() < 4){
-            MoveBucket(-3.4,-3.2, true, true);
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer1).count() < 8){
+            MoveBucket(-3.6,-3.5, true, true);
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
             leftDrive.SetVelocity(1500.0f);
             rightDrive.SetVelocity(1500.0f);
@@ -88,7 +88,7 @@ void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Requ
 
         auto dig_timer2 = std::chrono::high_resolution_clock::now();
         while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer2).count() < 8){
-            MoveBucket(-3.6,-2.2, true, true);
+            MoveBucket(-3.8,-3.0, true, true);
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
             leftDrive.SetVelocity(1500.0f);
             rightDrive.SetVelocity(1500.0f);
