@@ -40,14 +40,13 @@
             height: 100%;
             width: 100%;
 
-            flex-direction: row;
-            flex-wrap: wrap;
             justify-content: center;
             align-items: center;
             /* gap: 8px; */
 
-	        grid-template-columns: 2fr 2fr 2fr;
-	        grid-gap: 8px;
+	        grid-template-columns: 2fr 2fr;
+            grid-template-rows: repeat(5, 1fr);
+	        /* grid-gap: 8px; */
         }
 
         .camera-container {
@@ -55,7 +54,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 4px;
+            padding: 2px;
             box-sizing: border-box;
         }
 
@@ -66,10 +65,13 @@
         }
 
         .camera-frame {
-            width: 100%;
+            width: 100%;C:\Users\ColtonD
+
             height: auto;
             max-height: 90%;
-            object-fit: contain;
+            max-height: 100%;
+
+            /* object-fit: contain; */
             background-color: #222;
         }
 
@@ -88,28 +90,46 @@
               
                 <div class="multi-camera-checkerboard">
                     <!-- RGB D455 Camera Container -->
-                    <div class="camera-container">
+                    <div class="camera-container" style="
+                        grid-column: 1;
+                        grid-row: 4 / 5;
+                        margin: 0;
+                    ">
                         <p>D455 Camera 1</p>
                         <img id="camera-d455-1" class="camera-frame" />
                     </div>
 
                     <!-- Canny Filtered Image Container -->
-                    <div class="camera-container">
+                    <div class="camera-container" style="
+                        grid-column: 2;
+                        grid-row: 4 / 5;
+                        margin: 0;
+                    ">
                         <p>Canny Filtered Image</p>
                         <img id="camera-d455-1-edge" class="camera-frame"/>
                     </div>
 
                     <!-- First RGB Webcam Container -->
-                    <div class="camera-container">
+                    <div class="camera-container" style="
+                        grid-column: 1;
+                        grid-row: 1 / 4;
+                        margin: 0;
+                    ">
                         <p>USB RGB Camera 1</p>
                         <img id="camera-rgb-1" class="camera-frame" />
                     </div>
 
                     <!-- Second RGB Webcam Container -->
-                    <div class="camera-container">
+                    <div class="camera-container" style="
+                        grid-column: 2;
+                        grid-row: 1 / 4;
+                        margin: 0;
+                    ">
                         <p>USB RGB Camera 2</p>
                         <img id="camera-rgb-2" class="camera-frame" />
                     </div>
+
+
 
                     <!-- Gamepad Containter -->
                     <!-- <div class="camera-container">
