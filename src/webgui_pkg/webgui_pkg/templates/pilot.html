@@ -10,12 +10,12 @@
     <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
     <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
     <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
-    <script src="{{url_for('static', filename='js/animation/quest_arrow.js')}}" defer></script>
-    <script src="{{url_for('static', filename='js/animation/digital_twin.js')}}" defer></script>
     <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
-    <script src="{{url_for('static', filename='js/resources/three.min.js')}}"></script>
+    <!-- <script src="{{url_for('static', filename='js/animation/quest_arrow.js')}}" defer></script>
+    <script src="{{url_for('static', filename='js/animation/digital_twin.js')}}" defer></script> -->
+    <!-- <script src="{{url_for('static', filename='js/resources/three.min.js')}}"></script>
     <script src="{{url_for('static', filename='js/resources/DRACOLoader.js')}}"></script>
-    <script src="{{url_for('static', filename='js/resources/GLTFLoader.js')}}"></script>
+    <script src="{{url_for('static', filename='js/resources/GLTFLoader.js')}}"></script> -->
 
     <style>
         html, body {
@@ -39,8 +39,15 @@
             display: grid;
             height: 100%;
             width: 100%;
-	    grid-template-columns: 1fr 2fr 2fr;
-	    grid-gap: 8px;
+
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            /* gap: 8px; */
+
+	        grid-template-columns: 2fr 2fr 2fr;
+	        grid-gap: 8px;
         }
 
         .camera-container {
@@ -80,23 +87,37 @@
                 <button onclick="toggleFullscreen()" class="fullscreen-button">🔳 Fullscreen</button>
               
                 <div class="multi-camera-checkerboard">
+                    <!-- RGB D455 Camera Container -->
                     <div class="camera-container">
                         <p>D455 Camera 1</p>
                         <img id="camera-d455-1" class="camera-frame" />
                     </div>
+
+                    <!-- Canny Filtered Image Container -->
+                    <div class="camera-container">
+                        <p>Canny Filtered Image</p>
+                        <img id="camera-d455-1-edge" class="camera-frame"/>
+                    </div>
+
+                    <!-- First RGB Webcam Container -->
                     <div class="camera-container">
                         <p>USB RGB Camera 1</p>
                         <img id="camera-rgb-1" class="camera-frame" />
                     </div>
+
+                    <!-- Second RGB Webcam Container -->
                     <div class="camera-container">
                         <p>USB RGB Camera 2</p>
                         <img id="camera-rgb-2" class="camera-frame" />
                     </div>
+
+                    <!-- Gamepad Containter -->
+                    <!-- <div class="camera-container">
+                        <p>Gamepad Setup</p>
+                        <img id="gamepad"/>
+                    </div> -->
                 </div>
               </div>
-              
-
-
         </div>
     </div>
 

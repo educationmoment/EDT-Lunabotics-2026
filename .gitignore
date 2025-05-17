@@ -1,14 +1,17 @@
-build
-install
-log
-src/vision_pkg/vision_pkg/__pycache__
-.devcontainer/devcontainer.json
-.devcontainer/Dockerfile
+# Build Directory is created using 'colcon build'
+build/**
+
+# Install Directory is created using 'colcon build'
+install/**
+
+# Log Directory is created using 'colcon build'
+log/**
+
+# We do not want ANY swap files accidentally included in the worktree
+*.swp
+
+# Used to configure the individual camera
 calibration.bin
 calibration.json
 rs-imu-calibration.py
-test.py
-src/webgui_pkg/webgui_pkg/static/images
-src/webgui_pkg/webgui_pkg/static/objects
-.vscode/settings.json
-*.swp
+

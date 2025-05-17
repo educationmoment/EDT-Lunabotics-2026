@@ -38,7 +38,7 @@ public:
 
         // Timer to poll serial data
         timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(10),
+            std::chrono::milliseconds(500),
             std::bind(&SerialReaderNode::readSerial, this)
         );
     }
@@ -62,6 +62,9 @@ private:
             if (parseLightLevel(data, avgLight) && (avgLight >= 10.0)) {
                 std_msgs::msg::Float32 msg;
                 msg.data = avgLight;  // Directly assign the float value
+                if (msg.data > 96){
+                  //RCLCPP_INFO(this->get_logger(), "Bucket full!");
+                }
                 publisher_->publish(msg);
             }
         }

@@ -1,4 +1,3 @@
-// rs_camera_node.cpp
 // Optimized for low latency and high performance on Jetson
 
 #include <list>
@@ -37,7 +36,10 @@ public:
 
     // Known D455 serials
     rs2::config cfg;
-    cfg.enable_device("318122303486");
+    cfg.enable_device("308222300472");
+
+    // cfg.enable_device("318122303486");
+    spat_.set_option(RS2_OPTION_HOLES_FILL, 2);
     cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
     cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16, 15);
 
@@ -65,6 +67,7 @@ public:
 
     // Publishers
     d455_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 5);
+    // edge_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/d455_edge", 5);
     rgb_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 5);
     rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 5);
     L_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/left", 10);
@@ -78,9 +81,13 @@ public:
 private:
   rs2::context ctx;
   rs2::pipeline pipeline_;
+  rs2::decimation_filter deci_;
+  rs2::spatial_filter    spat_;
+  rs2::temporal_filter   temp_;
   cv::VideoCapture cap_rgb1_;
   cv::VideoCapture cap_rgb2_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam1_pub_;
+  // rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr edge_cam1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam2_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr L_obstacle_detection_pub_;
@@ -94,28 +101,47 @@ private:
    * @param None
    *******************************************************/
   void timer_callback()
+{
+  rs2::frameset frames;
+  if (pipeline_.poll_for_frames(&frames))
   {
-    // Use poll_for_frames to avoid blocking and stalling pipeline
-    rs2::frameset frames;
-    if (pipeline_.poll_for_frames(&frames))
-    {
-      rs2::frame color_frame = frames.get_color_frame();
-      rs2::depth_frame depth_frame = frames.get_depth_frame();
-      if (color_frame)
-        publish_realsense_image(color_frame, d455_cam1_pub_);
-      if (depth_frame && depth_frame.get_data())
-        obstacle_detection_callback(depth_frame, L_obstacle_detection_pub_, R_obstacle_detection_pub_, depth_detection_pub_);
-    }
-    else
-    {
-      RCLCPP_WARN(this->get_logger(), "No D455 frames available.");
-    }
+    // 1) Get raw frames
+    auto color_frame = frames.get_color_frame();
+    auto depth_frame = frames.get_depth_frame();
 
-    publish_rgb_camera(cap_rgb1_, rgb_cam1_pub_);
-    publish_rgb_camera(cap_rgb2_, rgb_cam2_pub_);
+    // 2) Publish color
+    if (color_frame)
+      publish_realsense_image(color_frame, d455_cam1_pub_);
+
+    // 3) Filter & publish depth‐detection
+    if (depth_frame && depth_frame.get_data())
+    {
+      rs2::frame f = depth_frame;
+      f = spat_.process(f);
+      f = temp_.process(f);
+      auto filtered_depth = f.as<rs2::depth_frame>();
+
+      obstacle_detection_callback(
+        filtered_depth,
+        L_obstacle_detection_pub_,
+        R_obstacle_detection_pub_,
+        depth_detection_pub_
+      );
+    }
+  }
+  else
+  {
+    RCLCPP_WARN(this->get_logger(), "No D455 frames available.");
   }
 
-  /**
+  // 4) Always publish your two USB webcams
+  publish_rgb_camera(cap_rgb1_, rgb_cam1_pub_);
+  publish_rgb_camera(cap_rgb2_, rgb_cam2_pub_);
+}
+
+    // Use poll_for_frames to avoid blocking and stalling pipeline
+
+                   /**
    * @brief Publishes a realsense frame to the passed publisher.
    * @param color_frame rs2::frame passed by reference. The color_frame to be sent.
    * @param pub a rclcpp::publisher to a Compressed Image.
@@ -153,16 +179,18 @@ private:
     cv::Mat frame;
     if (!cap.read(frame))
     {
-      // RCLCPP_WARN(this->get_logger(), "Failed to capture frame from USB RGB camera.");
+      RCLCPP_WARN(this->get_logger(), "Failed to capture frame from USB RGB camera.");
       return;
     }
+  
+    // Publish original image
     std::vector<uchar> buffer;
     std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 40};
     sensor_msgs::msg::CompressedImage msg;
     msg.header.stamp = this->now();
     msg.header.frame_id = "rgb_camera_frame";
     msg.format = "jpeg";
-
+  
     if (!cv::imencode(".jpg", frame, buffer, params))
     {
       RCLCPP_ERROR(this->get_logger(), "Failed to encode USB RGB image to JPEG.");
@@ -170,12 +198,45 @@ private:
     }
     msg.data = buffer;
     pub->publish(msg);
-  }
-
+    /** 
+    cv::Mat gray, edges, edges_bgr;
+    cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+    
+    // Improve contrast first
+    cv::equalizeHist(gray, gray);
+    
+    // Adjust thresholds here if needed
+    cv::Canny(gray, edges, 50, 150);
+    
+    // Colorize edges as red
+    edges_bgr = cv::Mat::zeros(frame.size(), CV_8UC3);
+    edges_bgr.setTo(cv::Scalar(0, 0, 255), edges);  // Red where edges exist
+  
+    // Encode edge image
+    
+    std::vector<uchar> edge_buffer;
+    sensor_msgs::msg::CompressedImage edge_msg;
+    edge_msg.header.stamp = this->now();
+    edge_msg.header.frame_id = "rgb_camera_frame_edge";
+    edge_msg.format = "jpeg";
+  
+    if (!cv::imencode(".jpg", edges_bgr, edge_buffer, params)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to encode Canny edge image.");
+      return;
+    }
+  
+    edge_msg.data = edge_buffer;
+    if (edge_cam1_pub_) {
+      edge_cam1_pub_->publish(edge_msg);
+      RCLCPP_INFO(this->get_logger(), "Published Canny edge image.");
+    }
+      */
+  };
+  
   /**
    * Function: average_depth
    * @brief Get the average depth pixel value across a rectangular region in the depth camera. Does not provide bounds checking.
-   * 
+   *
    * @param depth The depth frame passed by reference to the function call
    * @param x_bounds The lower and the upper bounds in the x-direction
    * @param y_bounds The lower and the upper bounds in the y-direction
@@ -183,7 +244,7 @@ private:
    * @returns double The average depth value across a region
    **********************************************************************/
   double average_depth( const rs2::depth_frame &depth, std::pair<int, int> x_bounds, std::pair<int, int> y_bounds, int increment = 1 ) {
-    int numberPixels = (x_bounds.second - x_bounds.first) * (y_bounds.second - y_bounds.first) / (increment * increment); 
+    int numberPixels = (x_bounds.second - x_bounds.first) * (y_bounds.second - y_bounds.first) / (increment * increment);
     double average_depth = 0.0;
 
     for( int i = x_bounds.first; i <= x_bounds.second; i += increment ) {
@@ -215,24 +276,24 @@ private:
     int left_count = 0;
     int right_count = 0;
 
-    // float average_depth = 0.0;
-    // for (int y = 228; y <= 252; y += 4)
-    // {
-    //   for (int x = 412; x <= 436; x += 4)
-    //   {
-    //     float dist_m = depth.get_distance(x, y);
-    //     average_depth += dist_m;
-    //   }
-    // }
-    // double val = average_depth(depth_frame, {228, 252}, {412, 436}, 4);
+    float average_depth = 0.0;
+    for (int y = 228; y <= 252; y += 4)
+    {
+      for (int x = 412; x <= 436; x += 4)
+      {
+        float dist_m = depth.get_distance(x, y);
+        average_depth += dist_m;
+      }
+    }
+    //double val = average_depth(depth_frame, {228, 252}, {412, 436}, 4);
 
 
 
-    // average_depth = average_depth / 49; // average of 49 pixels
+    average_depth = average_depth / 49; // average of 49 pixels
     std_msgs::msg::Float32 depth_msg;
 
-    // depth_msg.data = average_depth;
-    depth_msg.data = average_depth(depth, {235,245}, {420, 428}, 1);
+    depth_msg.data = average_depth;
+    //depth_msg.data = average_depth(depth, {235,245}, {420, 428}, 1);
     pub_depth->publish(depth_msg);
 
     for (int y = height / 2; y < height; y += 5)
@@ -327,3 +388,4 @@ int main(int argc, char **argv)
   rclcpp::shutdown();
   return 0;
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                

@@ -21,10 +21,10 @@ const img = document.getElementById("camera-output");
 // Create a Listener on Compressed Image Topic Published by a Camera Node
 ////////////////////////////////////////////////////////////////////////////////////////
 const cameraTopics = [
-  { id: "camera-d455-1", topic: "/rs_node/camera1/compressed_video" },
-  { id: "camera-d455-2", topic: "/rs_node/camera2/compressed_video" },
-  { id: "camera-rgb-1", topic: "/rgb_cam1/compressed" },
-  { id: "camera-rgb-2", topic: "/rgb_cam2/compressed" }
+  { id: "camera-d455-1",        topic: "/rs_node/camera1/compressed_video" },
+  { id: "camera-d455-1-edge",   topic: "/rs_node/camera1/d455_edge" },
+  { id: "camera-rgb-1",         topic: "/rgb_cam1/compressed" },
+  { id: "camera-rgb-2",         topic: "/rgb_cam2/compressed" }
 ];
 
 cameraTopics.forEach(({ id, topic }) => {

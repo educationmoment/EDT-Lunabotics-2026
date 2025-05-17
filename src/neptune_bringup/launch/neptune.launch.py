@@ -12,20 +12,6 @@ def generate_launch_description() -> LaunchDescription:
         executable="rosbridge_websocket"
     )
 
-    # # # Unused
-    # # Madgwick's Filter Node
-    # madgwick_filter = Node(
-    #     name            = "madgwick_node",
-    #     package         = "imu_filter_madgwick",
-    #     executable      = "imu_filter_madgwick_node",
-    #     parameters = [{
-    #         "use_mag": False,
-    #         "remove_gravity_vector": True,
-    #         "gain": 0.0025,
-    #         "frequency": 800
-    #     }]
-    # )
-
     # Add Webgui
     web_user_interface = Node(
         name        ="webgui_node",
@@ -52,68 +38,41 @@ def generate_launch_description() -> LaunchDescription:
         package     ="controller_pkg",
         executable  ="controller_node"
     )
+
     # Add Depositing Sequence
     depositing_module = Node(
         name        ="depositing_node",
         package     ="controller_pkg",
         executable  ="depositing_node",
     )
+
     # Add Excavation Sequence
     excavation_module = Node(
         name        ="excavation_node",
         package     ="controller_pkg",
         executable  ="excavation_node",
     )
+
     # Add Helath Node
     health_module = Node(
         name        ="health_node",
         package     ="controller_pkg",
         executable  ="health_node",
     )
-    #bucket sensor
+
+    # Bucket sensor
     serial_reader_module = Node(
         name = "serial_reader_node",
         package = "controller_pkg",
         executable = "serial_reader_node"
     )
+
     # Add Logger Node
     logger_module = Node(
         name        ="logger_node",
         package     ="logger_pkg",
         executable  ="loggerNode"
     )
-
-    # # # Unused
-    # # Add Depth-To-Laserscan Node
-    # depth_to_laserscan_module = Node(
-    #     name="depth_to_laserscan_node",
-    #     package="depth_to_laserscan",
-    #     executable="depth_to_laserscan_node",
-    #     remappings=[
-    #         ('depth', '/camera/depth/image_raw'),
-    #         ('depth_camera_info', '/camera/depth_camera_info')
-    #     ],
-    #
-    #     parameters=[
-    #         {''}
-    #     ]
-    # )
-
-
-
-    # Example Talker/Listener Launch Description
-    # talker_node = Node(
-    #     package="demo_nodes_cpp",
-    #     executable="talker",
-    # )
-    #
-    # listener_node = Node(
-    #     package="demo_nodes_py",
-    #     executable="listener"
-    # )
-    # ld.add_action(talker_node)
-    # ld.add_action(listener_node)
-
 
     # Add Actions to Launch Description
     ld.add_action(ros_bridge_server)
