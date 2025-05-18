@@ -1,121 +1,54 @@
-#include <chrono>
-#include <cstdlib>
-#include <memory>
-#include <limits>
-#include <cmath>
-#include <algorithm>
-
-#include "rclcpp/rclcpp.hpp"
+//UCF ODOMETRY, ONLY TO BE USED AT UCF
 #include "SparkMax.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "interfaces_pkg/msg/motor_health.hpp"
 
-using namespace std::chrono_literals;
-
-static constexpr double TARGET_FORWARD_REVOLUTIONS = 4.0;
-static constexpr double LEFT_TURN_REVOLUTIONS = 4.0;
-static constexpr double RIGHT_TURN_REVOLUTIONS = -3.0;
-static constexpr double MOTOR_RPM = 1000.0; // moderate speed
-
-enum class State { DRIVE_FORWARD, TURN_RIGHT, FINISHED };
-
-class BasicNavigationNode : public rclcpp::Node {
+class OdometryNode : public rclcpp::Node{
 public:
-  BasicNavigationNode()
-  : Node("navigation_node"), state_(State::DRIVE_FORWARD)
-  {
-    left_motor_ = std::make_shared<SparkMax>("can0", 1);
-    right_motor_ = std::make_shared<SparkMax>("can0", 2);
-
-    left_motor_->SetIdleMode(IdleMode::kBrake);
-    right_motor_->SetIdleMode(IdleMode::kBrake);
-    left_motor_->SetMotorType(MotorType::kBrushless);
-    right_motor_->SetMotorType(MotorType::kBrushless);
-    left_motor_->SetSensorType(SensorType::kHallSensor);
-    right_motor_->SetSensorType(SensorType::kHallSensor);
-
-    left_motor_->SetInverted(false);
-    right_motor_->SetInverted(true);
-
-    start_left_position_ = left_motor_->GetPosition();
-    start_right_position_ = right_motor_->GetPosition();
-
-    timer_ = create_wall_timer(100ms, std::bind(&BasicNavigationNode::control_loop, this));
-    RCLCPP_INFO(get_logger(), "Node initialized and running.");
-  }
-
+    OdometryNode() : Node("odometry_node"), leftMotor("can0", 1),
+    rightMotor("can0", 2) {
+      health_subscriber_ = this->create_subscription<interfaces_pkg::msg::MotorHealth>(
+        "/health_topic", 10,
+        std::bind(&OdometryNode::positional_test, this, std::placeholders::_1)
+      );
+}
 private:
-  void control_loop() {
-    double current_left_position = left_motor_->GetPosition();
-    double current_right_position = right_motor_->GetPosition();
+    SparkMax leftMotor;
+    SparkMax rightMotor;
+    //Motor controllers
 
-    double left_delta = current_left_position - start_left_position_;
-    double right_delta = current_right_position - start_right_position_;
+    rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
 
-    switch (state_) {
-      case State::DRIVE_FORWARD: {
-        double average_revolutions = (left_delta + right_delta) / 2.0;
-        RCLCPP_INFO(get_logger(), "State: DRIVE_FORWARD | Left Delta: %.2f | Right Delta: %.2f | Avg: %.2f", left_delta, right_delta, average_revolutions);
+    float setpointMeters = 5.0f;
+    float radius = 0.1524f;
+    float setpointRotations = 108.0f * (setpointMeters / (6.28f * radius)); //conversion from distance in meters to rotations
+    float initialPosition;
+    bool initialized = false;
 
-        if (average_revolutions < TARGET_FORWARD_REVOLUTIONS) {
-          left_motor_->SetVelocity(MOTOR_RPM);
-          right_motor_->SetVelocity(MOTOR_RPM);
-        } else {
-          left_motor_->SetVelocity(0);
-          right_motor_->SetVelocity(0);
-
-          start_left_position_ = current_left_position;
-          start_right_position_ = current_right_position;
-
-          state_ = State::TURN_RIGHT;
-          RCLCPP_INFO(get_logger(), "Finished DRIVE_FORWARD, starting TURN_RIGHT");
-        }
-        break;
+    void positional_test(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
+      if (!initialized) {
+        initialPosition = health_msg->left_motor_position;
+        initialized = true;
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
       }
 
-      case State::TURN_RIGHT: {
-        bool left_done = left_delta >= LEFT_TURN_REVOLUTIONS;
-        bool right_done = right_delta <= RIGHT_TURN_REVOLUTIONS;
-        RCLCPP_INFO(get_logger(), "State: TURN_RIGHT | Left Delta: %.2f | Right Delta: %.2f", left_delta, right_delta);
-
-        if (!left_done)
-          left_motor_->SetVelocity(MOTOR_RPM);
-        else
-          left_motor_->SetVelocity(0);
-
-        if (!right_done)
-          right_motor_->SetVelocity(-MOTOR_RPM);
-        else
-          right_motor_->SetVelocity(0);
-
-        if (left_done && right_done) {
-          left_motor_->SetVelocity(0);
-          right_motor_->SetVelocity(0);
-          state_ = State::FINISHED;
-          RCLCPP_INFO(get_logger(), "Finished TURN_RIGHT, navigation complete.");
-        }
-        break;
+      if (health_msg->left_motor_position - initialPosition <= setpointRotations){ //I might have to take an average of both motors, I will see with testing
+        leftMotor.SetVelocity(2500.0f);
+        rightMotor.SetVelocity(2500.0f);
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
       }
-
-      case State::FINISHED:
-      default:
-        RCLCPP_INFO(get_logger(), "State: FINISHED");
-        break;
+      else {
+        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
+        leftMotor.SetDutyCycle(0.0f);
+        rightMotor.SetDutyCycle(0.0f);
+      }
     }
-
-    left_motor_->Heartbeat();
-    right_motor_->Heartbeat();
-  }
-
-  State state_;
-  double start_left_position_, start_right_position_;
-  std::shared_ptr<SparkMax> left_motor_, right_motor_;
-  rclcpp::TimerBase::SharedPtr timer_;
 };
 
-int main(int argc, char **argv) {
+int main(int argc, char * argv[]) {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<BasicNavigationNode>();
-  rclcpp::spin(node);
+  rclcpp::spin(std::make_shared<OdometryNode>());
   rclcpp::shutdown();
   return 0;
 }
-

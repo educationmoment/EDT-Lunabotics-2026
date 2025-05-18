@@ -21,25 +21,25 @@ const img = document.getElementById("camera-output");
 // Create a Listener on Compressed Image Topic Published by a Camera Node
 ////////////////////////////////////////////////////////////////////////////////////////
 const cameraTopics = [
-  { id: "camera-d455-1",        topic: "/rs_node/camera1/compressed_video" },
-  { id: "camera-d455-1-edge",   topic: "/rs_node/camera1/d455_edge" },
-  { id: "camera-rgb-1",         topic: "/rgb_cam1/compressed" },
-  { id: "camera-rgb-2",         topic: "/rgb_cam2/compressed" }
+    { id: "camera-d455-1", topic: "/rs_node/camera1/compressed_video" },
+    { id: "camera-d455-1-edge", topic: "rs_node/camera1/d455_edge" },
+    { id: "camera-rgb-1", topic: "/rgb_cam1/compressed" },
+    { id: "camera-rgb-2", topic: "/rgb_cam2/compressed" }
 ];
 
 cameraTopics.forEach(({ id, topic }) => {
-  const listener = new ROSLIB.Topic({
-      ros: ROS,
-      name: topic,
-      messageType: 'sensor_msgs/CompressedImage'
-  });
-
-  listener.subscribe((message) => {
-      const imgEl = document.getElementById(id);
-      if (imgEl) {
-          imgEl.src = "data:image/jpeg;base64," + message.data;
-      }
-  });
+    const listener = new ROSLIB.Topic({
+        ros: ROS,
+        name: topic,
+        messageType: 'sensor_msgs/CompressedImage'
+    });
+    
+    listener.subscribe((message) => {
+        const imgEl = document.getElementById(id);
+        if (imgEl) {
+            imgEl.src = "data:image/jpeg;base64," + message.data;
+        }
+    });
 });
 
 function toggleFullscreen() {
@@ -60,16 +60,16 @@ function toggleFullscreen() {
 // Create a Gamepad Publisher Topic from Client page over ROSBRIDGE
 ////////////////////////////////////////////////////////////////////////////////////////
 var gamepadPublisher = new ROSLIB.Topic({
-    ros : ROS,
-    name : '/joy',
-    messageType : 'sensor_msgs/Joy'
+    ros: ROS,
+    name: '/joy',
+    messageType: 'sensor_msgs/Joy'
 });
 
 function publishGamepadMessage() {
-    var gamepadState = updateGamepadState( GAMEPAD, GAMEPAD_INDEX );
+    var gamepadState = updateGamepadState(GAMEPAD, GAMEPAD_INDEX);
 
     // Gamepade Valid State is False, is the Gamepad Connected?
-    if ( gamepadState === null ) {
+    if (gamepadState === null) {
         return;
     }
 
@@ -77,11 +77,11 @@ function publishGamepadMessage() {
 
     // Create Message
     var message = new ROSLIB.Message({
-        header : {
-            frame_id : `${FRAME_ID}`
+        header: {
+            frame_id: `${FRAME_ID}`
         },
-        axes : gamepadState.axes,
-        buttons : gamepadState.buttons
+        axes: gamepadState.axes,
+        buttons: gamepadState.buttons
     });
 
     // Publish Message
@@ -100,7 +100,7 @@ function animationLoop() {
     rot_y += 0.01;
 
     // Update Renders
-    render_quest_arrow( rot_y * Math.PI / 2);
+    render_quest_arrow(rot_y * Math.PI / 2);
     render_twin(rot_y);
     requestAnimationFrame(animationLoop);
     return;
@@ -118,7 +118,7 @@ function main() {
     } catch (error) {
         console.error('An error occurred while attempting to publish the gamepad message: ', error);
     }
-    
+
     requestAnimationFrame(animationLoop);
     return;
 }

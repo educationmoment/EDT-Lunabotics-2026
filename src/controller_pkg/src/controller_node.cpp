@@ -259,6 +259,7 @@ private:
       std::system("pkill -9 -f depositing_node");
       std::system("pkill -9 -f excavation_node");
       std::system("pkill -9 -f odometry_node");
+      std::system("pkill -9 -f navigation_node");
 
       std::this_thread::sleep_for(std::chrono::seconds(2)); //Allows time for the nodes to restarted
 
@@ -316,7 +317,7 @@ private:
       if (fabs(left_lift_position - right_lift_position) >= 0.2){
         leftLift.SetPosition(left_lift_position);
         rightLift.SetPosition(left_lift_position);
-      } //Lift correction 
+      } //Lift correction
       else {
         leftLift.SetDutyCycle(lift_duty);
         rightLift.SetDutyCycle(lift_duty);
@@ -384,11 +385,18 @@ private:
     }
     prev_excavate_button = current_excavate_button;
 
+    bool current_cycle_button = (joy_msg->buttons[8] > 0);
+    static bool prev_cycle_button = false;
+    if (current_cycle_button && !prev_cycle_button){
+      std::system("ros2 run controller_pkg odometry_node &");
+    }
+    prev_cycle_button = current_cycle_button;
+
     // TRAVEL AUTONOMY (Back)
-    bool current_travel_button = (joy_msg->buttons[8] > 0);
+    bool current_travel_button = (joy_msg->buttons[9] > 0);
     static bool prev_travel_button = false;
     if (current_travel_button && !prev_travel_button){
-      std::system("ros2 run controller_pkg odometry_node &");
+      std::system("ros2 run navigation_pkg navigation_node &");
     }
     prev_travel_button = current_travel_button;
 

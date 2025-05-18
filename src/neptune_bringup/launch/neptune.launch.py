@@ -67,12 +67,12 @@ def generate_launch_description() -> LaunchDescription:
         executable = "serial_reader_node"
     )
 
-    # Add Logger Node
-    logger_module = Node(
-        name        ="logger_node",
-        package     ="logger_pkg",
-        executable  ="loggerNode"
-    )
+    # # Add Logger Node
+    # logger_module = Node(
+    #     name        ="logger_node",
+    #     package     ="logger_pkg",
+    #     executable  ="loggerNode"
+    # )
 
     # Add Actions to Launch Description
     ld.add_action(ros_bridge_server)
@@ -84,6 +84,6 @@ def generate_launch_description() -> LaunchDescription:
     ld.add_action(excavation_module)
     ld.add_action(localization_module)
     ld.add_action(health_module)
-    ld.add_action(logger_module)
+    # ld.add_action(logger_module)
     ld.add_action(serial_reader_module)
     return ld

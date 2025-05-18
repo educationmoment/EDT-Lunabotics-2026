@@ -13,10 +13,11 @@ find_package(OpenCV REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
-add_executable(rs_camera_node src/rs_camera_node.cpp)
+add_executable(rs_camera_node src/CameraRS.cpp)
 
 target_link_libraries(rs_camera_node ${realsense2_LIBRARY})
 ament_target_dependencies(rs_camera_node rclcpp realsense2 sensor_msgs geometry_msgs OpenCV)
+include_directories(include)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.

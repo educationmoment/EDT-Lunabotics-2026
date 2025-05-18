@@ -2,7 +2,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "interfaces_pkg/srv/excavation_request.hpp"
 #include "std_msgs/msg/float32.hpp"
-#include "std_msgs/msg/bool.hpp"
 
 const float VIBRATOR_DUTY = 0.1f;
 const float ERROR = 0.1f;
@@ -14,7 +13,6 @@ SparkMax rightLift("can0", 4);
 SparkMax tilt("can0", 5);
 SparkMax vibrator("can0", 6); //Initalizes motor controllers
 
-std::atomic<bool> bucket_filled = false;
 
 void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrator, float drive_speed) {
     auto timer_start = std::chrono::high_resolution_clock::now();
@@ -38,7 +36,6 @@ void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrato
         } //block for normal bucket movement
 
         if (activate_vibrator) vibrator.SetDutyCycle(VIBRATOR_DUTY);
-
         
         leftDrive.SetVelocity(drive_speed);
         rightDrive.SetVelocity(drive_speed);
@@ -64,14 +61,14 @@ void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Requ
 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting excavation process");
 
-        MoveBucket(-2.0, -2.6, false, false);
+        MoveBucket(-2.5, -2.6, false, 0.0f);
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
         //Stage 1 
 
         MoveBucket(-3.0,-3.0, true, 1500);
 
         auto dig_timer1 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer1).count() < 3){
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer1).count() < 2){
             leftDrive.SetVelocity(1500.0f);
             rightDrive.SetVelocity(1500.0f);
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
@@ -83,11 +80,11 @@ void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Requ
         //Stage 2
 
         auto dig_timer2 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer2).count() < 3){
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer2).count() < 2){
             leftDrive.SetVelocity(1000.0f);
             rightDrive.SetVelocity(1000.0f);
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
-            MoveBucket(-3.8,-3.0, true, 1000);
+            MoveBucket(-3.8,-3.0, true, 1000.0f);
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
             //Keeps the drivetrain and vibrator moving even when the while loop is being skipped
         }
@@ -95,11 +92,21 @@ void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Requ
         //Stage 3
 
         auto dig_timer3 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer3).count() < 6){
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer3).count() < 2){
             leftDrive.SetVelocity(1000.0f);
-            rightDrive.SetVelocity(1000.0f);
+            rightDrive.SetVelocity(1000.0f); 
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
-            MoveBucket(-3.8,-2.5, true, 1000);
+            MoveBucket(-3.8,-2.5, true, 1000.0f);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
+            //Keeps the drivetrain and vibrator moving even when the while loop is being skipped
+        }
+
+        auto dig_timer4 = std::chrono::high_resolution_clock::now();
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - dig_timer4).count() < 4){
+            leftDrive.SetVelocity(500.0f);
+            rightDrive.SetVelocity(500.0f); //reduced RPM to 500
+            vibrator.SetDutyCycle(VIBRATOR_DUTY);
+            MoveBucket(-3.8,-2.5, true, 500.0f);
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
             //Keeps the drivetrain and vibrator moving even when the while loop is being skipped
         }
@@ -110,7 +117,7 @@ void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Requ
         vibrator.SetDutyCycle(0.0f);
         //Turns off da motors
 
-        MoveBucket(0.0, 0.0, false, false); //Resets bucket
+        MoveBucket(0.0, 0.0, false, 0.0f); //Resets bucket
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Excavation Sequence successfully completed");
         response->excavation_successful = true;
 }

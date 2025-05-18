@@ -14,6 +14,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sparkcan REQUIRED)  # Your SparkMax CAN library
 find_package(nav_msgs REQUIRED)
+find_package(interfaces_pkg REQUIRED)
 include_directories(
   include
 )
@@ -30,6 +31,7 @@ ament_target_dependencies(navigation_node
   std_msgs
   sparkcan
   nav_msgs
+  interfaces_pkg
 )
 
 # Install the executable

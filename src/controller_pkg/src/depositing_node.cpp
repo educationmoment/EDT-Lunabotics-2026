@@ -47,7 +47,7 @@ void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrato
         tiltReached = (fabs(tilt_setpoint - tilt.GetPosition() ) <=  ERROR); //Updates statuses
     }
 }
-
+//Fix depositing to be under the bar
 void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Request> request,
     std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Response> response) {
         if (!request->start_depositing){
@@ -58,18 +58,11 @@ void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Reque
 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting depositing process");
 
-        auto tiltback_start = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - tiltback_start).count() < 2) {
-            tilt.SetDutyCycle(1.0f);
-            std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
-        } 
-
-        MoveBucket(3.5, 1.0, false); //Moves bucket up, tilts bucket
+        MoveBucket(3.2, 2.0, false); //Moves bucket up, tilts bucket 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
 
         auto jiggleout_start = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - jiggleout_start).count() < 8) {
-            MoveBucket(3.5, 1.0, true);
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - jiggleout_start).count() < 20) {
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
         } //Vibrates sand out of bucket
