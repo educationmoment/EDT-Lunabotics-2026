@@ -45,6 +45,10 @@ for the NASA Lunabotics 2025 competition.</p>
 
     fix: sudo ip link set can0 up type can bitrate 1000000 || OR || lift E-stop (if busy).
 
+<p> robot isnt moving, no heartbeat sent.</p>
+
+    fix: sometimes when the E-stop is pushed down midway and can gets consistently full, the controller node stops sending heartbeats. please run "ros2 run controller_pkg controller_node &"
+
 <p>Clock Skew</p>
 
     fix: run "date" on the jetson. you might get a date/time that is off from the current time / date. then, run "sudo date -s "2025-05-15 10:00:00" (change the date to the current date) and run colcon build.
