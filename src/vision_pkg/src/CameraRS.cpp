@@ -115,6 +115,10 @@ private:
   cv::VideoCapture cap_rgb1_;
   cv::VideoCapture cap_rgb2_;
 
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr L_obstacle_detection_pub_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr R_obstacle_detection_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr depth_detection_pub_;
+
 
   // D455 RGB Camera Publishers
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam1_pub_;
@@ -123,9 +127,8 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr edge_cam1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam2_pub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr L_obstacle_detection_pub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr R_obstacle_detection_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr depth_detection_pub_;
+  
+  
   rclcpp::TimerBase::SharedPtr timer_;
 
   /**
@@ -177,22 +180,23 @@ private:
   if (pipeline_.poll_for_frames(&frames))
   {
     // 1) Get raw frames
-    auto color_frame = frames.get_color_frame();
-    auto depth_frame = frames.get_depth_frame();
+    rs2::video_frame color_fr = frames.get_color_frame();
+    rs2::depth_frame depth_fr = frames.get_depth_frame();
 
     // 2) Publish color
-    if (color_frame)
-      publish_realsense_image(color_frame, d455_cam1_pub_);
+    if (color_fr) {
+      publish_realsense_image(color_fr, d455_cam1_pub_);
+    }
 
     // 3) Filter & publish depth‐detection
-    if (depth_frame && depth_frame.get_data())
+    if (depth_fr && depth_fr.get_data())
     {
-      rs2::frame f = depth_frame;
+      rs2::frame f = depth_fr;
       f = spat_.process(f);
       f = temp_.process(f);
       auto filtered_depth = f.as<rs2::depth_frame>();
 
-      obstacle_detection_callback(
+      (void)obstacle_detection_callback(
         filtered_depth,
         L_obstacle_detection_pub_,
         R_obstacle_detection_pub_,
@@ -330,8 +334,15 @@ private:
    * TODO: If possible, try to modularize the obstacle detection callback function.
    *  TODO: Aim to have the function length extend no further than 60 lines of code.
    */
-  void obstacle_detection_callback(const rs2::frame &depth_frame, rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_left,
-                                   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_right, rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_depth)
+  /**
+   * @brief Obstacle detection callback function. Detects obstacles in the depth frame and publishes the results.
+   * @param depth_frame The depth frame passed by reference to the function call
+   * @param pub_left The publisher for the left side obstacle detection
+   * @param pub_right The publisher for the right side obstacle detection
+   * @param pub_depth The publisher for the average depth value
+   * @returns None
+   */
+  void obstacle_detection_callback(const rs2::frame &depth_frame, rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_depth)
   {
     const int GROUND_DEPTH_MM = 700;
     const int POS_THRESHOLD = 250;
@@ -365,7 +376,8 @@ private:
 
     depth_msg.data = average_depth;
     //depth_msg.data = average_depth(depth, {235,245}, {420, 428}, 1);
-    pub_depth->publish(depth_msg);
+
+    depth_detection_pub_->publish(depth_msg);
 
     for (int y = height / 2; y < height; y += 5)
     {
@@ -418,30 +430,21 @@ private:
     std_msgs::msg::Bool left_msg;
     std_msgs::msg::Bool right_msg;
 
-    if (pos_count > OBSTACLE_THRESHOLD || neg_count > OBSTACLE_THRESHOLD)
-    {
-      // RCLCPP_INFO(this->get_logger(), "Obstacle Detected :3 Positive = %i, Negative = %i", pos_count, neg_count);
-      if (left_count >= right_count)
-      {
-        // RCLCPP_INFO(this->get_logger(), "Obstacle on left side");
-        left_msg.data = true;
-        right_msg.data = false;
-      }
-      else
-      {
-        // RCLCPP_INFO(this->get_logger(), "Obstacle on right side");
-        left_msg.data = false;
-        right_msg.data = true;
-      }
-    }
-    else
-    {
-      // RCLCPP_INFO(this->get_logger(), "Obstacle Not Detected :( Positive = %i, Negative = %i", pos_count, neg_count);
+
+    if( pos_count > OBSTACLE_THRESHOLD ) {
+      right_msg.data = true;
       left_msg.data = false;
+    } else if( neg_count > OBSTACLE_THRESHOLD ) {
       right_msg.data = false;
+      left_msg.data = true;
+    } else {
+      right_msg.data = false;
+      left_msg.data = false;
     }
-    pub_left->publish(left_msg);
-    pub_right->publish(right_msg);
+    
+    // Publish Messages
+    this->L_obstacle_detection_pub_->publish(left_msg);
+    this->R_obstacle_detection_pub_->publish(right_msg);
   }
 };
 
