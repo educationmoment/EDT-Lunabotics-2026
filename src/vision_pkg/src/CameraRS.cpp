@@ -17,6 +17,9 @@
 #include "librealsense2/rs.hpp"
 // #include "SparkMax.hpp"
 
+#define WEBCAM_ONE_PATH "/dev/video6"
+#define WEBCAM_TWO_PATH "/dev/video8"
+
 using namespace std::chrono_literals;
 
 /**
@@ -52,34 +55,31 @@ public:
     {
       RCLCPP_ERROR(this->get_logger(), "Error starting D455 pipeline: %s", e.what());
     }
-    // Open USB RGB cameras explicitly
 
-    char devicePathA[] = "/dev/video6";
-    if (cap_rgb1_.open(devicePathA))
+    // Open Path to Webcam One, if possible
+    if (cap_rgb1_.open(WEBCAM_ONE_PATH))
     {
       cap_rgb1_.set(cv::CAP_PROP_FPS, 15);
       cap_rgb1_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
       cap_rgb1_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-      RCLCPP_INFO(this->get_logger(), "Webcam Connected on path: /dev/video6");
+      RCLCPP_INFO(this->get_logger(), WEBCAM_ONE_PATH);
+    }
+    else
+    {
+      RCLCPP_ERROR(this->get_logger(), WEBCAM_ONE_PATH);
     }
 
-    char devicePathB[] = "/dev/video8";
-    if (cap_rgb2_.open(devicePathB))
+    // Open Path to Webcam Two, if possible
+    if (cap_rgb2_.open(WEBCAM_TWO_PATH))
     {
       cap_rgb2_.set(cv::CAP_PROP_FPS, 15);
       cap_rgb2_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
       cap_rgb2_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-      RCLCPP_INFO(this->get_logger(), "Webcam Connected on path: /dev/video8");
+      RCLCPP_INFO(this->get_logger(), WEBCAM_TWO_PATH);
     }
-
-    if (!cap_rgb1_.isOpened())
+    else
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 1 (/dev/video6).\n");
-    }
-
-    if (!cap_rgb2_.isOpened())
-    {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open USB RGB camera 2 (/dev/video8).\n");
+      RCLCPP_ERROR(this->get_logger(), WEBCAM_TWO_PATH);
     }
 
     // Publishers
@@ -87,6 +87,7 @@ public:
     edge_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/d455_edge", 5);
     rgb_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 5);
     rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 5);
+
     L_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/left", 10);
     R_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/right", 10);
     depth_detection_pub_ = this->create_publisher<std_msgs::msg::Float32>("depth_detection", 5);
