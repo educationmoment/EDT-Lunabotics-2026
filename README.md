@@ -57,6 +57,14 @@ for the NASA Lunabotics 2025 competition.</p>
 
     then you may need to clear artificatsion, in robot_WS do "rm -rf build/ install/ log/" and then finally build again, "colcon build --symlink-install"
 
+<p>Depositing Not working / Freezes up.</p>
+
+    the service isnt displaying. press b to kill the service then try auto depositing again
+
+<p>rs_camera_node fails and dies instantly, with -11 error code.</p>
+
+    make sure the d455 is plugged in.
+
 
 <h2>Installation</h2>
 <hr>
