@@ -119,7 +119,7 @@ Configure the CAN interface using</p>
 
 <p>The pilot can access the WebGUI by visiting</p>
 
-    http://192.168.0.139:59440/pilot
+    http://192.168.0.140:59440/pilot
 
 <p>You can also view the health status of the robot with </p>
 
