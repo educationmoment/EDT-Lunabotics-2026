@@ -291,11 +291,11 @@ private:
     float vibrator_duty = vibrator_active_ ? VIBRATOR_OUTPUT : 0.0f;
 
     vibrator.SetDutyCycle(vibrator_duty);
-
+    // EXCAVATION RESET BUTTON (X button)
     if (joy_msg->buttons[2] > 0){
       leftLift.SetPosition(0.0f);
       rightLift.SetPosition(0.0f);
-      tilt.SetPosition(0.0f);
+      tilt.SetDutyCycle(1.0f);
     }
     else {
     // TILT ACTUATOR (D pad left and right)
@@ -323,7 +323,7 @@ private:
         rightLift.SetDutyCycle(lift_duty);
       }
     }
-    // EXCAVATION RESET BUTTON (X button)
+    
 
     //----------EXCAVATION SYSTEM----------//
 
