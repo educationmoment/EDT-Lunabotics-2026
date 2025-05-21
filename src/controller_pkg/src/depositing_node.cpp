@@ -3,7 +3,7 @@
 #include "interfaces_pkg/srv/depositing_request.hpp"
 #include "std_msgs/msg/bool.hpp"
 
-const float VIBRATOR_DUTY = 0.1f;
+const float VIBRATOR_DUTY = 1.0f;
 const float ERROR = 0.1;
 
 SparkMax leftLift("can0", 3);
@@ -41,7 +41,7 @@ void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrato
             RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "ERROR: Depositing Cancelled");
             break;
         } //Timer for when to quit a stage due to timeout
-        
+
         leftLiftReached = (fabs(lift_setpoint - leftLift.GetPosition() ) <=  ERROR);
         rightLiftReached = (fabs(lift_setpoint - rightLift.GetPosition() ) <=  ERROR);
         tiltReached = (fabs(tilt_setpoint - tilt.GetPosition() ) <=  ERROR); //Updates statuses
@@ -58,7 +58,7 @@ void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Reque
 
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Starting depositing process");
 
-        MoveBucket(3.2, 2.0, false); //Moves bucket up, tilts bucket 
+        MoveBucket(3.2, 2.0, false); //Moves bucket up, tilts bucket
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
 
         auto jiggleout_start = std::chrono::high_resolution_clock::now();
@@ -71,6 +71,11 @@ void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Reque
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 2 complete, resetting bucket");
 
         MoveBucket(0.0, 0.0, false); //Resets bucket
+        auto reset_tilt = std::chrono::high_resolution_clock::now();
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - reset_tilt).count() < 1){
+            tilt.SetDutyCycle(1.0f);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
+        }
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Bucket successfully reset");
         response->depositing_successful = true;
 }

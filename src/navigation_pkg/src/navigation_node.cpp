@@ -1,4 +1,4 @@
-//UCF ODOMETRY, ONLY TO BE USED AT UCF
+//KSC ODOMETRY, ONLY TO BE USED AT KENNEDY SPACE CENTER ARENA
 #include "SparkMax.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "interfaces_pkg/msg/motor_health.hpp"
@@ -19,29 +19,88 @@ private:
 
     rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
 
-    float setpointMeters = 5.0f;
+
+    float setpointMeters = 3.0f; //same for both forward and turn
     float radius = 0.1524f;
     float setpointRotations = 108.0f * (setpointMeters / (6.28f * radius)); //conversion from distance in meters to rotations
     float initialPosition;
     bool initialized = false;
 
-    void positional_test(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
-      if (!initialized) {
-        initialPosition = health_msg->left_motor_position;
-        initialized = true;
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
-      }
+    enum class TravelAutonomy {FORWARD, TURN_RIGHT, RIGHT, DONE};
 
-      if (health_msg->left_motor_position - initialPosition <= setpointRotations){ //I might have to take an average of both motors, I will see with testing
-        leftMotor.SetVelocity(2500.0f);
-        rightMotor.SetVelocity(2500.0f);
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
-      }
-      else {
-        RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
-        leftMotor.SetDutyCycle(0.0f);
-        rightMotor.SetDutyCycle(0.0f);
+    TravelAutonomy state = TravelAutonomy::FORWARD;
+
+    void positional_test(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
+      switch (state){
+        case TravelAutonomy::FORWARD:
+          if (!initialized) {
+            initialPosition = health_msg->left_motor_position;
+            initialized = true;
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
+          }
+
+          if (health_msg->left_motor_position - initialPosition <= setpointRotations){
+            leftMotor.SetVelocity(1500.0f);
+            rightMotor.SetVelocity(1500.0f);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+          }
+          else {
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
+            leftMotor.SetDutyCycle(0.0f);
+            rightMotor.SetDutyCycle(0.0f);
+            state = TravelAutonomy::TURN_RIGHT;
+            initialized = false;
+          }
+        break;
+
+        case TravelAutonomy::TURN_RIGHT:
+          if (!initialized) {
+            initialPosition = health_msg->left_motor_position;
+            initialized = true;
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
+          }
+
+          if (health_msg->left_motor_position - initialPosition <= 125){ //90 degree turn
+            leftMotor.SetVelocity(2500.0f);
+            rightMotor.SetVelocity(-2500.0f);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+          }
+          else {
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
+            leftMotor.SetDutyCycle(0.0f);
+            rightMotor.SetDutyCycle(0.0f);
+            state = TravelAutonomy::RIGHT;
+            initialized = false;
+          }
+        break;
+
+        case TravelAutonomy::RIGHT:
+          if (!initialized) {
+            initialPosition = health_msg->left_motor_position;
+            initialized = true;
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Initalized at : %f", 6.28 * radius * ((initialPosition) / 108));
+          }
+
+          if (health_msg->left_motor_position - initialPosition <= setpointRotations){
+            leftMotor.SetVelocity(1500.0f);
+            rightMotor.SetVelocity(1500.0f);
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Left Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current positions: Right Motor = %f", 6.28 * radius * ((health_msg->left_motor_position - initialPosition) / 108));
+          }
+          else {
+            RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Setpoint successfully reached!");
+            leftMotor.SetDutyCycle(0.0f);
+            rightMotor.SetDutyCycle(0.0f);
+            state = TravelAutonomy::DONE;
+            initialized = false;
+          }
+        break;
+
+        case TravelAutonomy::DONE:
+          RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Autonomy successfully completed!");
+          rclcpp::shutdown();
       }
     }
 };

@@ -3,8 +3,9 @@
 #include "interfaces_pkg/msg/motor_health.hpp"
 #include "std_msgs/msg/float32.hpp"
 
-const float VIBRATOR_DUTY = 0.1f;
+const float VIBRATOR_DUTY = 1.0f;
 const float ERROR = 0.1f;
+float buffer = 0.0;
 
 class OdometryNode : public rclcpp::Node{
 public:
@@ -14,6 +15,8 @@ public:
         "/depth_detection", 5,
         std::bind(&OdometryNode::depth_callback, this, std::placeholders::_1)
       );   
+
+      buffer = tilt.GetPosition();
 
       health_subscriber_ = this->create_subscription<interfaces_pkg::msg::MotorHealth>(
       "/health_topic", 10,
@@ -38,6 +41,7 @@ private:
     float initialPosition = 0.0;
     bool initialized = false;
     int cycleNumber = 0;
+    float buffer;
 
     enum class EXDEP {BACK, EXCAVATE, FORWARD, DEPOSIT, DONE};
 
@@ -93,7 +97,7 @@ private:
 
     switch (state){
         case EXDEP::BACK:
-        if (health_msg->left_motor_position - initialPosition <= -338){
+        if (health_msg->left_motor_position - initialPosition <= -200){
             state = EXDEP::EXCAVATE;
             leftMotor.SetDutyCycle(0.0f);
             rightMotor.SetDutyCycle(0.0f);
@@ -108,8 +112,8 @@ private:
         break;
 
         case EXDEP::EXCAVATE:
-        MoveBucket(-2.0, -2.6, false, false);
-        MoveBucket(-3.2 + (-0.5 * cycleNumber),-3.0, true, 1500);
+        MoveBucket(-2.0, -2.6 + buffer, false, false);
+        MoveBucket(-3.2 + (-0.1 * cycleNumber), -3.0 + buffer, true, 500);
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Current position %f", health_msg->left_motor_position - initialPosition);
         MoveBucket(0.0, 0.0, false, false);
         vibrator.SetDutyCycle(0.0);
@@ -130,9 +134,9 @@ private:
         break;
 
         case EXDEP::DEPOSIT:
-        MoveBucket(1.9, 0.0, false, 0);  
-        MoveBucket(2.9, 0.0, true, 0);
-        MoveBucket(0.0, 0.0, false, 0);  
+        MoveBucket(1.9, 0.0 + buffer, false, 0);  
+        MoveBucket(2.9, 0.0 + buffer, true, 0);
+        MoveBucket(0.0, 0.0 + buffer, false, 0);  
         vibrator.SetDutyCycle(0.0);
         leftMotor.SetDutyCycle(0.0);
         rightMotor.SetDutyCycle(0.0);
@@ -147,6 +151,7 @@ private:
 
         case EXDEP::DONE:
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "THE AUTO WORKED!!!");
         rclcpp::shutdown();
         break;

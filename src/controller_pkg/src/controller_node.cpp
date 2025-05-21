@@ -11,7 +11,7 @@
 #include <algorithm>
 
 const float VELOCITY_MAX = 2500.0; //rpm, after gearbox turns into 11.1 RPM
-const float VIBRATOR_OUTPUT = 0.1f; //Constant value for vibrator output
+const float VIBRATOR_OUTPUT = 1.0f; //Constant value for vibrator output
 
 enum CAN_IDs {
   LEFT_MOTOR  = 1,
@@ -323,7 +323,7 @@ private:
         rightLift.SetDutyCycle(lift_duty);
       }
     }
-    
+
 
     //----------EXCAVATION SYSTEM----------//
 
@@ -340,6 +340,9 @@ private:
     float right_drive = 0.0;
     float left_drive_raw = 0.0;
     float right_drive_raw = 0.0;
+
+    float left_drive_slow = 0.0;
+    float right_drive_slow = 0.0;
     if (alternate_mode_active_) { //Left and right joystick, controlled with duty cycle
       float leftJS = -joy_msg->axes[1];
       float rightJS = -joy_msg->axes[3];
@@ -352,6 +355,7 @@ private:
       leftMotor.SetDutyCycle(left_drive);
       rightMotor.SetDutyCycle(right_drive);
     }
+
     else { //Left joystick, controlled with velocity
       float forward = -joy_msg->axes[1];
       float turn = fabs(joy_msg->axes[0]) > 0.25 ? joy_msg->axes[0] : 0.0f;
@@ -363,8 +367,21 @@ private:
       left_drive = computeStepOutput(left_drive_raw) * VELOCITY_MAX;
       right_drive = computeStepOutput(right_drive_raw) * VELOCITY_MAX;
 
+      float slow_forward = -joy_msg->axes[3];
+      float slow_turn = fabs(joy_msg->axes[2]) > 0.25 ? joy_msg->axes[2] : 0.0;
+
+      left_drive_slow = slow_forward + slow_turn;
+      right_drive_slow = slow_forward - slow_turn;
+      left_drive_slow = std::max(-1.0f, std::min(1.0f, left_drive_slow));
+      right_drive_slow = std::max(-1.0f, std::min(1.0f, right_drive_slow));
+
+    if (fabs(joy_msg->axes[1]) > 0 || fabs(joy_msg->axes[0]) > 0){
       leftMotor.SetVelocity(left_drive);
       rightMotor.SetVelocity(right_drive);
+    } else {
+      leftMotor.SetVelocity(500 * left_drive_slow);
+      rightMotor.SetVelocity(500 * right_drive_slow);
+    }
     }
     //----------DRIVETRAIN----------//
 
