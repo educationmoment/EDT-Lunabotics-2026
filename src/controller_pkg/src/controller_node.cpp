@@ -11,7 +11,7 @@
 #include <algorithm>
 
 const float VELOCITY_MAX = 2500.0; //rpm, after gearbox turns into 11.1 RPM
-const float VIBRATOR_OUTPUT = 1.0f; //Constant value for vibrator output
+const float VIBRATOR_OUTPUT = 0.1f; //Constant value for vibrator output
 
 enum CAN_IDs {
   LEFT_MOTOR  = 1,
@@ -259,7 +259,7 @@ private:
       std::system("pkill -9 -f depositing_node");
       std::system("pkill -9 -f excavation_node");
       std::system("pkill -9 -f odometry_node");
-      std::system("pkill -9 -f navigation_node");
+      //std::system("pkill -9 -f navigation_node");
 
       std::this_thread::sleep_for(std::chrono::seconds(2)); //Allows time for the nodes to restarted
 
@@ -410,12 +410,12 @@ private:
     prev_cycle_button = current_cycle_button;
 
     // TRAVEL AUTONOMY (Back)
-    bool current_travel_button = (joy_msg->buttons[9] > 0);
+    /*bool current_travel_button = (joy_msg->buttons[9] > 0);
     static bool prev_travel_button = false;
     if (current_travel_button && !prev_travel_button){
       std::system("ros2 run navigation_pkg navigation_node &");
     }
-    prev_travel_button = current_travel_button;
+    prev_travel_button = current_travel_button;*/
 
     //----------AUTONOMOUS FUNCTIONS----------//
   }
