@@ -22,6 +22,14 @@
 
 using namespace std::chrono_literals;
 
+enum Cameras
+{
+  D455_ONE,
+  D455_TWO,
+  WEBCAM_ONE,
+  WEBCAM_TWO
+};
+
 /**
  * @class MultiCameraNode
  * @brief Handles a single realsense camera (by serial ID) and two Web Cameras.
@@ -35,33 +43,63 @@ public:
    */
   MultiCameraNode() : Node("multi_camera_node")
   {
+    // Camera Serial Numbers
+    const std::string DEPTH_CAMERA_ONE_SERIAL = "318122303486";
+    const std::string DEPTH_CAMERA_TWO_SERIAL = "308222300472";
+    this->activeCameras[0] = false;
+    this->activeCameras[1] = false;
+    this->activeCameras[2] = false;
+    this->activeCameras[3] = false;
+
     RCLCPP_INFO(this->get_logger(), "Multi-camera node startup.");
 
     // Known D455 serials
-    rs2::config cfg;
-    // cfg.enable_device("308222300472");
+    rs2::config cfg_1;
+    rs2::config cfg_2;
 
     spat_.set_option(RS2_OPTION_HOLES_FILL, 2);
-    cfg.enable_device("318122303486");
-    cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
-    cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16, 15);
 
+    // Create Pipeline Configurations
+    cfg_1.enable_device(DEPTH_CAMERA_ONE_SERIAL.c_str());
+    cfg_1.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
+    cfg_1.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16, 15);
+
+    cfg_2.enable_device(DEPTH_CAMERA_TWO_SERIAL.c_str());
+    cfg_2.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
+    cfg_2.enable_stream(RS2_STREAM_DEPTH, 424, 240, RS2_FORMAT_Z16, 15);
+
+    //////
+    // Attempt to create pipeline to First D455 Camera
     try
     {
-      pipeline_.start(cfg);
-      RCLCPP_INFO(this->get_logger(), "Started D455 pipeline.");
+      pipeline_1.start(cfg_1);
+      this->activeCameras[Cameras::D455_ONE];
     }
-    catch (const rs2::error &e)
+    catch (const rs2::error &exc)
     {
-      RCLCPP_ERROR(this->get_logger(), "Error starting D455 pipeline: %s", e.what());
+      RCLCPP_ERROR(this->get_logger(), "Error connecting to camera %s, ERROR: %s", DEPTH_CAMERA_ONE_SERIAL.c_str(), exc.what());
     }
 
+    //////
+    // Attempt to create pipeline to Second D455 Camera
+    try
+    {
+      pipeline_2.start(cfg_2);
+      this->activeCameras[Cameras::D455_TWO];
+    }
+    catch (const rs2::error &exc)
+    {
+      RCLCPP_ERROR(this->get_logger(), "Error connecting to camera %s, ERROR: %s", DEPTH_CAMERA_TWO_SERIAL.c_str(), exc.what());
+    }
+
+    /////
     // Open Path to Webcam One, if possible
     if (cap_rgb1_.open(WEBCAM_ONE_PATH))
     {
       cap_rgb1_.set(cv::CAP_PROP_FPS, 15);
       cap_rgb1_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
       cap_rgb1_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+      this->activeCameras[Cameras::WEBCAM_ONE] = true;
       RCLCPP_INFO(this->get_logger(), WEBCAM_ONE_PATH);
     }
     else
@@ -69,12 +107,14 @@ public:
       RCLCPP_ERROR(this->get_logger(), WEBCAM_ONE_PATH);
     }
 
+    /////
     // Open Path to Webcam Two, if possible
     if (cap_rgb2_.open(WEBCAM_TWO_PATH))
     {
       cap_rgb2_.set(cv::CAP_PROP_FPS, 15);
       cap_rgb2_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
       cap_rgb2_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+      this->activeCameras[Cameras::WEBCAM_TWO] = true;
       RCLCPP_INFO(this->get_logger(), WEBCAM_TWO_PATH);
     }
     else
@@ -82,23 +122,42 @@ public:
       RCLCPP_ERROR(this->get_logger(), WEBCAM_TWO_PATH);
     }
 
-    // Publishers
-    d455_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 5);
-    edge_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/d455_edge", 5);
-    rgb_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 5);
-    rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 5);
+    /////
+    // Create Publishers
+    if (this->activeCameras[Cameras::D455_ONE])
+    {
+      d455_1_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 5);
+      d455_1_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/depth_video", 5);
+    }
+
+    if (this->activeCameras[Cameras::D455_TWO])
+    {
+      d455_2_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/compressed_video", 5);
+      d455_2_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/depth_video", 5);
+    }
+
+    if( this->activeCameras[Cameras::WEBCAM_ONE]) {
+      rgb_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 5);
+    }
+
+    if( this->activeCameras[Cameras::WEBCAM_TWO]) {
+      rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 5);
+    }
 
     L_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/left", 10);
     R_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/right", 10);
     depth_detection_pub_ = this->create_publisher<std_msgs::msg::Float32>("depth_detection", 5);
 
-    // Timer
+    /////
+    // Create Timer
     timer_ = this->create_wall_timer(66ms, std::bind(&MultiCameraNode::timer_callback, this)); // ~15 FPS
   }
 
 private:
   rs2::context ctx;
-  rs2::pipeline pipeline_;
+  rs2::pipeline pipeline_1;
+  rs2::pipeline pipeline_2;
+
   rs2::decimation_filter deci_;
   rs2::spatial_filter spat_;
   rs2::temporal_filter temp_;
@@ -110,8 +169,11 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr depth_detection_pub_;
 
   // D455 RGB Camera Publishers
-  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam1_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_cam2_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_1_rgb_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_1_dep_pub_;
+
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_2_rgb_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr d455_2_dep_pub_;
 
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr edge_cam1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam1_pub_;
@@ -119,44 +181,8 @@ private:
 
   rclcpp::TimerBase::SharedPtr timer_;
 
-  /**
-   * @brief Enumerates all connected RealSense devices.
-   * @return rs2::device_list List of connected devices.
-   */
-  /**
-  rs2::device_list enumerateDevices()
-  {
-    rs2::device_list devices = ctx.query_devices();
-    if (devices.size() == 0)
-    {
-      RCLCPP_ERROR(this->get_logger(), "No RealSense devices found.");
-    }
-    else
-    {
-      RCLCPP_INFO(this->get_logger(), "Found %u RealSense devices.", devices.size());
-    }
-    return devices;
-  }
-  */
-  /**
-   * @brief Initiallize Pipelines with default configurations
-   *
-   */
-  /**
-  void initPipelines( const rs2::device_list &devices ) {
-    for( const auto &device : devices )
-    {
-      std::string serial_number = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
-      RCLCPP_INFO(this->get_logger(), "Found Realsense Camera with Serial Number: %s", serial_number.c_str());
-      rs2::pipeline pipeline;
-      rs2::config cfg;
-      cfg.enable_device(serial_number);
-      cfg.enable_stream(RS2_STREAM_COLOR, 424, 240, RS2_FORMAT_BGR8, 15);
-      cfg.enable_stream(RS2_STREAM_DEPTH, RS2_FORMAT_Z16, 15);
-      pipeline.start(device);
-    }
-  }
-  */
+  std::array<bool, 4> activeCameras;
+
   /**
    * @brief Callback to timer object. Callback polls the Realsense pipeline for available frams, avoiding locking the thread.
    *        If a frame is successfully polled, extracts both the depth and the RGB frmes. Publishes frames upon successful retrieval.
@@ -165,37 +191,82 @@ private:
   void timer_callback()
   {
     rs2::frameset frames;
-    if (pipeline_.poll_for_frames(&frames))
+
+    // If D455 One is Active AND a frame is available
+
+    /////
+    // D455 Camera One
+    if (this->activeCameras[Cameras::D455_ONE])
     {
-      // 1) Get raw frames
-      rs2::video_frame color_fr = frames.get_color_frame();
-      rs2::depth_frame depth_fr = frames.get_depth_frame();
-
-      // 2) Publish color
-      if (color_fr)
+      if (pipeline_1.poll_for_frames(&frames))
       {
-        publish_realsense_image(color_fr, d455_cam1_pub_);
+        // 1) Get raw frames
+        rs2::video_frame color_fr = frames.get_color_frame();
+        rs2::depth_frame depth_fr = frames.get_depth_frame();
+
+        // 2) Publish color
+        if (color_fr)
+        {
+          publish_realsense_image(color_fr, d455_1_rgb_pub_);
+        }
+
+        // 3) Filter & publish depth‐detection
+        if (depth_fr && depth_fr.get_data())
+        {
+          rs2::frame f = depth_fr;
+          f = spat_.process(f);
+          f = temp_.process(f);
+          auto filtered_depth = f.as<rs2::depth_frame>();
+
+          (void)obstacle_detection_callback(filtered_depth);
+        }
       }
-
-      // 3) Filter & publish depth‐detection
-      if (depth_fr && depth_fr.get_data())
+      else
       {
-        rs2::frame f = depth_fr;
-        f = spat_.process(f);
-        f = temp_.process(f);
-        auto filtered_depth = f.as<rs2::depth_frame>();
-
-        (void)obstacle_detection_callback(filtered_depth);
+        RCLCPP_WARN(this->get_logger(), "No D455 frames available.");
       }
     }
-    else
+
+    /////
+    // D455 Camera two
+    if (this->activeCameras[Cameras::D455_TWO])
     {
-      RCLCPP_WARN(this->get_logger(), "No D455 frames available.");
+      if (pipeline_2.poll_for_frames(&frames))
+      {
+        rs2::video_frame color_fr = frames.get_color_frame();
+        rs2::depth_frame depth_fr = frames.get_depth_frame();
+
+        // 2.) Publish Color
+        if (color_fr)
+        {
+          publish_realsense_image(color_fr, d455_2_rgb_pub_);
+        }
+
+        // 3.) Filter and Publish Depth->Detection
+        if (depth_fr && depth_fr.get_data())
+        {
+          rs2::frame f = depth_fr;
+          f = spat_.process(f);
+          f = temp_.process(f);
+          auto filtered_depth = f.as<rs2::depth_frame>();
+          (void)obstacle_detection_callback(filtered_depth);
+        }
+      }
+      else
+      {
+        RCLCPP_WARN(this->get_logger(), "No D455 frames available.");
+      }
     }
 
-    // 4) Always publish your two USB webcams
-    publish_rgb_camera(cap_rgb1_, rgb_cam1_pub_);
-    publish_rgb_camera(cap_rgb2_, rgb_cam2_pub_);
+    // 4) Always publish available Webcams
+    if (this->activeCameras[Cameras::WEBCAM_ONE])
+    {
+      publish_rgb_camera(cap_rgb1_, rgb_cam1_pub_);
+    }
+    if (this->activeCameras[Cameras::WEBCAM_TWO])
+    {
+      publish_rgb_camera(cap_rgb2_, rgb_cam2_pub_);
+    }
   }
 
   // Use poll_for_frames to avoid blocking and stalling pipeline
