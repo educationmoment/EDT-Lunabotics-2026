@@ -45,6 +45,10 @@ for the NASA Lunabotics 2025 competition.</p>
 
     fix: sudo ip link set can0 up type can bitrate 1000000 || OR || lift E-stop (if busy).
 
+<p> robot isnt moving, no heartbeat sent.</p>
+
+    fix: sometimes when the E-stop is pushed down midway and can gets consistently full, the controller node stops sending heartbeats. please run "ros2 run controller_pkg controller_node &"
+
 <p>Clock Skew</p>
 
     fix: run "date" on the jetson. you might get a date/time that is off from the current time / date. then, run "sudo date -s "2025-05-15 10:00:00" (change the date to the current date) and run colcon build.
@@ -52,6 +56,14 @@ for the NASA Lunabotics 2025 competition.</p>
     if you still encounter clock skew after this, you will have to "touch" all files to replace their time and date- "find . -exec touch {} +" IN THE ROOT OF THE WORKSPACE (ROBOT_WS)! !! DOING THIS OUTSIDE WILL BREAK THE JETSON!
 
     then you may need to clear artificatsion, in robot_WS do "rm -rf build/ install/ log/" and then finally build again, "colcon build --symlink-install"
+
+<p>Depositing Not working / Freezes up.</p>
+
+    the service isnt displaying. press b to kill the service then try auto depositing again
+
+<p>rs_camera_node fails and dies instantly, with -11 error code.</p>
+
+    make sure the d455 is plugged in.
 
 
 <h2>Installation</h2>
@@ -107,7 +119,7 @@ Configure the CAN interface using</p>
 
 <p>The pilot can access the WebGUI by visiting</p>
 
-    http://192.168.0.139:59440/pilot
+    http://192.168.0.140:59440/pilot
 
 <p>You can also view the health status of the robot with </p>
 
