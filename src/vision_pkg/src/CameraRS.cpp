@@ -70,30 +70,42 @@ public:
 
     //////
     // Attempt to create pipeline to First D455 Camera
-    try
-    {
-      pipeline_1.start(cfg_1);
-      this->activeCameras[Cameras::D455_ONE];
+    RCLCPP_INFO( this->get_logger(), "Attempting to connect Pipeline 1");
+    if( this->ctx.query_devices().size() > 0 ) {
+      try
+      {
+        pipeline_1.start(cfg_1);
+        this->activeCameras[Cameras::D455_ONE];
+      }
+      catch (const rs2::error &exc)
+      {
+        RCLCPP_ERROR(this->get_logger(), "Error connecting to camera %s, ERROR: %s", DEPTH_CAMERA_ONE_SERIAL.c_str(), exc.what());
+      }
     }
-    catch (const rs2::error &exc)
-    {
-      RCLCPP_ERROR(this->get_logger(), "Error connecting to camera %s, ERROR: %s", DEPTH_CAMERA_ONE_SERIAL.c_str(), exc.what());
+    else {
+      RCLCPP_WARN( this->get_logger(), "D455 Camera One Not Connected");
     }
 
     //////
     // Attempt to create pipeline to Second D455 Camera
-    try
-    {
-      pipeline_2.start(cfg_2);
-      this->activeCameras[Cameras::D455_TWO];
-    }
-    catch (const rs2::error &exc)
-    {
-      RCLCPP_ERROR(this->get_logger(), "Error connecting to camera %s, ERROR: %s", DEPTH_CAMERA_TWO_SERIAL.c_str(), exc.what());
+    RCLCPP_INFO( this->get_logger(), "Attempting to connect Pipeline 2");
+    if( this->ctx.query_devices().size() > 1 ) {
+      try
+      {
+        pipeline_2.start(cfg_2);
+        this->activeCameras[Cameras::D455_TWO];
+      }
+      catch (const rs2::error &exc)
+      {
+        RCLCPP_ERROR(this->get_logger(), "Error connecting to camera %s, ERROR: %s", DEPTH_CAMERA_TWO_SERIAL.c_str(), exc.what());
+      }
+    } else {
+      RCLCPP_WARN( this->get_logger(), "D455 Camera Two Not Connected");
     }
 
     /////
     // Open Path to Webcam One, if possible
+    RCLCPP_INFO( this->get_logger(), "Attempting to connect to Webcam 1");
     if (cap_rgb1_.open(WEBCAM_ONE_PATH))
     {
       cap_rgb1_.set(cv::CAP_PROP_FPS, 15);
@@ -104,11 +116,12 @@ public:
     }
     else
     {
-      RCLCPP_ERROR(this->get_logger(), WEBCAM_ONE_PATH);
+      RCLCPP_WARN(this->get_logger(), WEBCAM_ONE_PATH);
     }
 
     /////
     // Open Path to Webcam Two, if possible
+    RCLCPP_INFO( this->get_logger(), "Attempting to connect to Webcam 2");
     if (cap_rgb2_.open(WEBCAM_TWO_PATH))
     {
       cap_rgb2_.set(cv::CAP_PROP_FPS, 15);
@@ -119,29 +132,44 @@ public:
     }
     else
     {
-      RCLCPP_ERROR(this->get_logger(), WEBCAM_TWO_PATH);
+      RCLCPP_WARN(this->get_logger(), WEBCAM_TWO_PATH);
     }
 
     /////
     // Create Publishers
     if (this->activeCameras[Cameras::D455_ONE])
     {
+      RCLCPP_INFO(this->get_logger(), "Creating D455_1_ Publishers");
       d455_1_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 5);
       d455_1_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/depth_video", 5);
     }
 
     if (this->activeCameras[Cameras::D455_TWO])
     {
+      RCLCPP_INFO( this->get_logger(), "Creating D455_2_ Publishers");
       d455_2_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/compressed_video", 5);
       d455_2_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/depth_video", 5);
     }
 
     if( this->activeCameras[Cameras::WEBCAM_ONE]) {
+      RCLCPP_INFO( this->get_logger(), "Creating Webcam_1_ Publisher");
       rgb_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 5);
     }
 
     if( this->activeCameras[Cameras::WEBCAM_TWO]) {
+      RCLCPP_INFO( this->get_logger(), "Creating Webcam_2_ Publisher");
       rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 5);
+    }
+
+    // No Cameras Connected
+    if( ! this->activeCameras[Cameras::D455_ONE] && 
+        ! this->activeCameras[Cameras::D455_TWO] && 
+        ! this->activeCameras[Cameras::WEBCAM_ONE] &&
+        ! this->activeCameras[Cameras::WEBCAM_TWO] ) {
+
+          // Throw Error, No cameras are detected
+          RCLCPP_ERROR(this->get_logger(), "NO CAMERAS DETECTED");
+          throw std::exception();
     }
 
     L_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/left", 10);
