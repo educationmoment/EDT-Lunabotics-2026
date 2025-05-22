@@ -17,34 +17,6 @@ const cameraWrapper = document.getElementById("camera-wrapper");
 // fctIndicators_div.textContent += "   Hello World";
 // outLogs_div.textContent += "   Hello World";
 
-
-
-// Create a Listener on Compressed Image Topic Published by a Camera Node
-////////////////////////////////////////////////////////////////////////////////////////
-const cameraTopics = [
-    { id: "camera1-compressed_video",      topic: "/rs_node/camera1/compressed_video" },
-    // { id: "camera-d455-1-edge", topic: "/rs_node/camera1/depth_video" },
-    // { id: "camera-rgb-1",       topic: "/rs_node/camera2/compressed_video" },
-    // { id: "camera-rgb-2",       topic: "/rs_node/camera2/depth_video" }
-];
-
-// For each configured camera, create a subscriber and begin listening.
-// Connect to each stream and publish to its respective ID element
-cameraTopics.forEach(({ id, topic }) => {
-    const listener = new ROSLIB.Topic({
-        ros: ROS,
-        name: topic,
-        messageType: 'sensor_msgs/CompressedImage'
-    });
-    
-    listener.subscribe((message) => {
-        const imgEl = document.getElementById(id);
-        if (imgEl) {
-            imgEl.src = "data:image/jpeg;base64," + message.data;
-        }
-    });
-});
-
 /**
  * @function toggleFullscreen
  * @brief Toggle fullscreen mode
@@ -95,11 +67,29 @@ function publishGamepadMessage() {
 }
 ////////////////////////////////////////////////////////////////////////////////////////
 
+
+const listener = new ROSLIB.Topic({
+    ros: ROS,
+    name: '/rs_node/camera1/compressed_video',
+    messageType: 'sensor_msgs/CompressedImage'
+});
+
+listener.subscribe((message)=>{
+    const imgEl = document.getElementById('main-camera-frame');
+    console.log("Updating Image");
+    if(imgEl) {
+        imgEl.src = "data:image/jpeg;base64, " + message.data;
+    }
+});
+
 // Main Code
 ////////////////////////////////////////////////////////////////////////////////////////
 console.log("[ Main ] Running");
 function main() {
+    
+
     console.log("[ Main ] Running");
+
     try {
         setInterval(publishGamepadMessage, 50);
     } catch (error) {

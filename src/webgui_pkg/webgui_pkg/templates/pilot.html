@@ -10,7 +10,6 @@
     <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
     <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
     <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
-    <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
     <!-- <script src="{{url_for('static', filename='js/animation/quest_arrow.js')}}" defer></script>
     <script src="{{url_for('static', filename='js/animation/digital_twin.js')}}" defer></script> -->
     <!-- <script src="{{url_for('static', filename='js/resources/three.min.js')}}"></script>
@@ -99,58 +98,13 @@
                         margin: 0;
                     ">
                         <p>D455 Camera 1</p>
-                        <img id="camera1-compressed_video" class="camera-frame" />
+                        <img id="main-camera-frame" class="camera-frame" />
                     </div>
-                </div>
+
               </div>
         </div>
     </div>
-
-    <script>
-        const feeds = [
-            { id: "camera-d455-2", container: "container-d455-2" },
-            { id: "camera-d455-1", container: "container-d455-1" },
-            { id: "camera-rgb-1",  container: "container-rgb-1"  },
-            { id: "camera-rgb-2",  container: "container-rgb-2"  }
-        ];
-
-        function updateCameraLayout() {
-            let activeCount = 0;
-
-            feeds.forEach(feed => {
-                const img = document.getElementById(feed.id);
-                const container = document.getElementById(feed.container);
-                if (!img || !container) return;
-
-                const wasVisible = !container.classList.contains("hidden");
-                const isActive = img.complete && img.naturalWidth > 0;
-
-                if (isActive) {
-                    container.classList.remove("hidden");
-                    activeCount++;
-                } else {
-                    container.classList.add("hidden");
-                }
-            });
-
-            const layout = document.getElementById("grid-layout");
-            if (activeCount <= 1) {
-                layout.style.gridTemplateColumns = "1fr";
-                layout.style.gridTemplateRows = "1fr";
-            } else if (activeCount === 2) {
-                layout.style.gridTemplateColumns = "1fr 1fr";
-                layout.style.gridTemplateRows = "1fr";
-            } else {
-                layout.style.gridTemplateColumns = "1fr 1fr";
-                layout.style.gridTemplateRows = "1fr 1fr";
-            }
-        }
-
-        window.addEventListener("load", () => {
-            setTimeout(updateCameraLayout, 1000);
-            setInterval(updateCameraLayout, 5000);
-        });
-    </script>
+    <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
 </body>
 </html>
 
