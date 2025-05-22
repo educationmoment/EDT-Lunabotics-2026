@@ -4,6 +4,7 @@
 // const fctIndicators_div = document.getElementById("function-indicators");
 // const outLogs_div = document.getElementById("output-logs");
 const img = document.getElementById("camera-output");
+const cameraWrapper = document.getElementById("camera-wrapper");
 ////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -21,12 +22,14 @@ const img = document.getElementById("camera-output");
 // Create a Listener on Compressed Image Topic Published by a Camera Node
 ////////////////////////////////////////////////////////////////////////////////////////
 const cameraTopics = [
-    { id: "camera-d455-1", topic: "/rs_node/camera1/compressed_video" },
-    { id: "camera-d455-1-edge", topic: "rs_node/camera1/d455_edge" },
-    { id: "camera-rgb-1", topic: "/rgb_cam1/compressed" },
-    { id: "camera-rgb-2", topic: "/rgb_cam2/compressed" }
+    { id: "camera1-compressed_video",      topic: "/rs_node/camera1/compressed_video" },
+    // { id: "camera-d455-1-edge", topic: "/rs_node/camera1/depth_video" },
+    // { id: "camera-rgb-1",       topic: "/rs_node/camera2/compressed_video" },
+    // { id: "camera-rgb-2",       topic: "/rs_node/camera2/depth_video" }
 ];
 
+// For each configured camera, create a subscriber and begin listening.
+// Connect to each stream and publish to its respective ID element
 cameraTopics.forEach(({ id, topic }) => {
     const listener = new ROSLIB.Topic({
         ros: ROS,
@@ -42,6 +45,10 @@ cameraTopics.forEach(({ id, topic }) => {
     });
 });
 
+/**
+ * @function toggleFullscreen
+ * @brief Toggle fullscreen mode
+ */
 function toggleFullscreen() {
     const elem = document.getElementById("camera-wrapper");
 
@@ -53,7 +60,6 @@ function toggleFullscreen() {
         document.exitFullscreen();
     }
 }
-
 ////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -72,7 +78,6 @@ function publishGamepadMessage() {
     if (gamepadState === null) {
         return;
     }
-
     FRAME_ID += 1;
 
     // Create Message
@@ -90,24 +95,6 @@ function publishGamepadMessage() {
 }
 ////////////////////////////////////////////////////////////////////////////////////////
 
-// Animation Loop
-////////////////////////////////////////////////////////////////////////////////////////
-var rot_y = 0.0;
-function animationLoop() {
-    console.log("[ ANIMATION-LOOP ] Running");
-
-
-    rot_y += 0.01;
-
-    // Update Renders
-    render_quest_arrow(rot_y * Math.PI / 2);
-    render_twin(rot_y);
-    requestAnimationFrame(animationLoop);
-    return;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////
-
 // Main Code
 ////////////////////////////////////////////////////////////////////////////////////////
 console.log("[ Main ] Running");
@@ -118,8 +105,6 @@ function main() {
     } catch (error) {
         console.error('An error occurred while attempting to publish the gamepad message: ', error);
     }
-
-    requestAnimationFrame(animationLoop);
     return;
 }
 ////////////////////////////////////////////////////////////////////////////////////////

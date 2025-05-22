@@ -73,6 +73,7 @@
 
             /* object-fit: contain; */
             background-color: #222;
+            z-index: 0;
         }
 
         .hidden {
@@ -81,11 +82,13 @@
     </style>
 </head>
 <body>
-    <div id="camera-wrapper">
-
+    <img id="pride" src="{{url_for('static', filename='images/chicago_flag.jpg')}}">
+    <div id="camera-frame">
+        
+            
             <!-- Camera Feed -->
             <!-- NOTE: Using a canvas element may bee better -->
-            <div id="camera-wrapper">
+            <div id="camera-wrapper" style="z-index: 1;">
                 <button onclick="toggleFullscreen()" class="fullscreen-button">🔳 Fullscreen</button>
               
                 <div class="multi-camera-checkerboard">
@@ -96,46 +99,8 @@
                         margin: 0;
                     ">
                         <p>D455 Camera 1</p>
-                        <img id="camera-d455-1" class="camera-frame" />
+                        <img id="camera1-compressed_video" class="camera-frame" />
                     </div>
-                  
-                    <!-- Canny Filtered Image Container 
-                    <div class="camera-container" style="
-                        grid-column: 2;
-                        grid-row: 4 / 5;
-                        margin: 0;
-                    ">
-                        <p>Canny Filtered Image</p>
-                        <img id="camera-d455-1-edge" class="camera-frame"/>
-                    </div>
-
-                    <! First RGB Webcam Container 
-                    <div class="camera-container" style="
-                        grid-column: 1;
-                        grid-row: 1 / 4;
-                        margin: 0;
-                    ">
-                        <p>USB RGB Camera 1</p>
-                        <img id="camera-rgb-1" class="camera-frame" />
-                    </div>
-
-                    <!- Second RGB Webcam Container ->
-                    <div class="camera-container" style="
-                        grid-column: 2;
-                        grid-row: 1 / 4;
-                        margin: 0;
-                    ">
-                        <p>USB RGB Camera 2</p>
-                        <img id="camera-rgb-2" class="camera-frame" />
-                    </div>
-                                                                        -->
-
-
-                    <!-- Gamepad Containter -->
-                    <!-- <div class="camera-container">
-                        <p>Gamepad Setup</p>
-                        <img id="gamepad"/>
-                    </div> --> 
                 </div>
               </div>
         </div>
