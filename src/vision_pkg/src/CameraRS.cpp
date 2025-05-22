@@ -7,6 +7,11 @@
 #include <chrono>
 #include <thread>
 #include <opencv2/opencv.hpp>
+#include <opencv2/core/cuda.hpp>
+#include <opencv2/cudafilters.hpp>
+
+// #include <opencv2/imgproc.hpp>
+
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -123,11 +128,11 @@ public:
       cap_rgb1_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
       cap_rgb1_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
       this->activeCameras[Cameras::WEBCAM_ONE] = true;
-      RCLCPP_INFO(this->get_logger(), WEBCAM_ONE_PATH);
+      RCLCPP_INFO(this->get_logger(), "Webcam at %s connected successfully", WEBCAM_ONE_PATH);
     }
     else
     {
-      RCLCPP_WARN(this->get_logger(), WEBCAM_ONE_PATH);
+      RCLCPP_WARN(this->get_logger(), "Webcam not found at %s", WEBCAM_ONE_PATH);
     }
 
     /////
@@ -139,11 +144,11 @@ public:
       cap_rgb2_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
       cap_rgb2_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
       this->activeCameras[Cameras::WEBCAM_TWO] = true;
-      RCLCPP_INFO(this->get_logger(), WEBCAM_TWO_PATH);
+      RCLCPP_INFO(this->get_logger(), "Webcam at %s connected successfully", WEBCAM_TWO_PATH);
     }
     else
     {
-      RCLCPP_WARN(this->get_logger(), WEBCAM_TWO_PATH);
+      RCLCPP_WARN(this->get_logger(), "Webcam not found at %s", WEBCAM_TWO_PATH);
     }
 
     /////
@@ -151,27 +156,27 @@ public:
     if (this->activeCameras[Cameras::D455_ONE])
     {
       RCLCPP_INFO(this->get_logger(), "Creating D455_1_ Publishers");
-      d455_1_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 5);
-      d455_1_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/depth_video", 5);
+      d455_1_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/compressed_video", 1);
+      d455_1_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera1/depth_video", 1);
     }
 
     if (this->activeCameras[Cameras::D455_TWO])
     {
       RCLCPP_INFO(this->get_logger(), "Creating D455_2_ Publishers");
-      d455_2_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/compressed_video", 5);
-      d455_2_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/depth_video", 5);
+      d455_2_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/compressed_video", 1);
+      d455_2_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/depth_video", 1);
     }
 
     if (this->activeCameras[Cameras::WEBCAM_ONE])
     {
       RCLCPP_INFO(this->get_logger(), "Creating Webcam_1_ Publisher");
-      rgb_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 5);
+      rgb_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 1);
     }
 
     if (this->activeCameras[Cameras::WEBCAM_TWO])
     {
       RCLCPP_INFO(this->get_logger(), "Creating Webcam_2_ Publisher");
-      rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 5);
+      rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 1);
     }
 
     // No Cameras Connected
@@ -222,14 +227,42 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam2_pub_;
 
-  rclcpp::TimerBase::SharedPtr timer_;  // Timer of ~15Hz, callback processes and publishes frames when and where available
+  rclcpp::TimerBase::SharedPtr timer_; // Timer of ~15Hz, callback processes and publishes frames when and where available
 
-  std::array<bool, 4> activeCameras;    // Store the active cameras used by the class
+  std::array<bool, 4> activeCameras; // Store the active cameras used by the class
+
+  cv::cuda::Filter filt;
+
+
+  // TODO: Unfinished Function: processFrames 
+  /**
+   * @brief Retrieve Canny Edge detection of depth data and merge onto RGB image.
+   * @param frames frameset containing a color frame and a depth frame
+   * @returns cv::Mat object containing merged color image and Depth frame
+   */
+  cv::Mat processFrames(rs2::frameset &frames)
+  {
+    rs2::video_frame color_frame = frames.get_color_frame();
+    rs2::depth_frame depth_frame = frames.get_depth_frame();
+
+    cv::Mat depth_mat(cv::Size(depth_frame.get_width(), depth_frame.get_height()), CV_16UC1, (void *)depth_frame.get_data(), cv::Mat::AUTO_STEP);
+    cv::Mat color_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void *)color_frame.get_data(), cv::Mat::AUTO_STEP);
+
+    cv::cuda::GpuMat src, dst;
+    src.upload(depth_mat);
+
+    filt = cv::cuda::createGaussianFilter(CV_16UC1, CV_16UC1, cv::Size(7,7), 3.0);
+    filt.apply(src);
+
+    cv::GaussianBlur(depth_mat, depth_mat, cv::Size(7,7), 3, 3 );
+    return {};
+  }
 
   /**
    * @brief Callback to timer object. Callback polls the Realsense pipeline for available frames, avoiding locking the thread.
    *        If a frame is successfully polled, extracts both the depth and the RGB frmes. Publishes frames upon successful retrieval.
    * @param None
+   * @return None
    *******************************************************/
   void timer_callback()
   {
