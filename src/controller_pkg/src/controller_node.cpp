@@ -11,7 +11,7 @@
 #include <algorithm>
 
 const float VELOCITY_MAX = 2500.0;  // rpm, after gearbox turns into 11.1 RPM
-const float VIBRATOR_OUTPUT = 0.1f; // Constant value for vibrator output
+const float VIBRATOR_OUTPUT = 1.0f; // Constant value for vibrator output
 
 enum CAN_IDs
 {
@@ -469,8 +469,8 @@ private:
       }
       else
       {
-        leftMotor.SetVelocity(500 * left_drive_slow);
-        rightMotor.SetVelocity(500 * right_drive_slow);
+        leftMotor.SetVelocity(1500 * left_drive_slow);
+        rightMotor.SetVelocity(1500 * right_drive_slow);
       }
     }
     //----------DRIVETRAIN----------//
@@ -494,10 +494,11 @@ private:
     }
     prev_excavate_button = current_excavate_button;
 
-    bool current_cycle_button = (Gp::Buttons::_WINDOW_KEY > 0);
+    bool current_cycle_button = (joy_msg->buttons[Gp::Buttons::_WINDOW_KEY] > 0);
     static bool prev_cycle_button = false;
     if (current_cycle_button && !prev_cycle_button)
     {
+      RCLCPP_INFO(this->get_logger(), "Full cycle launched");
       std::system("ros2 run controller_pkg odometry_node &");
     }
     prev_cycle_button = current_cycle_button;
