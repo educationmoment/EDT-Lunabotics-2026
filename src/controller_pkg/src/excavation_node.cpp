@@ -3,7 +3,7 @@
 #include "interfaces_pkg/srv/excavation_request.hpp"
 #include "interfaces_pkg/msg/motor_health.hpp"
 
-const float VIBRATOR_DUTY = 1.0f;
+const float VIBRATOR_DUTY = 0.1f;
 const float ERROR = 0.1f;
 float buffer = 0.0f;
 
@@ -17,6 +17,16 @@ SparkMax vibrator("can0", 6); //Initalizes motor controllers
 rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
 std::shared_ptr<rclcpp::Node> node;
 
+/**
+ * @brief MoveBucket positions the bucket to a predefined position specified in the passed
+ *        parameters. By choice, the vibrator can be enabled to assist in cleaving through regolith.
+ *        Motor output during excavation cycle is also passed to function call.
+ * @param lift_setpoint Desired lift actuator setpoint expressed as a float
+ * @param tilt_setpoint Desired tilt actuator setpoint expressed as a float
+ * @param activate_vibrator Should the vibrator be activated? (true == yes)
+ * @param drive_speed Floating point value used to express desired motor speed during auto excavation
+ * @returns None
+ */
 void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrator, float drive_speed) {
     auto timer_start = std::chrono::high_resolution_clock::now();
     bool leftLiftReached = (fabs(lift_setpoint - leftLift.GetPosition() ) <=  ERROR);
@@ -54,10 +64,20 @@ void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrato
     }
 }
 
+/**
+ * @param health_msg interfaces_pkg::msg::MotorHealth, tilt_position read from node and stored in buffer
+ * @returns None
+ */
 void updateTiltPosition(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg){
     buffer = health_msg->tilt_position;
 }
 
+/**
+ * @brief Callback for interfaces_pkg::srv::ExcavationRequest::Request interface. Handles autonomous excavation.
+ * @param request std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Request>, client provided request
+ * @param response std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Request>, server response
+ * @returns None
+ */
 void Excavate(const std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Request> request,
     std::shared_ptr<interfaces_pkg::srv::ExcavationRequest::Response> response) {
         if (!request->start_excavation){
