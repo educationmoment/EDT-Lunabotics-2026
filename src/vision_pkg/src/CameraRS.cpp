@@ -40,16 +40,22 @@ class MultiCameraNode : public rclcpp::Node
 public:
   /**
    * @brief MultiCameraNode is the main constructor of the MultiCameraNode class.
+   *        It initiallizes the activeCameras array, an array to keep track of connected cameras,
+   *        and sets/creates pipelines to up to 4 cameras (2 RS and 2 Webcams). For those cameras
+   *        which are connected, a publisher is initiallized. A timer with a frequency of 15Hz is created
+   *        to publish video frames to all channels.
+   * @return None
+   * @exception No cameras detected (activeCameras is ALL false)
    */
-  MultiCameraNode() : Node("multi_camera_node")
+  MultiCameraNode() : Node("multi_camera_node"), activeCameras({false, false, false, false})
   {
     // Camera Serial Numbers
     const std::string DEPTH_CAMERA_ONE_SERIAL = "318122303486";
     const std::string DEPTH_CAMERA_TWO_SERIAL = "308222300472";
-    this->activeCameras[0] = false;
-    this->activeCameras[1] = false;
-    this->activeCameras[2] = false;
-    this->activeCameras[3] = false;
+    // this->activeCameras[0] = false;
+    // this->activeCameras[1] = false;
+    // this->activeCameras[2] = false;
+    // this->activeCameras[3] = false;
 
     RCLCPP_INFO(this->get_logger(), "Multi-camera node startup.");
 
@@ -70,8 +76,9 @@ public:
 
     //////
     // Attempt to create pipeline to First D455 Camera
-    RCLCPP_INFO( this->get_logger(), "Attempting to connect Pipeline 1");
-    if( this->ctx.query_devices().size() > 0 ) {
+    RCLCPP_INFO(this->get_logger(), "Attempting to connect Pipeline 1");
+    if (this->ctx.query_devices().size() > 0)
+    {
       try
       {
         pipeline_1.start(cfg_1);
@@ -82,14 +89,16 @@ public:
         RCLCPP_ERROR(this->get_logger(), "Error connecting to camera %s, ERROR: %s", DEPTH_CAMERA_ONE_SERIAL.c_str(), exc.what());
       }
     }
-    else {
-      RCLCPP_WARN( this->get_logger(), "D455 Camera One Not Connected");
+    else
+    {
+      RCLCPP_WARN(this->get_logger(), "D455 Camera One Not Connected");
     }
 
     //////
     // Attempt to create pipeline to Second D455 Camera
-    RCLCPP_INFO( this->get_logger(), "Attempting to connect Pipeline 2");
-    if( this->ctx.query_devices().size() > 1 ) {
+    RCLCPP_INFO(this->get_logger(), "Attempting to connect Pipeline 2");
+    if (this->ctx.query_devices().size() > 1)
+    {
       try
       {
         pipeline_2.start(cfg_2);
@@ -99,13 +108,15 @@ public:
       {
         RCLCPP_ERROR(this->get_logger(), "Error connecting to camera %s, ERROR: %s", DEPTH_CAMERA_TWO_SERIAL.c_str(), exc.what());
       }
-    } else {
-      RCLCPP_WARN( this->get_logger(), "D455 Camera Two Not Connected");
+    }
+    else
+    {
+      RCLCPP_WARN(this->get_logger(), "D455 Camera Two Not Connected");
     }
 
     /////
     // Open Path to Webcam One, if possible
-    RCLCPP_INFO( this->get_logger(), "Attempting to connect to Webcam 1");
+    RCLCPP_INFO(this->get_logger(), "Attempting to connect to Webcam 1");
     if (cap_rgb1_.open(WEBCAM_ONE_PATH))
     {
       cap_rgb1_.set(cv::CAP_PROP_FPS, 15);
@@ -121,7 +132,7 @@ public:
 
     /////
     // Open Path to Webcam Two, if possible
-    RCLCPP_INFO( this->get_logger(), "Attempting to connect to Webcam 2");
+    RCLCPP_INFO(this->get_logger(), "Attempting to connect to Webcam 2");
     if (cap_rgb2_.open(WEBCAM_TWO_PATH))
     {
       cap_rgb2_.set(cv::CAP_PROP_FPS, 15);
@@ -146,30 +157,33 @@ public:
 
     if (this->activeCameras[Cameras::D455_TWO])
     {
-      RCLCPP_INFO( this->get_logger(), "Creating D455_2_ Publishers");
+      RCLCPP_INFO(this->get_logger(), "Creating D455_2_ Publishers");
       d455_2_rgb_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/compressed_video", 5);
       d455_2_dep_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rs_node/camera2/depth_video", 5);
     }
 
-    if( this->activeCameras[Cameras::WEBCAM_ONE]) {
-      RCLCPP_INFO( this->get_logger(), "Creating Webcam_1_ Publisher");
+    if (this->activeCameras[Cameras::WEBCAM_ONE])
+    {
+      RCLCPP_INFO(this->get_logger(), "Creating Webcam_1_ Publisher");
       rgb_cam1_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam1/compressed", 5);
     }
 
-    if( this->activeCameras[Cameras::WEBCAM_TWO]) {
-      RCLCPP_INFO( this->get_logger(), "Creating Webcam_2_ Publisher");
+    if (this->activeCameras[Cameras::WEBCAM_TWO])
+    {
+      RCLCPP_INFO(this->get_logger(), "Creating Webcam_2_ Publisher");
       rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 5);
     }
 
     // No Cameras Connected
-    if( ! this->activeCameras[Cameras::D455_ONE] && 
-        ! this->activeCameras[Cameras::D455_TWO] && 
-        ! this->activeCameras[Cameras::WEBCAM_ONE] &&
-        ! this->activeCameras[Cameras::WEBCAM_TWO] ) {
+    if (!this->activeCameras[Cameras::D455_ONE] &&
+        !this->activeCameras[Cameras::D455_TWO] &&
+        !this->activeCameras[Cameras::WEBCAM_ONE] &&
+        !this->activeCameras[Cameras::WEBCAM_TWO])
+    {
 
-          // Throw Error, No cameras are detected
-          RCLCPP_ERROR(this->get_logger(), "NO CAMERAS DETECTED");
-          throw std::exception();
+      // Throw Error, No cameras are detected
+      RCLCPP_ERROR(this->get_logger(), "NO CAMERAS DETECTED");
+      throw std::exception();
     }
 
     L_obstacle_detection_pub_ = this->create_publisher<std_msgs::msg::Bool>("obstacle_detection/left", 10);
@@ -182,15 +196,16 @@ public:
   }
 
 private:
-  rs2::context ctx;
-  rs2::pipeline pipeline_1;
-  rs2::pipeline pipeline_2;
+  rs2::context ctx;         // Global Context used to query devices
+  rs2::pipeline pipeline_1; // Pipeline One used by the first D455 Camera
+  rs2::pipeline pipeline_2; // Pipeline Two used by the second D455 Camera
 
   rs2::decimation_filter deci_;
   rs2::spatial_filter spat_;
   rs2::temporal_filter temp_;
-  cv::VideoCapture cap_rgb1_;
-  cv::VideoCapture cap_rgb2_;
+
+  cv::VideoCapture cap_rgb1_; // VideoCapture stream used by the USB Webcams
+  cv::VideoCapture cap_rgb2_; //
 
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr L_obstacle_detection_pub_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr R_obstacle_detection_pub_;
@@ -207,12 +222,12 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam1_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr rgb_cam2_pub_;
 
-  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr timer_;  // Timer of ~15Hz, callback processes and publishes frames when and where available
 
-  std::array<bool, 4> activeCameras;
+  std::array<bool, 4> activeCameras;    // Store the active cameras used by the class
 
   /**
-   * @brief Callback to timer object. Callback polls the Realsense pipeline for available frams, avoiding locking the thread.
+   * @brief Callback to timer object. Callback polls the Realsense pipeline for available frames, avoiding locking the thread.
    *        If a frame is successfully polled, extracts both the depth and the RGB frmes. Publishes frames upon successful retrieval.
    * @param None
    *******************************************************/
@@ -297,8 +312,6 @@ private:
     }
   }
 
-  // Use poll_for_frames to avoid blocking and stalling pipeline
-
   /**
    * @brief Publishes a realsense frame to the passed publisher.
    * @param color_frame rs2::frame passed by reference. The color_frame to be sent.
@@ -356,6 +369,7 @@ private:
     }
     msg.data = buffer;
     pub->publish(msg);
+
     /**
     cv::Mat gray, edges, edges_bgr;
     cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
@@ -389,7 +403,7 @@ private:
       RCLCPP_INFO(this->get_logger(), "Published Canny edge image.");
     }
    */
-  };
+  }
 
   /**
    * Function: average_depth
