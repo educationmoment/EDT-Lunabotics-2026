@@ -87,7 +87,7 @@ public:
       try
       {
         pipeline_1.start(cfg_1);
-        this->activeCameras[Cameras::D455_ONE];
+        this->activeCameras[Cameras::D455_ONE] = true;
       }
       catch (const rs2::error &exc)
       {
@@ -107,7 +107,7 @@ public:
       try
       {
         pipeline_2.start(cfg_2);
-        this->activeCameras[Cameras::D455_TWO];
+        this->activeCameras[Cameras::D455_TWO] = true;
       }
       catch (const rs2::error &exc)
       {
@@ -179,11 +179,17 @@ public:
       rgb_cam2_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>("rgb_cam2/compressed", 1);
     }
 
+
+    RCLCPP_WARN(this->get_logger(), "Camera 1 Status: %s", this->activeCameras[Cameras::D455_ONE]?"ON":"OFF");
+    RCLCPP_WARN(this->get_logger(), "Camera 2 Status: %s", this->activeCameras[Cameras::D455_TWO]?"ON":"OFF");
+    RCLCPP_WARN(this->get_logger(), "Camera 3 Status: %s", this->activeCameras[Cameras::WEBCAM_ONE]?"ON":"OFF");
+    RCLCPP_WARN(this->get_logger(), "Camera 4 Status: %s", this->activeCameras[Cameras::WEBCAM_TWO]?"ON":"OFF");
+
     // No Cameras Connected
-    if (!this->activeCameras[Cameras::D455_ONE] &&
-        !this->activeCameras[Cameras::D455_TWO] &&
-        !this->activeCameras[Cameras::WEBCAM_ONE] &&
-        !this->activeCameras[Cameras::WEBCAM_TWO])
+    if ( !this->activeCameras[Cameras::D455_ONE] &&
+         !this->activeCameras[Cameras::D455_TWO] &&
+         !this->activeCameras[Cameras::WEBCAM_ONE] &&
+         !this->activeCameras[Cameras::WEBCAM_TWO])
     {
 
       // Throw Error, No cameras are detected
@@ -231,7 +237,7 @@ private:
 
   std::array<bool, 4> activeCameras; // Store the active cameras used by the class
 
-  cv::cuda::Filter filt;
+  // cv::cuda::Filter filt;
 
 
   // TODO: Unfinished Function: processFrames 
@@ -240,6 +246,7 @@ private:
    * @param frames frameset containing a color frame and a depth frame
    * @returns cv::Mat object containing merged color image and Depth frame
    */
+  /*
   cv::Mat processFrames(rs2::frameset &frames)
   {
     rs2::video_frame color_frame = frames.get_color_frame();
@@ -257,6 +264,7 @@ private:
     cv::GaussianBlur(depth_mat, depth_mat, cv::Size(7,7), 3, 3 );
     return {};
   }
+  */
 
   /**
    * @brief Callback to timer object. Callback polls the Realsense pipeline for available frames, avoiding locking the thread.
