@@ -3,7 +3,7 @@
 #include "interfaces_pkg/srv/depositing_request.hpp"
 #include "std_msgs/msg/bool.hpp"
 
-const float VIBRATOR_DUTY = 1.0f;
+const float VIBRATOR_DUTY = 0.1f;
 const float ERROR = 0.1;
 
 SparkMax leftLift("can0", 3);
@@ -12,6 +12,14 @@ SparkMax tilt("can0", 5);
 SparkMax vibrator("can0", 6);
 //Initalizes motor controllers
 
+
+/**
+ * @brief Move the bucket to a setpoint and activate as specified by the parameters. 
+ * @param lift_setpoint Setpoint for the lift actuators expressed as a float
+ * @param tilt_setpoint Setpoint for the tilt actuators expressed as a float
+ * @param activate_vibrator Should the vibrator be set on? (true == yes)
+ * @returns None
+ */
 void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrator) {
     auto timer_start = std::chrono::high_resolution_clock::now();
     bool leftLiftReached = (fabs(lift_setpoint - leftLift.GetPosition() ) <=  ERROR);
@@ -47,7 +55,16 @@ void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrato
         tiltReached = (fabs(tilt_setpoint - tilt.GetPosition() ) <=  ERROR); //Updates statuses
     }
 }
+
+
 //Fix depositing to be under the bar
+/**
+ * @brief Begins autonomous depositing cycle. If request is TRUE, a cycle is begun with a 20 second 
+ *        duration used to shake material out of the bucket. Afterwards, resets bucket.
+ * @param request interfaces_pkg::srv::DepositingRequest::Request is the request from the client node (controller_node)
+ * @param response interfaces_pkg::srv::DepositingRequest::Response is the response to the client node
+ * @returns None
+ */
 void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Request> request,
     std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Response> response) {
         if (!request->start_depositing){
