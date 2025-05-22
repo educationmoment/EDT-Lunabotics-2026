@@ -3,7 +3,7 @@
 #include "interfaces_pkg/srv/depositing_request.hpp"
 #include "std_msgs/msg/bool.hpp"
 
-const float VIBRATOR_DUTY = 0.1f;
+const float VIBRATOR_DUTY = 1.0f;
 const float ERROR = 0.1;
 
 SparkMax leftLift("can0", 3);
