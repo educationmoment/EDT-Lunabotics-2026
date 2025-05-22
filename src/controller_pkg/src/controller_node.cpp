@@ -50,11 +50,20 @@ namespace Gp
     _RIGHT_HORIZONTAL_STICK = 2,
     _RIGHT_VERTICAL_STICK = 3,
   };
-};
+}
 
 class ControllerNode : public rclcpp::Node
 {
 public:
+  /** Function: ControllerNode Constructor
+   * @brief ControllerNode class Constructor is passed a string reference of a CAN interface.
+   *        It initiallizes the motors by flashing configuration settings to the SparkMaxes.
+   *        Furtheremore, this creates subscriptions(2), publishers(3), and a timer for the following, respectively:
+   *        joy_topic, health_subscriber, depositing client, excavation client, heartbeat pub, and a timer to publisher heatbeat.
+   * @param can_interface The interface used by the operating system to communicate
+   *                      on the Controller Area Network, listed under 'ip link list' (i.e., can0)
+   * @returns None
+   */
   ControllerNode(const std::string &can_interface)
       : Node("controller_node"),
         leftMotor(can_interface, LEFT_MOTOR),
@@ -205,21 +214,35 @@ private:
   float right_lift_position = 0.0f;
 
   // Helper for stepped output, in velocity control mode it is multiplied by VELOCITY_MAX
+  /**
+   * @brief Output must be bound within the range [-1.0,1.0].
+   *        Returned value will be an integer multiple of 0.25.
+   * @param value
+   * @returns Step output of value.
+   */
   float computeStepOutput(float value)
   {
     float absVal = std::fabs(value);
     if (absVal < 0.25f)
       return 0.0f;
+
     else if (absVal < 0.5f)
       return (value > 0 ? 0.25f : -0.25f);
+
     else if (absVal < 0.75f)
       return (value > 0 ? 0.5f : -0.5f);
+
     else if (absVal < 1.0f)
       return (value > 0 ? 0.75f : -0.75f);
+
     return (value > 0 ? 1.0f : -1.0f);
   }
 
-  // Sends request to depositing node and manages response
+  /**
+   * @brief Sends request to depositing node and manages response
+   * @param None
+   * @returns None
+   */
   void send_deposit_request()
   {
     if (!depositing_client_ || !depositing_client_->wait_for_service(std::chrono::seconds(1)))
@@ -239,7 +262,11 @@ private:
       } });
   }
 
-  // Sends request to excavation node and manages response
+  /**
+   * @brief Sends request to excavation node and manages node response
+   * @param None
+   * @returns None
+   */
   void send_excavation_request()
   {
     if (!excavation_client_ || !excavation_client_->wait_for_service(std::chrono::seconds(1)))
@@ -259,14 +286,23 @@ private:
       } });
   }
 
-  // Keeps track of position for actuator control
+  /**
+   * @brief Keeps track of position for actuator control
+   * @param health_msg The received health message from the ROS framework
+   * @returns None
+   */
   void position_callback(const interfaces_pkg::msg::MotorHealth::SharedPtr health_msg)
   {
     left_lift_position = health_msg->left_lift_position;
     right_lift_position = health_msg->right_lift_position;
   }
 
-  // Manual control - joy callback.
+  /**
+   * @brief Manual control callback for the robot. This subscriber callback handles all
+   *        control requests received from the joy interface.
+   * @param joy_msg A subscription pointer to a joy interface topic.
+   * @returns None
+   */
   void joy_callback(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
   {
     if (joy_msg->axes.size() < 2 || joy_msg->buttons.size() < 17)
@@ -477,6 +513,11 @@ private:
     //----------AUTONOMOUS FUNCTIONS----------//
   }
 
+  /**
+   * @brief Sends periodic heartbeats to Sparkmax motorcontrollers
+   * @param None
+   * @returns None
+   */
   void publish_heartbeat()
   {
     auto msg = std_msgs::msg::String();
