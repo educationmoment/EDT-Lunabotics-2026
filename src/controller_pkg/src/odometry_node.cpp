@@ -3,7 +3,7 @@
 #include "interfaces_pkg/msg/motor_health.hpp"
 #include "std_msgs/msg/float32.hpp"
 
-const float VIBRATOR_DUTY = 1.0f;
+const float VIBRATOR_DUTY = 0.1f;
 const float ERROR = 0.1f;
 float buffer = 0.0;
 
