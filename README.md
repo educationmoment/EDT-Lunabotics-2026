@@ -1,7 +1,12 @@
 <h1>EDT-Lunabotics-2025</h1>
 
+
+
 <img src="https://github.com/user-attachments/assets/6e77045f-b1a8-47ea-ad5b-2ae286bfaef3" style="width: 400px" alt="EDT-Logo"></img>
 
+    ╔═║╔═║╔═║ ╝╔═╝╔═╝═╔╝  ╔═ ╔═╝╔═║═╔╝║ ║╔═ ╔═╝
+    ╔═╝╔╔╝║ ║ ║╔═╝║   ║   ║ ║╔═╝╔═╝ ║ ║ ║║ ║╔═╝
+    ╝  ╝ ╝══╝═╝══╝══╝ ╝   ╝ ╝══╝╝   ╝ ══╝╝ ╝══╝
 <hr>
 <h2>Packages</h2>
     <ul>
