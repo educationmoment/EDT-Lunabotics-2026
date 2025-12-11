@@ -387,55 +387,26 @@ private:
       }
       tilt.SetDutyCycle(tilt_duty);
 
-      const float HIGH_PASS_FILTER = 0.38; // 1/64 inch
-      const float KP_LIFT = 8.0f; // Proportional gain
-      //...
-
       // LIFT ACTUATOR (D pad up and down)
-      // lift_error = right_lift_position - left_lift_position; error, right minus left
-
-      // ---- LIFT POSITION SYNC ---- //
-
-      // ---- LIFT POSITION SYNC ---- //
-
-      // compute lift error (right - left)
-      float lift_error = right_lift_position - left_lift_position;
-
-      // high-pass deadband
-      if (fabs(lift_error) < HIGH_PASS_FILTER)
-          lift_error = 0.0f;
-
-      // get user lift direction
-      float lift_setpoint = 0.0f;
-      if (joy_msg->buttons[Gp::Buttons::_D_PAD_UP] > 0)
-          lift_setpoint = 1.0f;
-      else if (joy_msg->buttons[Gp::Buttons::_D_PAD_DOWN] > 0)
-          lift_setpoint = -1.0f;
-
-      // base duties (before correction)
-      float left_duty  = lift_setpoint;
-      float right_duty = lift_setpoint;
-
-      // proportional correction (always slows the higher side)
-      float correction = KP_LIFT * fabs(lift_error);
-
-      // right is higher → slow right
-      if (lift_error > 0)
+      float lift_duty = 0.0f;
+      if (joy_msg->buttons[Gp::Buttons::_D_PAD_UP] > 0 && joy_msg->buttons[Gp::Buttons::_D_PAD_LEFT] == 0)
       {
-          right_duty = lift_setpoint - correction;
+        lift_duty = 1.0f;
       }
-      // left is higher → slow left
-      else if (lift_error < 0)
+      else if (joy_msg->buttons[Gp::Buttons::_D_PAD_DOWN] > 0 && joy_msg->buttons[Gp::Buttons::_D_PAD_RIGHT] == 0)
       {
-          left_duty = lift_setpoint - correction;
+        lift_duty = -1.0f;
       }
-
-      left_duty  = std::clamp(left_duty,  -1.0f, 1.0f);
-      right_duty = std::clamp(right_duty, -1.0f, 1.0f);
-
-      leftLift.SetDutyCycle(left_duty);
-      rightLift.SetDutyCycle(right_duty);
-
+      if (fabs(left_lift_position - right_lift_position) >= 0.2)
+      {
+        leftLift.SetPosition(left_lift_position);
+        rightLift.SetPosition(left_lift_position);
+      } // Lift correction
+      else
+      {
+        leftLift.SetDutyCycle(lift_duty);
+        rightLift.SetDutyCycle(lift_duty);
+      }
     }
 
     //----------EXCAVATION SYSTEM----------//

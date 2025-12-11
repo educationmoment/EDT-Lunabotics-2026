@@ -16,11 +16,18 @@ public:
     leftLift("can0", 3),
     rightLift("can0", 4),
     tilt("can0", 5),
-    vibrator("can0", 6) {
-        health_publisher_ = this->create_publisher<interfaces_pkg::msg::MotorHealth>("health_topic", 10);
+    vibrator("can0", 6)     {
+        health_publisher_ = this->create_publisher<interfaces_pkg::msg::MotorHealth>(
+            "health_topic", 10);
 
-        timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&HealthNode::status_monitoring, this));
-}
+        // declare + get parameter
+        int health_rate_hz = this->declare_parameter<int>("health_rate_hz", 600); // default 100 Hz
+        auto period = std::chrono::microseconds(1'000'000 / health_rate_hz);
+
+        timer_ = this->create_wall_timer(
+            period,
+            std::bind(&HealthNode::status_monitoring, this));
+    }
 private:
     SparkMax leftMotor;
     SparkMax rightMotor;
