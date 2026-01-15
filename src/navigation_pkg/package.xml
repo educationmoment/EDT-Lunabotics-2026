@@ -1,33 +1,29 @@
 <?xml version="1.0"?>
-<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>navigation_pkg</name>
-  <version>0.0.1</version>
-  <description>Nav2 interface for autonomous robot with SparkMax motor controllers</description>
-  <maintainer email="cdiede2@uic.edu">edt</maintainer>
+  <version>1.0.0</version>
+  <description>This package contains action servers and clients required for autonomous navigation.</description>
+  <maintainer email="grayson.n.arendt5@gmail.com">Grayson Arendt</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- Core ROS 2 dependencies -->
-  <depend>rclcpp</depend>
-  <depend>geometry_msgs</depend>
-  <depend>sensor_msgs</depend>
-  <depend>std_msgs</depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>rclcpp_action</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>nav_msgs</build_depend>
+  <build_depend>nav2_msgs</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>eigen</build_depend>
+  <build_depend>libpcl-all-dev</build_depend>
+  <build_depend>msg_pkg</build_depend>
 
-  <!-- Your SparkMax hardware interface library -->
-  <depend>sparkcan</depend>
-
-  <!-- Nav2-specific interfaces -->
-  <depend>nav2_msgs</depend>
-  <depend>nav_msgs</depend>
-
-  <!-- Testing -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
+    <nav2_core plugin="${prefix}/global_planner_plugin.xml" />
   </export>
 </package>
-
