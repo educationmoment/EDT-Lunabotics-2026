@@ -405,17 +405,46 @@ def generate_launch_description():
         arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
     )
 
+    base_to_d455_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="base_to_d455_tf",
+        arguments=["0.42", "0", "0.37", "0", "-0.523599", "0", "base_link", "d455_link"],
+    )
+
+    base_to_d456_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="base_to_d456_tf",
+        arguments=["0.535", "-0.28", "0.141", "0", "0", "0", "base_link", "d456_link"],
+    )
+
+        
+    
+
     apriltag_d455_node = Node(
-        package='apriltag_ros', executable='apriltag_node', output='screen',
+        package='apriltag_ros', 
+        executable='apriltag_node', 
+        output='screen',
         parameters=[apriltag_params_file],
-        remappings=[('/image_rect', '/d455/color/image_raw'),
-                    ('/camera_info', '/d455/color/camera_info')])
+        remappings=[
+            ('/image_rect', '/d455/color/image_raw'),
+            ('/camera_info', '/d455/color/camera_info'),
+
+        ]
+    )
 
     apriltag_d456_node = Node(
-        package='apriltag_ros', executable='apriltag_node', output='screen',
+        package='apriltag_ros', 
+        executable='apriltag_node', 
+        output='screen',
         parameters=[apriltag_params_file],
-        remappings=[('/image_rect', '/d456/color/image_raw'),
-                    ('/camera_info', '/d456/color/camera_info')])
+        remappings=[
+            ('/image_rect', '/d456/color/image_raw'),
+            ('/camera_info', '/d456/color/camera_info'),
+
+        ]
+    )
 
     ld = LaunchDescription()
 
@@ -428,10 +457,12 @@ def generate_launch_description():
     ld.add_action(imu_rotator_node)
     ld.add_action(actuator_node)
     ld.add_action(d455_imu_filter)
-    ld.add_action(d456_imu_filter)
+    ld.add_action(d456_imu_filter) 
     ld.add_action(apriltag_d455_node)
     ld.add_action(apriltag_d456_node)
     ld.add_action(map_to_odom_tf)
+    ld.add_action(base_to_d455_tf) 
+    ld.add_action(base_to_d456_tf) 
     ld.add_action(controller_teleop_node)
 
     ld.add_action(
