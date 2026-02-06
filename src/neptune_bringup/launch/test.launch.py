@@ -391,12 +391,8 @@ def generate_launch_description():
     imu_rotator_node = Node(package="util_pkg", executable="imu_rotator")
     actuator_node = Node(package="util_pkg", executable="actuator_position")
 
-    controller_teleop_node = Node(
-        package="teleop_pkg",
-        executable="controller_teleop",
-        name="controller_teleop",
-        arguments=["--ros-args", "--log-level", "info"],
-    )
+
+    
 
     map_to_odom_tf = Node(
         package="tf2_ros",
@@ -419,7 +415,37 @@ def generate_launch_description():
         arguments=["0.535", "-0.28", "0.141", "0", "0", "0", "base_link", "d456_link"],
     )
 
-        
+
+    hardware_controller_module = Node(
+        name        ="controller_node",
+        package     ="controller_pkg",
+        executable  ="controller_node"
+    )
+    web_user_interface = Node(
+        name        ="webgui_node",
+        package     = "webgui_pkg",
+        executable  = "webgui_server"
+    )
+
+    # Add Depositing Sequence
+    depositing_module = Node(
+        name        ="depositing_node",
+        package     ="controller_pkg",
+        executable  ="depositing_node",
+    )
+
+    # Add Excavation Sequence
+    excavation_module = Node(
+        name        ="excavation_node",
+        package     ="controller_pkg",
+        executable  ="excavation_node",
+    )
+
+    health_module = Node(
+        name        ="health_node",
+        package     ="controller_pkg",
+        executable  ="health_node",
+    )
     
 
     apriltag_d455_node = Node(
@@ -463,7 +489,13 @@ def generate_launch_description():
     ld.add_action(map_to_odom_tf)
     ld.add_action(base_to_d455_tf) 
     ld.add_action(base_to_d456_tf) 
-    ld.add_action(controller_teleop_node)
+    #ld.add_action(controller_teleop_node)
+    ld.add_action(hardware_controller_module)
+    ld.add_action(depositing_module)
+    ld.add_action(excavation_module)
+    ld.add_action(health_module)
+    ld.add_action(web_user_interface)
+
 
     ld.add_action(
         GroupAction(
