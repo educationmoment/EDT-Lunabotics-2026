@@ -26,7 +26,7 @@ def generate_launch_description():
         config_dir, "behavior_trees", "nav_through_poses_w_replanning_and_recovery.xml"
     )
     nav2_params_file = os.path.join(
-        config_dir, "params", "nav2", "nav2_real_bot_params.yaml"
+        config_dir, "params", "nav2", "nav2_uic_bot_params.yaml"
     )
     rtabmap_params_file = os.path.join(
         config_dir, "params", "rtabmap", "rtabmap_params.yaml"
@@ -123,7 +123,7 @@ def generate_launch_description():
             {
                 "frame_id": "base_link",
                 "odom_frame_id": "odom",
-                "publish_tf": False,
+                "publish_tf": True,
                 "approx_sync": True,
                 "Reg/Strategy": "1",
                 "Odom/Strategy": "1",
@@ -223,6 +223,56 @@ def generate_launch_description():
             ukf_params_file,
         ],
     )
+    controller_server_node = Node(
+        package="nav2_controller",
+        executable="controller_server",
+        name="controller_server",
+        output="screen",
+        parameters=[nav2_params_file],
+    )
+
+    planner_server_node = Node(
+        package="nav2_planner",
+        executable="planner_server",
+        name="planner_server",
+        output="screen",
+        parameters=[nav2_params_file],
+    )
+
+    behavior_server_node = Node(
+        package="nav2_behaviors",
+        executable="behavior_server",
+        name="behavior_server",
+        output="screen",
+        parameters=[nav2_params_file],
+    )
+
+    bt_navigator_node = Node(
+        package="nav2_bt_navigator",
+        executable="bt_navigator",
+        name="bt_navigator",
+        output="screen",
+        parameters=[nav2_params_file,
+            {"default_nav_to_pose_bt_xml": bt_nav_to_pose, "default_nav_through_poses_bt_xml": bt_nav_through_poses},
+        ],
+    )
+
+    lifecycle_manager_node = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        name="lifecycle_manager_navigation",
+        output="screen",
+        parameters=[
+            {"autostart": True},
+            {"node_timeout": 10.0},
+            {"node_names": [
+                "controller_server",
+                "planner_server",
+                "behavior_server",
+                "bt_navigator",
+            ]},
+        ],
+    )
 
     excavation_server_node = Node(
         package="navigation_pkg",
@@ -306,10 +356,19 @@ def generate_launch_description():
                 "inverted": False,
                 "scan_mode": "DenseBoost",
                 "angle_compensate": True,
+                "scan_frequency": 20.0,
             }
         ],
+      
         output="screen",
     )
+    base_to_s3_lidar_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="base_to_s3_lidar_tf",
+        arguments=["0.0", "-0.1", "0.25", "0", "0", "0", "base_link", "s3_lidar_link"],
+    )
+
 
 
     d455_launch = IncludeLaunchDescription(
@@ -394,12 +453,12 @@ def generate_launch_description():
 
     
 
-    map_to_odom_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="map_to_odom_tf",
-        arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
-    )
+#    map_to_odom_tf = Node(
+ #       package="tf2_ros",
+ #       executable="static_transform_publisher",
+ #       name="map_to_odom_tf",
+ #       arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
+ #   )
 
     base_to_d455_tf = Node(
         package="tf2_ros",
@@ -433,6 +492,13 @@ def generate_launch_description():
         package     ="controller_pkg",
         executable  ="depositing_node",
     )
+
+    rosbridge_node = Node(
+    package='rosbridge_server',
+    executable='rosbridge_websocket',
+    name='rosbridge_websocket',
+    parameters=[{'port': 9090}]
+    )   
 
     # Add Excavation Sequence
     excavation_module = Node(
@@ -473,9 +539,9 @@ def generate_launch_description():
     )
 
     ld = LaunchDescription()
-
     ld.add_action(declare_robot_mode)
     ld.add_action(s3_lidar_node)
+    ld.add_action(base_to_s3_lidar_tf)
     ld.add_action(d455_launch)
     ld.add_action(d456_launch)
     ld.add_action(rgbd_sync1_node)
@@ -486,7 +552,7 @@ def generate_launch_description():
     ld.add_action(d456_imu_filter) 
     ld.add_action(apriltag_d455_node)
     ld.add_action(apriltag_d456_node)
-    ld.add_action(map_to_odom_tf)
+    #ld.add_action(map_to_odom_tf)
     ld.add_action(base_to_d455_tf) 
     ld.add_action(base_to_d456_tf) 
     #ld.add_action(controller_teleop_node)
@@ -495,6 +561,7 @@ def generate_launch_description():
     ld.add_action(excavation_module)
     ld.add_action(health_module)
     ld.add_action(web_user_interface)
+    ld.add_action(rosbridge_node)
 
 
     ld.add_action(
@@ -537,7 +604,7 @@ def generate_launch_description():
                     period=3.0,
                     actions=[
                         excavation_server_node,
-                        #localization_server_node,
+                        localization_server_node,
                         navigation_client_node,
                     ],
                 ),
