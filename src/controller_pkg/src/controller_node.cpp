@@ -2,6 +2,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "geometry_msgs/msg/twist.hpp"  
 #include "interfaces_pkg/msg/motor_health.hpp"
 #include "interfaces_pkg/srv/depositing_request.hpp"
 #include "interfaces_pkg/srv/excavation_request.hpp"
@@ -12,6 +13,8 @@
 
 const float VELOCITY_MAX = 2500.0;  // rpm, after gearbox turns into 11.1 RPM
 const float VIBRATOR_OUTPUT = 1.0f; // Constant value for vibrator output
+const float WHEEL_SEPARATION = 0.7f;  // Distance between wheels in meters - ADJUST THIS
+const float WHEEL_RADIUS = 0.1651f;  
 
 enum CAN_IDs
 {
@@ -75,7 +78,9 @@ public:
         vibrator_active_(false),
         prev_vibrator_button_(false),
         alternate_mode_active_(false),
-        prev_alternate_button_(false)
+        prev_alternate_button_(false),
+        nav2_control_active_(false), 
+        last_cmd_vel_time_(this->now())  
   {
     RCLCPP_INFO(this->get_logger(), "Begin Initializing Node");
 
@@ -165,6 +170,12 @@ public:
         "/health_topic", 10,
         std::bind(&ControllerNode::position_callback, this, std::placeholders::_1));
 
+    RCLCPP_INFO(this->get_logger(), "Initializing cmd_vel Subscription");
+    cmd_vel_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
+        "/cmd_vel", 10,
+        std::bind(&ControllerNode::cmd_vel_callback, this, std::placeholders::_1));
+    RCLCPP_INFO(this->get_logger(), "cmd_vel Subscription Initialized");
+
     RCLCPP_INFO(this->get_logger(), "Initializing depositing, excavation, and travel client");
     depositing_client_ = (this->create_client<interfaces_pkg::srv::DepositingRequest>("depositing_service"));
     excavation_client_ = (this->create_client<interfaces_pkg::srv::ExcavationRequest>("excavation_service"));
@@ -181,6 +192,10 @@ public:
     RCLCPP_INFO(this->get_logger(), "Timer Initialized");
 
     RCLCPP_INFO(this->get_logger(), "Node Initialization Complete");
+
+    cmd_vel_timeout_timer_ = this->create_wall_timer(
+    std::chrono::milliseconds(100),
+    std::bind(&ControllerNode::check_cmd_vel_timeout, this));
   }
 
 private:
@@ -198,6 +213,10 @@ private:
   rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr heartbeatPub;
   rclcpp::TimerBase::SharedPtr timer;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_subscriber_;
+  rclcpp::TimerBase::SharedPtr cmd_vel_timeout_timer_;
+  bool nav2_control_active_;
+  rclcpp::Time last_cmd_vel_time_;
 
   // Autonomy flag
   bool is_autonomy_active_ = false;
@@ -303,6 +322,66 @@ private:
    * @param joy_msg A subscription pointer to a joy interface topic.
    * @returns None
    */
+
+       // ADD: cmd_vel callback for Nav2 control
+void cmd_vel_callback(const geometry_msgs::msg::Twist::SharedPtr cmd_vel_msg)
+{
+    // Update timestamp
+    last_cmd_vel_time_ = this->now();
+    nav2_control_active_ = true;
+
+    // Extract linear and angular velocities
+    float linear_x = cmd_vel_msg->linear.x;   // m/s forward
+    float angular_z = cmd_vel_msg->angular.z; // rad/s rotation
+
+    // Convert to differential drive (left/right wheel velocities)
+    float v_left = linear_x - (angular_z * WHEEL_SEPARATION / 2.0f);
+    float v_right = linear_x + (angular_z * WHEEL_SEPARATION / 2.0f);
+
+    // Convert m/s to RPM
+    float rpm_left = (v_left / (2.0f * M_PI * WHEEL_RADIUS)) * 60.0f;
+    float rpm_right = (v_right / (2.0f * M_PI * WHEEL_RADIUS)) * 60.0f;
+
+    // Scale to motor RPM
+    const float GEARBOX_RATIO = 225.0f;
+    rpm_left *= GEARBOX_RATIO;
+    rpm_right *= GEARBOX_RATIO;
+
+    // NEGATE TO FIX DIRECTION
+    rpm_left = -rpm_left;
+    rpm_right = -rpm_right;
+
+    // Clamp to max velocity
+    rpm_left = std::clamp(rpm_left, -VELOCITY_MAX, VELOCITY_MAX);
+    rpm_right = std::clamp(rpm_right, -VELOCITY_MAX, VELOCITY_MAX);
+
+    // Send to motors
+    leftMotor.SetVelocity(rpm_left);
+    rightMotor.SetVelocity(rpm_right);
+
+    // Send heartbeats
+    leftMotor.Heartbeat();
+    rightMotor.Heartbeat();
+
+    RCLCPP_DEBUG(this->get_logger(), "cmd_vel: linear=%.2f, angular=%.2f -> L=%.0f, R=%.0f RPM",
+                 linear_x, angular_z, rpm_left, rpm_right);
+}
+    void check_cmd_vel_timeout()
+  {
+    if (nav2_control_active_)
+    {
+      auto time_since_last_cmd = this->now() - last_cmd_vel_time_;
+      if (time_since_last_cmd.seconds() > 0.5)  // 500ms timeout
+      {
+        // Stop motors if no recent cmd_vel
+        leftMotor.SetVelocity(0.0f);
+        rightMotor.SetVelocity(0.0f);
+        nav2_control_active_ = false;
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                             "cmd_vel timeout - stopping motors");
+      }
+    }
+  }
   void joy_callback(const sensor_msgs::msg::Joy::SharedPtr joy_msg)
   {
     if (joy_msg->axes.size() < 2 || joy_msg->buttons.size() < 17)
@@ -310,6 +389,8 @@ private:
       RCLCPP_WARN(this->get_logger(), "Insufficient axes/buttons in Joy message");
       return;
     }
+
+
 
     // HEARTBEAT SIGNALS
     try
@@ -329,6 +410,9 @@ private:
     // CANCEL AUTONOMY (B Button)
     if (joy_msg->buttons[Gp::Buttons::_B] > 0)
     {
+      nav2_control_active_ = false;
+      std::system("pkill -9 -f navigation_client");
+      
       std::system("pkill -9 -f depositing_node");
       std::system("pkill -9 -f excavation_node");
       std::system("pkill -9 -f odometry_node");
@@ -345,12 +429,21 @@ private:
 
     if (!triggersPressed)
     {
+      if (!nav2_control_active_)
+        {
+          leftMotor.SetDutyCycle(0.0f);
+          rightMotor.SetDutyCycle(0.0f);
+        }
       leftMotor.SetDutyCycle(0.0f);
       rightMotor.SetDutyCycle(0.0f);
       leftLift.SetDutyCycle(0.0f);
       rightLift.SetDutyCycle(0.0f);
       tilt.SetDutyCycle(0.0f);
       return;
+    }
+    if (triggersPressed)
+    {
+      nav2_control_active_ = false;
     }
 
     //----------EXCAVATION SYSTEM----------//
