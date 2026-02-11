@@ -480,8 +480,8 @@ void cmd_vel_callback(const geometry_msgs::msg::Twist::SharedPtr cmd_vel_msg)
       }
       tilt.SetDutyCycle(tilt_duty);
 
-      const float HIGH_PASS_FILTER = 0.4; // 0.38 position units
-      const float KP_LIFT = 9.0f; // Proportional gain
+      const float HIGH_PASS_FILTER = 0.38; // 0.38 position units
+      const float KP_LIFT = 8.0f; // Proportional gain
       //...
 
       // LIFT ACTUATOR (D pad up and down)
