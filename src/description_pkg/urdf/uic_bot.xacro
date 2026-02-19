@@ -199,7 +199,8 @@
   <joint name="base_d455_joint" type="fixed">
     <parent link="base_link" />
     <child link="d455_link" />
-    <origin xyz="-0.42 0 0.37" rpy="0 0.523599 3.14" />
+    <origin xyz="-0.556 0.032 0.464" rpy="0 0 3.14159" />
+    <!-- Note: rpy has yaw=π (180°) to face backward, pitch=25° down = 0.436 rad -->
   </joint>
 
   <joint name="d455_optical_joint" type="fixed">
@@ -211,7 +212,7 @@
   <joint name="base_d456_joint" type="fixed">
     <parent link="base_link" />
     <child link="d456_link" />
-    <origin xyz="0.535 -0.28 0.141" rpy="0 0 0" />
+    <origin xyz="0.457 -0.289 0.210" rpy="0 0 0" />
   </joint>
 
   <joint name="d456_optical_joint" type="fixed">
@@ -223,7 +224,7 @@
   <joint name="base_s3_lidar_joint" type="fixed">
     <parent link="base_link" />
     <child link="s3_lidar_link" />
-    <origin xyz="-0.38 -0.0889 0.2811" rpy="0 0 0" />
+    <origin xyz="-0.38 0.102 0.470" rpy="0 0 0"/>
   </joint>
 
   <joint name="imu_joint" type="fixed">

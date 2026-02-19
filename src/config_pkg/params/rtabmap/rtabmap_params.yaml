@@ -1,6 +1,6 @@
 rtabmap:
   ros__parameters:
-    Grid/CellSize: "0.02"
+    Grid/CellSize: "0.05"
     Grid/MaxGroundAngle: "30"
     Grid/MinClusterSize: "30"
     Grid/Sensor: "2"
@@ -24,7 +24,7 @@ rtabmap:
     RGBD/OdomVarianceGuess: "false"
     RGBD/OdomCorrection: "true"
     RGBD/ProximityOdomGuess: "false"
-    RGBD/OptimizeMaxError: "0.3"
+    RGBD/OptimizeMaxError: "3.0"
     RGBD/NeighborLinkRefining: "true"
     RGBD/OptimizeFromGraphEnd: "false"
     RGBD/StartAtOrigin: "true"
@@ -33,9 +33,9 @@ rtabmap:
     RGBD/LinearSpeedUpdate: "0.02"
     RGBD/AngularSpeedUpdate: "0.002"
     RGBD/CreateOccupancyGrid: "true"
-    RGBD/MarkerDetection: "true"
+    RGBD/MarkerDetection: "false"
     Marker/Dictionary: "20"
-    Marker/Length: "0.3125"
+    Marker/Length: "0.1651"
     Rtabmap/StartNewMapOnGoodSignature: "false"
     Rtabmap/DetectionRate: "15"
     Rtabmap/OdomGuessRatio: "0.2"

@@ -115,8 +115,8 @@ function publishGamepadMessage() {
 
 const listener = new ROSLIB.Topic({
     ros: ROS,
-    name: '/rs_node/camera1/compressed_video',
-    messageType: 'sensor_msgs/CompressedImage'
+    name: 'rgb_cam1/compressed',
+    messageType: 'sensor_msgs/msg/CompressedImage'
 });
 
 listener.subscribe((message)=>{

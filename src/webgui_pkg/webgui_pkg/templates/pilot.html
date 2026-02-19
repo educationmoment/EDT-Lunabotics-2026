@@ -41,15 +41,14 @@
 </head>
 <body>
     <img id="pride" src="{{url_for('static', filename='images/chicago_flag.jpg')}}">
-    <div id="camera-frame">
+    <div id="camera-wrapper">
         
             
             <!-- Camera Feed -->
             <!-- NOTE: Using a canvas element may bee better -->
             <button onclick="toggleFullscreen()" class="fullscreen-button">🔳 Fullscreen</button>
-            <img id="main-camera-frame" class="camera-frame" />
+            <img id="camera-output" />
     </div>
-    <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
 </body>
 </html>
 

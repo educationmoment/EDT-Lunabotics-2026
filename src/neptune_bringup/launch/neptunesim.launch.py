@@ -289,12 +289,17 @@ def generate_launch_description():
         executable="lifecycle_manager",
         name="lifecycle_manager_navigation",
         output="screen",
-        parameters=[{"autostart": True}, {"node_names": [
-            "controller_server",
-            "planner_server",
-            "behavior_server",
-            "bt_navigator",
-        ]}, {"node_timeout": 10.0}],
+        parameters=[
+            {"use_sim_time": True},
+            {"autostart": True},
+            {"node_timeout": 60.0},
+            {"node_names": [
+                "controller_server",
+                "planner_server",
+                "behavior_server",
+                "bt_navigator",
+            ]},
+        ],
     )
 
     joy_node = Node(

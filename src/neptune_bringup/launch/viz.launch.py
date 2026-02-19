@@ -106,9 +106,10 @@ def generate_launch_description():
         ),
         launch_arguments={
             "gui": LaunchConfiguration("sim_gui"),
+            "world": world_file,
         }.items(),
     )
-    #    "world": world_file,
+    #  "world": world_file,
 
     spawn_robot_node = Node(
         package="gazebo_ros",

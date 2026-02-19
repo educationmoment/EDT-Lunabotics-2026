@@ -9,12 +9,14 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- Add dependencies -->
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>sparkcan</depend>
   <depend>interfaces_pkg</depend>
+
+  <!-- ✅ Add this -->
+  <depend>rosidl_typesupport_cpp</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
@@ -23,4 +25,3 @@
     <build_type>ament_cmake</build_type>
   </export>
 </package>
-

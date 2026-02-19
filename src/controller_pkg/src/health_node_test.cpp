@@ -20,7 +20,6 @@ public:
         health_publisher_ = this->create_publisher<interfaces_pkg::msg::MotorHealth>(
             "health_topic", 10);
 
-        // declare + get parameter
         int health_rate_hz = this->declare_parameter<int>("health_rate_hz", 100); // default 100 Hz
         auto period = std::chrono::microseconds(1'000'000 / health_rate_hz);
 
@@ -35,14 +34,12 @@ private:
     SparkMax rightLift;
     SparkMax tilt;
     SparkMax vibrator;
-    //Motor controllers
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<interfaces_pkg::msg::MotorHealth>::SharedPtr health_publisher_;   
 
     void status_monitoring(){
         auto msg = interfaces_pkg::msg::MotorHealth();
 
-        //Left Motor Monitoring
         try{
             msg.left_motor_velocity = leftMotor.GetVelocity();
             msg.left_motor_current = leftMotor.GetCurrent();
@@ -52,9 +49,7 @@ private:
         } catch (const std::exception & ex) {
             RCLCPP_ERROR(this->get_logger(), "ERROR: Could not gain readings from left motor, %s", ex.what());
         } 
-        //Left Motor Monitoring
 
-        //Right Motor Monitoring
         try{
             msg.right_motor_velocity = rightMotor.GetVelocity();
             msg.right_motor_current = rightMotor.GetCurrent();
@@ -64,9 +59,7 @@ private:
         } catch (const std::exception & ex) {
             RCLCPP_ERROR(this->get_logger(), "ERROR: Could not gain readings from right motor, %s", ex.what());
         } 
-        //Right motor monitoring
 
-        //Left Lift Monitoring
         try{
             msg.left_lift_position = leftLift.GetPosition();
             msg.left_lift_current = leftLift.GetCurrent();
@@ -74,9 +67,7 @@ private:
         } catch (const std::exception & ex) {
             RCLCPP_ERROR(this->get_logger(), "ERROR: Could not gain readings from left lift, %s", ex.what());
         } 
-        //Left lift monitoring
 
-        //Right Lift Monitoring
         try{
             msg.right_lift_position = rightLift.GetPosition();
             msg.right_lift_current = rightLift.GetCurrent();
