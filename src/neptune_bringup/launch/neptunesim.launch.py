@@ -123,8 +123,8 @@ def generate_launch_description():
                 "frame_id": "base_link",
                 "map_frame_id": "map",
                 "odom_frame_id": "odom",
-                "publish_tf": False,
-                "publish_tf_odom": False,
+                "publish_tf": True,
+                "publish_tf_odom": True,
                 "database_path": "",
                 "approx_sync": True,
                 "sync_queue_size": 1000,
@@ -143,6 +143,16 @@ def generate_launch_description():
         arguments=["--ros-args", "--log-level", "error"],
     )
 
+    scan2_relay_node = Node(
+        package="topic_tools",
+        executable="relay",
+        name="scan2_relay",
+        parameters=[{
+            "input_topic": "/scan2",
+            "output_topic": "/scan",
+    }],
+    )
+
     icp_odometry_node = Node(
         package="rtabmap_odom",
         executable="icp_odometry",
@@ -151,7 +161,7 @@ def generate_launch_description():
             {
                 "frame_id": "base_link",
                 "odom_frame_id": "odom",
-                "publish_tf": True,
+                "publish_tf": False,
                 "guess_from_tf": True,
                 "approx_sync": True,
                 "Reg/Strategy": "1",
@@ -379,7 +389,8 @@ def generate_launch_description():
                         ukf_node,
                         s3_filter_node,
                         s2l_filter_node,
-                        icp_odometry_node,
+                        scan2_relay_node,
+                        #icp_odometry_node,
                         rf2o_odometry_node,
                     ],
                 ),
@@ -413,20 +424,21 @@ def generate_launch_description():
                 TimerAction(
                     period=3.0,
                     actions=[
-                        excavation_server_node,
-                        #localization_server_node,
+                        #excavation_server_node,
+                        localization_server_node,
                         navigation_client_node,
                     ],
                 ),
                 TimerAction(
                     period=5.0,
                     actions=[
-                        icp_odometry_node,
+                        #icp_odometry_node,
                         rf2o_odometry_node,
                         ukf_node,
                         slam_node,
                         s3_filter_node,
                         s2l_filter_node,
+                        scan2_relay_node,
                     ],
                 ),
                 TimerAction(

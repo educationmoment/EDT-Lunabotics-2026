@@ -42,8 +42,9 @@ def generate_launch_description():
     urdf_file = os.path.join(
         get_package_share_directory("description_pkg"), 
         "urdf", 
-        "uic_bot.xacro"  # adjust path as needed
+        "uic_bot.xacro"  
     )
+
 
     robot_description = xacro.process_file(urdf_file, mappings={'use_sim': 'false'}).toxml()
 

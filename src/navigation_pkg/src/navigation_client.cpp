@@ -49,8 +49,14 @@ private:
     // Adjust these for your field layout
     struct GoalXY { double x; double y; };
     const std::array<GoalXY, 1> goals_{{
-        {0.0, 3.0},  // 3 meters forward from start
+        {5.15655, 2.29728},  // 3 meters forward from start
     }};
+
+    // ksc:
+    //   x: 5.156559944152832
+    //    y: 2.29728364944458
+
+    //ucf
 
     bool localization_in_progress_;
     bool localized_;

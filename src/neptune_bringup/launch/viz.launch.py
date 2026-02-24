@@ -4,15 +4,16 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.substitutions import Command, LaunchConfiguration
-from launch.conditions import LaunchConfigurationEquals, LaunchConfigurationNotEquals
+from launch.conditions import LaunchConfigurationEquals
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_xml.launch_description_sources import XMLLaunchDescriptionSource
+from launch_ros.parameter_descriptions import ParameterValue
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     SetLaunchConfiguration,
     OpaqueFunction,
     GroupAction,
+    TimerAction,
 )
 
 
@@ -33,23 +34,27 @@ def set_orientation(context, *args, **kwargs):
 
 def set_robot_description(context, *args, **kwargs):
     config_dir = get_package_share_directory("description_pkg")
-
     urdf_file = os.path.join(config_dir, "urdf", "uic_bot.xacro")
     return [
         SetLaunchConfiguration(
-            "robot_description", Command(["xacro ", urdf_file, " use_sim:=", LaunchConfiguration("use_sim")])
+            "robot_description",
+            Command(["xacro ", urdf_file, " use_sim:=", LaunchConfiguration("use_sim")])
         )
+  
     ]
 
 
+
+
 def generate_launch_description():
+
     sim_dir = get_package_share_directory("sim_pkg")
     config_dir = get_package_share_directory("config_pkg")
 
     rviz_config_file = os.path.join(config_dir, "rviz", "robot_view.rviz")
 
     world_file = os.path.join(
-        sim_dir, "worlds", "high_resolution", "artemis", "artemis_arena2.world"
+        sim_dir, "worlds", "low_resolution", "artemis", "artemis_arena2.world"
     )
 
     declare_use_sim = DeclareLaunchArgument(
@@ -62,7 +67,7 @@ def generate_launch_description():
         "robot_heading",
         default_value="east",
         choices=["north", "east", "south", "west", "random"],
-        description="Sets the starting orientation of the robot. Choose a cardinal direction ('north', 'east', 'south', 'west') or 'random' for a randomized orientation.",
+        description="Sets the starting orientation of the robot.",
     )
 
     declare_viz_type = DeclareLaunchArgument(
@@ -76,7 +81,7 @@ def generate_launch_description():
         "sim_gui",
         default_value="true",
         choices=["true", "false"],
-        description="Sets whether to open Gazebo with its GUI. 'true' opens the GUI, while 'false' runs Gazebo in headless mode.",
+        description="Sets whether to open Gazebo with its GUI.",
     )
 
     rviz_launch = Node(
@@ -87,16 +92,9 @@ def generate_launch_description():
         condition=LaunchConfigurationEquals("viz_type", "rviz"),
     )
 
-   # foxglove_bridge_launch = IncludeLaunchDescription(
-      #  XMLLaunchDescriptionSource(
-      #      os.path.join(
-     #           get_package_share_directory("foxglove_bridge"),
-     #           "launch",
-     #           "foxglove_bridge_launch.xml",
-     #       )
-    #    ),
-   #     condition=LaunchConfigurationEquals("viz_type", "foxglove"),
-   # )
+
+
+
 
     sim_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -109,24 +107,17 @@ def generate_launch_description():
             "world": world_file,
         }.items(),
     )
-    #  "world": world_file,
 
     spawn_robot_node = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
         arguments=[
-            "-topic",
-            "robot_description",
-            "-entity",
-            "uic_bot",
-            "-x",
-            "2.5",
-            "-y",
-            "1.6",
-            "-Y",
-            LaunchConfiguration("robot_heading"),
-            "-z",
-            "0.35",
+            "-topic", "robot_description",
+            "-entity", "uic_bot",
+            "-x", "2.5",
+            "-y", "1.6",
+            "-Y", LaunchConfiguration("robot_heading"),
+            "-z", "0.35",
         ],
         output="screen",
     )
@@ -137,21 +128,24 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                "robot_description": LaunchConfiguration(
-                    "robot_description"
+                "robot_description": ParameterValue(
+                    LaunchConfiguration("robot_description"),
+                    value_type=str
                 ),
                 "use_sim_time": LaunchConfiguration("use_sim"),
             }
         ],
     )
 
+
+
+
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=[
             "joint_state_broadcaster",
-            "--controller-manager",
-            "/controller_manager",
+            "--controller-manager", "/controller_manager",
         ],
     )
 
@@ -160,15 +154,14 @@ def generate_launch_description():
         executable="spawner",
         arguments=[
             "diff_drive_controller",
-            "--controller-manager",
-            "/controller_manager",
+            "--controller-manager", "/controller_manager",
         ],
     )
 
     joint_state_publisher_node = Node(
         package="joint_state_publisher",
         executable="joint_state_publisher",
-        parameters=[{"use_sim_time": False}],
+        parameters=[{"use_sim_time": True}],
     )
 
     ld = LaunchDescription()
@@ -182,7 +175,6 @@ def generate_launch_description():
     ld.add_action(OpaqueFunction(function=set_robot_description))
 
     ld.add_action(rviz_launch)
-    #ld.add_action(foxglove_bridge_launch)
     ld.add_action(robot_state_publisher)
 
     ld.add_action(
@@ -190,8 +182,10 @@ def generate_launch_description():
             actions=[
                 sim_launch,
                 spawn_robot_node,
-                joint_state_broadcaster_spawner,
-                diff_drive_controller_spawner,
+                TimerAction(period=5.0, actions=[
+                    joint_state_broadcaster_spawner,
+                    diff_drive_controller_spawner,
+                ]),
             ],
             condition=LaunchConfigurationEquals("use_sim", "true"),
         )

@@ -24,7 +24,7 @@ rtabmap:
     RGBD/OdomVarianceGuess: "false"
     RGBD/OdomCorrection: "true"
     RGBD/ProximityOdomGuess: "false"
-    RGBD/OptimizeMaxError: "3.0"
+    RGBD/OptimizeMaxError: "0.5"
     RGBD/NeighborLinkRefining: "true"
     RGBD/OptimizeFromGraphEnd: "false"
     RGBD/StartAtOrigin: "true"
