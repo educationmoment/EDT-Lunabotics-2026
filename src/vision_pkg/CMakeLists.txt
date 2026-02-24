@@ -22,6 +22,8 @@ include_directories(include)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+
+
 install(TARGETS
   rs_camera_node
   DESTINATION lib/${PROJECT_NAME}

@@ -1,4 +1,5 @@
 import os
+import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
@@ -37,6 +38,15 @@ def generate_launch_description():
     s3_params_file = os.path.join(
         config_dir, "params", "laser_filters", "s3_params.yaml"
     )
+
+    urdf_file = os.path.join(
+        get_package_share_directory("description_pkg"), 
+        "urdf", 
+        "uic_bot.xacro"  
+    )
+
+
+    robot_description = xacro.process_file(urdf_file, mappings={'use_sim': 'false'}).toxml()
 
     declare_robot_mode = DeclareLaunchArgument(
         "robot_mode", default_value="manual", choices=["manual", "auto"]
@@ -84,7 +94,10 @@ def generate_launch_description():
         name="rtabmap",
         output="screen",
         parameters=[
+            rtabmap_params_file,
             {
+                "publish_tf": True,
+                "publish_tf_odom": False,
                 "use_sim_time": False,
                 "rgbd_cameras": 2,
                 "subscribe_depth": False,
@@ -95,24 +108,39 @@ def generate_launch_description():
                 "frame_id": "base_link",
                 "map_frame_id": "map",
                 "odom_frame_id": "odom",
-                "publish_tf": False,
-                "publish_tf_odom": False,
+                "odom_topic": "/odometry/filtered",
                 "database_path": "",
                 "approx_sync": True,
                 "sync_queue_size": 1000,
                 "subscribe_scan_cloud": False,
                 "subscribe_scan": True,
-                "wait_imu_to_init": True,
+                "wait_imu_to_init": False,
                 "imu_topic": "/oak_d/imu/data",
             },
-            rtabmap_params_file,
         ],
         remappings=[
             ("rgbd_image0", "/d456/rgbd_image"),
             ("rgbd_image1", "/d455/rgbd_image"),
             ("scan", "/scan"),
         ],
-        arguments=["--ros-args", "--log-level", "error"],
+        arguments=["--ros-args", "--log-level", "warn"],
+    )
+    robot_state_publisher_node = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        output="screen",
+        parameters=[{
+            "robot_description": robot_description,
+            "use_sim_time": False,
+        }],
+    )
+    joint_state_publisher_node = Node(
+        package="joint_state_publisher",
+        executable="joint_state_publisher",
+        output="screen",
+        parameters=[{
+            "use_sim_time": False,
+        }],
     )
 
     icp_odometry_node = Node(
@@ -123,7 +151,8 @@ def generate_launch_description():
             {
                 "frame_id": "base_link",
                 "odom_frame_id": "odom",
-                "publish_tf": True,
+                "publish_tf": False,
+                "wait_for_transform": 0.2,
                 "approx_sync": True,
                 "Reg/Strategy": "1",
                 "Odom/Strategy": "1",
@@ -204,6 +233,7 @@ def generate_launch_description():
                 "publish_tf": False,
                 "base_frame_id": "base_link",
                 "odom_frame_id": "odom",
+                "laser_frame_id": "s3_lidar_link",
                 "init_pose_from_topic": "",
                 "freq": 20.0,
             }
@@ -222,6 +252,7 @@ def generate_launch_description():
             },
             ukf_params_file,
         ],
+        
     )
     controller_server_node = Node(
         package="nav2_controller",
@@ -264,7 +295,8 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {"autostart": True},
-            {"node_timeout": 10.0},
+            {"node_timeout": 20.0},
+            {"bond_timeout": 8.0},
             {"node_names": [
                 "controller_server",
                 "planner_server",
@@ -362,13 +394,14 @@ def generate_launch_description():
       
         output="screen",
     )
-    base_to_s3_lidar_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="base_to_s3_lidar_tf",
-        arguments=["0.0", "-0.1", "0.25", "0", "0", "0", "base_link", "s3_lidar_link"],
-    )
-
+    #
+    #base_to_s3_lidar_tf = Node(
+    #    package="tf2_ros",
+    #    executable="static_transform_publisher",
+    #    name="base_to_s3_lidar_tf",
+    #    arguments=["-0.38", "-0.0889", "0.2811", "0", "0", "0", "base_link", "s3_lidar_link"],
+    #)
+    
 
 
     d455_launch = IncludeLaunchDescription(
@@ -447,32 +480,33 @@ def generate_launch_description():
         ],
     )
 
+
     imu_rotator_node = Node(package="util_pkg", executable="imu_rotator")
-    actuator_node = Node(package="util_pkg", executable="actuator_position")
+ #   actuator_node = Node(package="util_pkg", executable="actuator_position")
 
 
     
 
-#    map_to_odom_tf = Node(
- #       package="tf2_ros",
- #       executable="static_transform_publisher",
- #       name="map_to_odom_tf",
- #       arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
- #   )
+    # map_to_odom_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="map_to_odom_tf",
+    #     arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
+    # )
 
-    base_to_d455_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="base_to_d455_tf",
-        arguments=["0.42", "0", "0.37", "0", "-0.523599", "0", "base_link", "d455_link"],
-    )
+    #base_to_d455_tf = Node(
+     #   package="tf2_ros",
+     #   executable="static_transform_publisher",
+     #   name="base_to_d455_tf",
+     #   arguments=["0.39", "0", "0.34", "0", "-0.523599", "0", "base_link", "d455_link"],
+    #)
 
-    base_to_d456_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="base_to_d456_tf",
-        arguments=["0.535", "-0.28", "0.141", "0", "0", "0", "base_link", "d456_link"],
-    )
+    #base_to_d456_tf = Node(
+   #     package="tf2_ros",
+    #    executable="static_transform_publisher",
+    #    name="base_to_d456_tf",
+   #     arguments=["0.535", "-0.28", "0.141", "0", "0", "0", "base_link", "d456_link"],
+   # )
 
 
     hardware_controller_module = Node(
@@ -541,20 +575,22 @@ def generate_launch_description():
     ld = LaunchDescription()
     ld.add_action(declare_robot_mode)
     ld.add_action(s3_lidar_node)
-    ld.add_action(base_to_s3_lidar_tf)
+    ld.add_action(robot_state_publisher_node)
+    ld.add_action(joint_state_publisher_node)
+    #ld.add_action(base_to_s3_lidar_tf)
     ld.add_action(d455_launch)
     ld.add_action(d456_launch)
     ld.add_action(rgbd_sync1_node)
     ld.add_action(rgbd_sync2_node)
     ld.add_action(imu_rotator_node)
-    ld.add_action(actuator_node)
+    #ld.add_action(actuator_node)
     ld.add_action(d455_imu_filter)
     ld.add_action(d456_imu_filter) 
     ld.add_action(apriltag_d455_node)
     ld.add_action(apriltag_d456_node)
     #ld.add_action(map_to_odom_tf)
-    ld.add_action(base_to_d455_tf) 
-    ld.add_action(base_to_d456_tf) 
+    #ld.add_action(base_to_d455_tf) 
+    #ld.add_action(base_to_d456_tf) 
     #ld.add_action(controller_teleop_node)
     ld.add_action(hardware_controller_module)
     ld.add_action(depositing_module)
@@ -570,8 +606,8 @@ def generate_launch_description():
                 TimerAction(
                     period=2.0,
                     actions=[
-                        icp_odometry_node,
-                        rgbd_odometry_node,
+                        #icp_odometry_node,
+                        #rgbd_odometry_node,
                         rf2o_odometry_node,
                         ukf_node,
                     ],
@@ -609,16 +645,16 @@ def generate_launch_description():
                     ],
                 ),
                 TimerAction(
-                    period=5.0,
+                    period=6.0,
                     actions=[
-                        icp_odometry_node,
+                        #icp_odometry_node,
                         rf2o_odometry_node,
                         ukf_node,
                         slam_node,
                     ],
                 ),
                 TimerAction(
-                    period=7.0,
+                    period=20.0,
                     actions=[
                         controller_server_node,
                         planner_server_node,

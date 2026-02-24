@@ -23,7 +23,7 @@
 // #include "SparkMax.hpp"
 
 #define WEBCAM_ONE_PATH "/dev/video6"
-#define WEBCAM_TWO_PATH "/dev/video8"
+#define WEBCAM_TWO_PATH "/dev/video7"
 
 using namespace std::chrono_literals;
 

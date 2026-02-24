@@ -1,55 +1,2081 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Pilot Control Interface</title>
-    <link rel="stylesheet" href="../static/css/pilot.css"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dev portal</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;700&display=swap');
+:root {
+  --bg:#06080b; --surface:#0b0f14; --surface2:#0f1520;
+  --border:#162030; --border2:#1e3050;
+  --accent:#0af; --accent2:#0fc; --warn:#f80; --danger:#f24; --ok:#0f8;
+  --dim:#3a5060; --text:#9bb8cc; --bright:#def0ff;
+  --mono:'JetBrains Mono',monospace; --ui:'Rajdhani',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--ui);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
 
-    <!-- loadyourstuff -->
-    <script src="{{url_for('static', filename='js/resources/roslib.min.js')}}"></script>
-    <script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
-    <script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
-    <script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
-    <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
+/* ── TOPBAR ── */
+.topbar{height:44px;background:rgba(0,0,0,.65);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:16px;flex-shrink:0;}
+.logo{font-size:15px;font-weight:700;letter-spacing:5px;color:var(--bright);text-transform:uppercase;white-space:nowrap;}
+.logo span{color:var(--accent);}
+.vsep{width:1px;height:24px;background:var(--border2);}
+.conn-status{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;letter-spacing:1px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:all .3s;}
+.dot.ok{background:var(--ok);box-shadow:0 0 6px var(--ok);animation:blink 2s infinite;}
+.dot.err{background:var(--danger);box-shadow:0 0 6px var(--danger);animation:blink .5s infinite;}
+.dot.warn{background:var(--warn);box-shadow:0 0 6px var(--warn);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.ws-input{background:var(--surface2);border:1px solid var(--border2);color:var(--accent);font-family:var(--mono);font-size:10px;padding:4px 8px;width:175px;outline:none;}
+.ws-input:focus{border-color:var(--accent);}
+.tbtn{background:rgba(0,170,255,.1);border:1px solid var(--accent);color:var(--accent);font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:2px;padding:4px 12px;cursor:pointer;transition:all .15s;text-transform:uppercase;white-space:nowrap;}
+.tbtn:hover{background:rgba(0,170,255,.25);}
+.tbtn.green{background:rgba(0,255,136,.08);border-color:var(--ok);color:var(--ok);}
+.tbtn.green:hover{background:rgba(0,255,136,.2);}
+.clock{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:2px;white-space:nowrap;}
 
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            background-color: black;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
+/* ── MAIN GRID: 4 cols, 2 rows ── */
+.main{flex:1;display:grid;grid-template-columns:1fr 1fr 1fr 290px;grid-template-rows:1fr 1fr 280px;gap:1px;background:var(--border);overflow:hidden;min-height:0;}
+.panel{background:var(--surface);display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:5px 11px;background:rgba(0,0,0,.45);border-bottom:1px solid var(--border);flex-shrink:0;gap:6px;}
+.ph-title{font-size:10px;font-weight:600;letter-spacing:3px;color:var(--accent);text-transform:uppercase;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.ph-title::before{content:'';width:2px;height:10px;background:var(--accent);flex-shrink:0;}
+.ph-tag{font-family:var(--mono);font-size:8px;padding:2px 5px;border:1px solid var(--border2);color:var(--dim);letter-spacing:1px;border-radius:2px;white-space:nowrap;}
+.ph-tag.live{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,.05);}
+.ph-tag.warn{border-color:var(--warn);color:var(--warn);}
+.ph-tag.dead{border-color:var(--danger);color:var(--danger);}
 
-        #main-camera-frame {
-            height: auto;
-            width: 100vw;
-        }
-        #camera-frame {
-            width: 100vw;
-            height: 100vh;
+/* ── CAMERA PANELS ── */
+.cam-wrap{flex:1;position:relative;background:#020406;overflow:hidden;min-height:0;cursor:crosshair;}
+.cam-img{width:100%;height:100%;object-fit:cover;display:block;image-rendering:crisp-edges;}
+.cam-canvas{position:absolute;inset:0;width:100%;height:100%;}
+.cam-overlay{position:absolute;inset:0;pointer-events:none;}
+.corner{position:absolute;width:14px;height:14px;border-color:rgba(0,170,255,.45);border-style:solid;}
+.c-tl{top:8px;left:8px;border-width:1px 0 0 1px}.c-tr{top:8px;right:8px;border-width:1px 1px 0 0}
+.c-bl{bottom:8px;left:8px;border-width:0 0 1px 1px}.c-br{bottom:8px;right:8px;border-width:0 1px 1px 0}
+.cam-label{position:absolute;bottom:8px;left:10px;font-family:var(--mono);font-size:9px;color:rgba(0,170,255,.6);letter-spacing:1px;}
+.cam-rec{position:absolute;top:8px;right:10px;font-family:var(--mono);font-size:9px;color:var(--danger);display:flex;align-items:center;gap:4px;}
+.rec-dot{width:5px;height:5px;border-radius:50%;background:var(--danger);animation:blink 1s infinite;}
+.cam-fps{position:absolute;top:8px;left:10px;font-family:var(--mono);font-size:9px;color:rgba(0,255,200,.6);}
+/* Camera tab strip */
+.cam-tabs{display:flex;gap:1px;background:var(--border);flex-shrink:0;}
+.cam-tab{flex:1;padding:5px 6px;background:var(--surface2);border:none;color:var(--dim);font-family:var(--mono);font-size:9px;cursor:pointer;transition:all .12s;letter-spacing:1px;text-align:center;}
+.cam-tab:hover{background:rgba(0,170,255,.08);color:var(--text);}
+.cam-tab.active{background:rgba(0,170,255,.12);color:var(--accent);box-shadow:inset 0 -2px var(--accent);}
 
-            justify-content: center;
-            align-items: center;
-        }
-        .hidden {
-            display: none !important;
-        }
-    </style>
+/* ── MOTOR HEALTH ── */
+.health-grid{flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);overflow:auto;min-height:0;}
+.motor-card{background:var(--surface2);padding:7px 9px;display:flex;flex-direction:column;gap:3px;}
+.mc-title{font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:2px;}
+.mc-row{display:flex;justify-content:space-between;align-items:baseline;}
+.mc-label{font-size:9px;color:var(--dim);letter-spacing:1px;}
+.mc-val{font-family:var(--mono);font-size:11px;color:var(--text);transition:color .3s;}
+.mc-val.hi{color:var(--warn);}.mc-val.crit{color:var(--danger);}.mc-val.good{color:var(--ok);}
+.bar-track{height:2px;background:var(--border);border-radius:1px;margin-top:3px;}
+.bar-fill{height:100%;border-radius:1px;transition:width .3s;background:var(--accent);}
+.bar-fill.warn{background:var(--warn);}.bar-fill.crit{background:var(--danger);}
+
+/* ── TELEMETRY ── */
+.telem-body{flex:1;display:flex;flex-direction:column;gap:1px;overflow:auto;min-height:0;}
+.telem-row{display:flex;align-items:stretch;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tc{flex:1;padding:7px 10px;background:var(--surface2);}
+.tc+.tc{border-left:1px solid var(--border);}
+.tc-label{font-size:8px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;}
+.tc-val{font-family:var(--mono);font-size:16px;color:var(--bright);line-height:1.15;margin-top:1px;}
+.tc-val.accent{color:var(--accent);}.tc-val.ok{color:var(--ok);}.tc-val.warn{color:var(--warn);}.tc-val.danger{color:var(--danger);}
+.tc-unit{font-size:9px;color:var(--dim);margin-left:2px;}
+
+/* ── BANDWIDTH ── */
+.bw-body{padding:9px 11px;flex:1;display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden;}
+.bw-stats{display:flex;gap:14px;flex-shrink:0;}
+.bw-stat{display:flex;flex-direction:column;gap:1px;}
+.bw-stat-label{font-size:8px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;}
+.bw-stat-val{font-family:var(--mono);font-size:13px;}
+.bw-graph{flex:1;background:rgba(0,0,0,.3);border:1px solid var(--border);min-height:36px;overflow:hidden;position:relative;}
+.bw-graph canvas{position:absolute;inset:0;width:100%;height:100%;}
+
+/* ── RIGHT PANEL ── */
+.right{grid-column:4;grid-row:1/4;display:flex;flex-direction:column;gap:1px;background:var(--border);overflow-y:auto;min-height:0;}
+.ctrl-section{background:var(--surface);padding:9px 11px;flex-shrink:0;}
+.cs-title{font-size:9px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;gap:7px;}
+.cs-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Buttons */
+.btn{width:100%;padding:7px 10px;border:1px solid var(--border2);background:rgba(0,170,255,.04);color:var(--text);font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .15s;margin-bottom:4px;text-align:left;display:flex;align-items:center;gap:7px;position:relative;overflow:hidden;}
+.btn::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent);opacity:0;transition:.15s;}
+.btn:hover{background:rgba(0,170,255,.1);border-color:var(--accent);color:var(--bright);}
+.btn:hover::before{opacity:1;}
+.btn:active{transform:scale(.99);}
+.btn:last-child{margin-bottom:0;}
+.btn.primary{background:rgba(0,170,255,.1);border-color:var(--accent);color:var(--accent);}
+.btn.success{background:rgba(0,255,136,.08);border-color:var(--ok);color:var(--ok);}
+.btn.success::before{background:var(--ok);}
+.btn.warn-btn{background:rgba(255,136,0,.08);border-color:var(--warn);color:var(--warn);}
+.btn.warn-btn::before{background:var(--warn);}
+.btn.danger-btn{background:rgba(255,34,68,.08);border-color:var(--danger);color:var(--danger);}
+.btn.danger-btn::before{background:var(--danger);}
+.btn.nav-active{background:rgba(0,255,136,.1);border-color:var(--ok);color:var(--ok);animation:navpulse 2s infinite;}
+.btn.rviz-btn{background:rgba(120,80,255,.1);border-color:#a070ff;color:#c0a0ff;}
+.btn.rviz-btn::before{background:#a070ff;}
+.btn.rviz-btn:hover{background:rgba(120,80,255,.2);}
+@keyframes navpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,.3)}50%{box-shadow:0 0 8px 2px rgba(0,255,136,.15)}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,170,255,.4)}100%{box-shadow:0 0 0 12px rgba(0,170,255,0)}}
+.btn.flash{animation:pulse .35s ease;}
+
+/* Navigation goal input */
+.nav-goal-row{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;}
+.nav-input{background:var(--surface2);border:1px solid var(--border2);color:var(--accent2);font-family:var(--mono);font-size:11px;padding:5px 7px;width:100%;outline:none;text-align:center;}
+.nav-input:focus{border-color:var(--accent2);}
+.nav-input-label{font-size:8px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:2px;}
+.nav-status-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);margin-bottom:6px;font-family:var(--mono);font-size:10px;}
+.nav-dist{margin-left:auto;color:var(--dim);font-size:10px;}
+
+/* Mode toggle */
+.mode-row{display:flex;border:1px solid var(--border2);margin-bottom:7px;overflow:hidden;}
+.mode-btn{flex:1;padding:7px 4px;background:transparent;border:none;color:var(--dim);font-family:var(--ui);font-size:10px;font-weight:600;letter-spacing:1px;cursor:pointer;transition:all .15s;text-transform:uppercase;}
+.mode-btn.active{background:rgba(0,170,255,.12);color:var(--accent);box-shadow:inset 0 -2px var(--accent);}
+.mode-btn:hover:not(.active){background:rgba(255,255,255,.04);color:var(--text);}
+
+/* Keys */
+.keys-grid{display:grid;grid-template-columns:repeat(3,34px);gap:3px;justify-content:center;margin:0 auto;}
+.key{width:34px;height:34px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--dim);cursor:pointer;transition:all .1s;user-select:none;}
+.key:hover,.key.active{background:rgba(0,170,255,.12);border-color:var(--accent);color:var(--accent);box-shadow:0 0 8px rgba(0,170,255,.2);}
+.key.ghost{background:transparent;border-color:transparent;cursor:default;}
+
+/* Service badges */
+.svc-badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:2px;border:1px solid var(--border2);color:var(--dim);}
+.svc-badge.ok{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,.05);}
+.svc-badge.busy{border-color:var(--warn);color:var(--warn);background:rgba(255,136,0,.05);animation:blink .5s infinite;}
+.svc-badge.err{border-color:var(--danger);color:var(--danger);}
+
+/* Log */
+.log-body{flex:1;overflow-y:auto;padding:5px 9px;font-family:var(--mono);font-size:9px;min-height:0;}
+.log-line{display:flex;gap:7px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.025);line-height:1.4;}
+.log-time{color:var(--dim);opacity:.6;min-width:52px;flex-shrink:0;}
+.log-src{color:var(--accent);min-width:48px;flex-shrink:0;}
+.log-msg.info{color:var(--text);}.log-msg.ok{color:var(--ok);}.log-msg.warn{color:var(--warn);}.log-msg.error{color:var(--danger);}
+
+/* Topic health */
+.th-row{display:flex;align-items:center;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border);}
+.th-topic{font-family:var(--mono);font-size:8px;color:var(--dim);}
+.th-hz{font-family:var(--mono);font-size:8px;color:var(--dim);}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:3px;height:3px;}::-webkit-scrollbar-thumb{background:var(--border2);}
+
+/* Grid placement */
+.panel-cam-front{grid-column:1;grid-row:1;}
+.panel-cam-fish{grid-column:2;grid-row:1;}
+.panel-health{grid-column:3;grid-row:1;}
+.panel-telem{grid-column:1;grid-row:2;}
+.panel-bw{grid-column:2;grid-row:2;}
+.panel-log{grid-column:3;grid-row:2;}
+
+/* Toast */
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(50px);background:var(--surface);border:1px solid var(--accent);padding:8px 20px;font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1px;z-index:999;transition:transform .25s;pointer-events:none;box-shadow:0 0 20px rgba(0,170,255,.15);}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+/* node launch bar */
+.nodebar{height:32px;background:rgba(0,0,0,.5);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:4px;flex-shrink:0;overflow-x:auto;}
+.nodebar::-webkit-scrollbar{height:2px;}
+.nbtn{padding:3px 10px;border:1px solid var(--border2);background:rgba(0,0,0,0);color:var(--dim);font-family:var(--mono);font-size:9px;letter-spacing:1px;cursor:pointer;transition:all .12s;white-space:nowrap;border-radius:2px;}
+.nbtn:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,170,255,.08);}
+.nbtn.running{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,.06);}
+.nbtn.running::before{content:'● ';font-size:7px;}
+.nbtn.stopped{border-color:var(--danger);color:var(--danger);}
+.nbtn.kill{border-color:var(--danger);color:var(--danger);background:rgba(255,34,68,.06);}
+.nbtn.kill:hover{background:rgba(255,34,68,.15);}
+.nbsep{width:1px;height:18px;background:var(--border2);margin:0 4px;flex-shrink:0;}
+
+/* ── CONTROLLER SECTION ── */
+.ctrl-section-wrap{background:var(--surface2);border:1px solid var(--border);margin-top:0;}
+.ctrl-embed{display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 8px;}
+.ctrl-embed .controller-svg-wrap{max-width:100%;}
+.ctrl-embed .axes-row{width:100%;}
+.ctrl-status-embed{padding:0 10px 10px;}
+/* ── LEFT: CONTROLLER VISUALIZER ── */
+.ctrl-panel{background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px;overflow:hidden;position:relative;}
+
+/* scanline overlay */
+.ctrl-panel::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 4px);pointer-events:none;z-index:0;}
+
+.ctrl-title{font-size:9px;letter-spacing:4px;color:var(--dim);text-transform:uppercase;z-index:1;}
+
+/* SVG controller wrapper */
+.controller-svg-wrap{position:relative;width:100%;max-width:520px;z-index:1;}
+.controller-svg-wrap svg{width:100%;height:auto;overflow:visible;}
+
+/* ── CONTROLLER SVG STYLES ── */
+/* Body */
+.ctrl-body{fill:#0d1117;stroke:var(--border2);stroke-width:1.5;}
+.ctrl-grip{fill:#090c0f;stroke:var(--border2);stroke-width:1;}
+/* D-pad */
+.dpad-arm{fill:#0f1520;stroke:var(--border2);stroke-width:1;}
+.dpad-arm.active{fill:var(--accent);stroke:var(--accent);filter:drop-shadow(0 0 4px var(--accent));}
+/* Face buttons */
+.face-btn{stroke-width:1.5;transition:all .1s;}
+.face-btn-a{fill:#0d1a0f;stroke:var(--btn-a);}
+.face-btn-b{fill:#1a0d0d;stroke:var(--btn-b);}
+.face-btn-x{fill:#0d1520;stroke:var(--btn-x);}
+.face-btn-y{fill:#1a1408;stroke:var(--btn-y);}
+.face-btn-a.active{fill:var(--btn-a);filter:drop-shadow(0 0 6px var(--btn-a));}
+.face-btn-b.active{fill:var(--btn-b);filter:drop-shadow(0 0 6px var(--btn-b));}
+.face-btn-x.active{fill:var(--btn-x);filter:drop-shadow(0 0 6px var(--btn-x));}
+.face-btn-y.active{fill:var(--btn-y);filter:drop-shadow(0 0 6px var(--btn-y));}
+.face-label{font-family:var(--mono);font-size:8px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}
+.lbl-a{fill:var(--btn-a);}.lbl-b{fill:var(--btn-b);}.lbl-x{fill:var(--btn-x);}.lbl-y{fill:var(--btn-y);}
+/* Bumpers */
+.bumper{fill:#0f1520;stroke:var(--border2);stroke-width:1.2;rx:4;}
+.bumper.active{fill:var(--accent);stroke:var(--accent);filter:drop-shadow(0 0 5px var(--accent));}
+/* Triggers */
+.trigger{fill:#080c10;stroke:var(--border2);stroke-width:1.2;}
+.trigger-fill{fill:var(--accent);transition:height .05s,y .05s;}
+.trigger-pct{font-family:var(--mono);font-size:7px;fill:var(--accent);text-anchor:middle;dominant-baseline:middle;}
+/* Sticks */
+.stick-base{fill:#090c10;stroke:var(--border2);stroke-width:1.2;}
+.stick-knob{fill:#0f1520;stroke:var(--accent);stroke-width:1.2;transition:cx .05s,cy .05s;}
+.stick-knob.active{fill:rgba(0,170,255,.2);}
+.stick-dot{fill:var(--accent);opacity:.6;}
+/* Center buttons */
+.center-btn{fill:#0d1520;stroke:var(--border2);stroke-width:1;}
+.center-btn.active{fill:rgba(0,170,255,.2);stroke:var(--accent);}
+/* Xbox logo */
+.xbox-ring{fill:none;stroke:var(--border2);stroke-width:1.5;}
+.xbox-ring.active{stroke:var(--accent);filter:drop-shadow(0 0 6px var(--accent));}
+
+/* function annotations */
+.annotation-line{stroke:var(--dim);stroke-width:.5;stroke-dasharray:3,3;}
+.annotation-text{font-family:var(--mono);font-size:7px;fill:var(--dim);dominant-baseline:middle;}
+.annotation-text.lit{fill:var(--accent);}
+
+/* ── AXIS BARS ── */
+.axes-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:520px;z-index:1;}
+.axis-widget{background:var(--surface2);border:1px solid var(--border);padding:7px 10px;}
+.axis-label{font-size:8px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:5px;}
+.axis-track{height:4px;background:var(--border);border-radius:2px;position:relative;margin:2px 0;}
+.axis-fill{position:absolute;top:0;height:100%;border-radius:2px;background:var(--accent);transition:all .05s;}
+.axis-center{position:absolute;left:50%;top:-2px;width:1px;height:8px;background:var(--border2);}
+.axis-val{font-family:var(--mono);font-size:9px;color:var(--accent2);text-align:right;}
+.axis-thumb{display:flex;gap:6px;align-items:center;}
+.thumb-canvas-wrap{position:relative;width:60px;height:60px;flex-shrink:0;}
+.thumb-canvas-wrap canvas{border-radius:50%;border:1px solid var(--border);}
+
+/* ── RIGHT: STATUS PANEL ── */
+.status-panel{background:var(--surface);display:flex;flex-direction:column;gap:1px;background:var(--border);overflow-y:auto;}
+.sp-section{background:var(--surface);padding:10px 12px;flex-shrink:0;}
+.sp-title{font-size:9px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.sp-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Button grid */
+.btn-matrix{display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+.bm-cell{background:var(--surface2);padding:5px 8px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;transition:all .1s;}
+.bm-cell.active{border-color:var(--accent);background:rgba(0,170,255,.08);}
+.bm-cell.active .bm-name{color:var(--bright);}
+.bm-name{font-size:9px;color:var(--dim);font-family:var(--mono);letter-spacing:.5px;}
+.bm-idx{font-size:8px;color:var(--border2);font-family:var(--mono);}
+.bm-cell.active .bm-idx{color:var(--accent);}
+
+/* Robot action decoded */
+.action-card{background:var(--surface2);border:1px solid var(--border2);padding:8px 10px;margin-bottom:4px;transition:all .1s;}
+.action-card.active{border-color:var(--ok);background:rgba(0,255,136,.05);}
+.action-name{font-size:12px;font-weight:600;letter-spacing:1px;color:var(--dim);transition:.1s;}
+.action-card.active .action-name{color:var(--ok);}
+.action-desc{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:1px;}
+
+/* Safety indicator */
+.safety-bar{background:var(--surface2);border:1px solid var(--border);padding:8px 10px;display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.safety-indicator{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.safety-fill{height:100%;width:0%;background:var(--danger);border-radius:3px;transition:width .1s;}
+.safety-label{font-family:var(--mono);font-size:9px;white-space:nowrap;}
+
+/* pub rate */
+.pub-rate{font-family:var(--mono);font-size:8px;color:var(--dim);}
+</style>
 </head>
 <body>
-    <img id="pride" src="{{url_for('static', filename='images/chicago_flag.jpg')}}">
-    <div id="camera-frame">
-        
-            
-            <!-- Camera Feed -->
-            <!-- NOTE: Using a canvas element may bee better -->
-            <button onclick="toggleFullscreen()" class="fullscreen-button">🔳 Fullscreen</button>
-            <img id="main-camera-frame" class="camera-frame" />
+
+<!-- ── TOPBAR ── -->
+<div class="topbar">
+  <div class="logo">FUCK<span>MIT</span><span style="font-size:10px;font-weight:400;letter-spacing:2px;color:var(--dim);margin-left:8px">EDT UIC 2026</span></div>
+  <div class="vsep"></div>
+  <div class="conn-status"><div class="dot" id="ws-dot"></div><span id="ws-label" style="color:var(--dim)">DISCONNECTED</span></div>
+  <div class="conn-status"><div class="dot" id="hb-dot"></div><span style="color:var(--dim)">/heartbeat</span></div>
+  <div class="conn-status"><div class="dot" id="nav-dot"></div><span id="nav-label" style="color:var(--dim)">NAV2 IDLE</span></div>
+  <div class="topbar-right">
+    <input class="ws-input" id="ws-url" value="{{ rosbridge_url }}" title="rosbridge WebSocket URL"/>
+    <button class="tbtn" id="conn-btn" onclick="toggleConnect()">Connect</button>
+    <button class="tbtn green" onclick="launchRviz()" title="ros2 launch … rviz2">⬡ RViz2</button>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</div>
+
+
+<!-- NODE LAUNCH BAR -->
+<div class="nodebar" id="nodebar">
+  <span style="font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:2px;margin-right:4px;flex-shrink:0">NODES</span>
+  <div class="nbsep"></div>
+  <button class="nbtn" id="nb-rosbridge" onclick="launchNode('rosbridge',this)" title="ros2 launch rosbridge_server rosbridge_websocket_launch.xml">rosbridge</button>
+  <button class="nbtn" id="nb-controller" onclick="launchNode('controller',this)" title="ros2 run controller_pkg controller_node">controller</button>
+  <button class="nbtn" id="nb-health" onclick="launchNode('health',this)" title="ros2 run controller_pkg health_node">health</button>
+  <button class="nbtn" id="nb-excavation" onclick="launchNode('excavation',this)" title="ros2 run controller_pkg excavation_node">excavation</button>
+  <button class="nbtn" id="nb-depositing" onclick="launchNode('depositing',this)" title="ros2 run controller_pkg depositing_node">depositing</button>
+  <div class="nbsep"></div>
+  <button class="nbtn" id="nb-slam_manual" onclick="launchNode('slam_manual',this)" title="neptune_sim.launch.py robot_mode:=manual">slam/nav manual</button>
+  <button class="nbtn" id="nb-slam_auto" onclick="launchNode('slam_auto',this)" title="neptune_sim.launch.py robot_mode:=auto">slam/nav auto</button>
+  <button class="nbtn" id="nb-navigation_client" onclick="launchNode('navigation_client',this)" title="ros2 run navigation_pkg navigation_client">nav client</button>
+  <div class="nbsep"></div>
+  <button class="nbtn" id="nb-rviz2" onclick="launchNode('rviz2',this)" title="rviz2 -d robot_view.rviz" style="border-color:#a070ff;color:#c0a0ff">rviz2</button>
+  <div class="nbsep"></div>
+  <button class="nbtn kill" onclick="refreshNodeStatus()">↺ refresh</button>
+</div>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <!-- FRONT CAM (d456) -->
+  <div class="panel panel-cam-front">
+    <div class="ph">
+      <div class="ph-title">Front Cam</div>
+      <div style="display:flex;gap:5px;align-items:center">
+        <span class="ph-tag" id="d456-tag">/d456/color/image_raw</span>
+        <span class="ph-tag" id="d456-fps">--fps</span>
+      </div>
     </div>
-    <script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
+    <div class="cam-tabs">
+      <button class="cam-tab active" onclick="setCamMode('front','d456')" id="tab-f-d456">/d456 raw</button>
+      <button class="cam-tab" onclick="setCamMode('front','d455')" id="tab-f-d455">/d455 raw</button>
+      <button class="cam-tab" onclick="setCamMode('front','sim')" id="tab-f-sim">sim</button>
+    </div>
+    <div class="cam-wrap" id="cwrap-front">
+      <canvas id="cam-front-canvas" class="cam-canvas"></canvas>
+      <img id="cam-front-img" class="cam-img" style="display:none" alt=""/>
+      <div class="cam-overlay">
+        <div class="cam-fps" id="cam-f-fps"></div>
+        <div class="corner c-tl"></div><div class="corner c-tr"></div>
+        <div class="corner c-bl"></div><div class="corner c-br"></div>
+        <div class="cam-rec"><div class="rec-dot"></div><span id="cam-f-st">NO SIGNAL</span></div>
+        <div class="cam-label" id="cam-f-info">SELECT SOURCE ABOVE</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FISHEYE CAM (d455) -->
+  <div class="panel panel-cam-fish">
+    <div class="ph">
+      <div class="ph-title">Rear View</div>
+      <div style="display:flex;gap:5px;align-items:center">
+        <span class="ph-tag" id="d455-tag">/d455/color/image_raw</span>
+        <span class="ph-tag" id="d455-fps">--fps</span>
+      </div>
+    </div>
+    <div class="cam-tabs">
+      <button class="cam-tab active" onclick="setCamMode('rear','d455')" id="tab-r-d455">/d455 raw</button>
+      <button class="cam-tab" onclick="setCamMode('rear','d456')" id="tab-r-d456">/d456 raw</button>
+      <button class="cam-tab" onclick="setCamMode('rear','sim')" id="tab-r-sim">sim</button>
+    </div>
+    <div class="cam-wrap" id="cwrap-rear">
+      <canvas id="cam-rear-canvas" class="cam-canvas"></canvas>
+      <img id="cam-rear-img" class="cam-img" style="display:none" alt=""/>
+      <div class="cam-overlay">
+        <div class="cam-fps" id="cam-r-fps"></div>
+        <div class="corner c-tl"></div><div class="corner c-tr"></div>
+        <div class="corner c-bl"></div><div class="corner c-br"></div>
+        <div class="cam-rec"><div class="rec-dot"></div><span id="cam-r-st">NO SIGNAL</span></div>
+        <div class="cam-label" id="cam-r-info">SELECT SOURCE ABOVE</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOTOR HEALTH -->
+  <div class="panel panel-health">
+    <div class="ph">
+      <div class="ph-title">Motor Health</div>
+      <span class="ph-tag" id="health-tag">/health_topic</span>
+    </div>
+    <div class="health-grid" id="health-grid"></div>
+  </div>
+
+  <!-- TELEMETRY -->
+  <div class="panel panel-telem">
+    <div class="ph">
+      <div class="ph-title">Telemetry</div>
+      <span class="ph-tag" id="odom-tag">/odometry/filtered</span>
+    </div>
+    <div class="telem-body">
+      <div class="telem-row">
+        <div class="tc"><div class="tc-label">Lin Vel</div><div class="tc-val accent" id="t-lv">0.00<span class="tc-unit">m/s</span></div></div>
+        <div class="tc"><div class="tc-label">Ang Vel</div><div class="tc-val accent" id="t-av">0.00<span class="tc-unit">rad/s</span></div></div>
+      </div>
+      <div class="telem-row">
+        <div class="tc"><div class="tc-label">Pos X</div><div class="tc-val" id="t-px">0.00<span class="tc-unit">m</span></div></div>
+        <div class="tc"><div class="tc-label">Pos Y</div><div class="tc-val" id="t-py">0.00<span class="tc-unit">m</span></div></div>
+      </div>
+      <div class="telem-row">
+        <div class="tc"><div class="tc-label">L Lift</div><div class="tc-val ok" id="t-ll">0.00<span class="tc-unit">rev</span></div></div>
+        <div class="tc"><div class="tc-label">R Lift</div><div class="tc-val ok" id="t-rl">0.00<span class="tc-unit">rev</span></div></div>
+      </div>
+      <div class="telem-row">
+        <div class="tc"><div class="tc-label">Tilt Pos</div><div class="tc-val" id="t-ti">0.00<span class="tc-unit">rev</span></div></div>
+        <div class="tc"><div class="tc-label">Lift Δ</div><div class="tc-val" id="t-ld">0.00<span class="tc-unit">rev</span></div></div>
+      </div>
+      <div class="telem-row">
+        <div class="tc"><div class="tc-label">Heartbeat</div><div class="tc-val ok" id="t-hb">--</div></div>
+        <div class="tc"><div class="tc-label">Vib Current</div><div class="tc-val" id="t-vc">0.00<span class="tc-unit">A</span></div></div>
+      </div>
+      <div class="telem-row">
+        <div class="tc" style="flex:2"><div class="tc-label">Nav2 Distance Remaining</div><div class="tc-val" id="t-navdist" style="font-size:20px">--<span class="tc-unit">m</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BANDWIDTH -->
+  <div class="panel panel-bw">
+    <div class="ph">
+      <div class="ph-title">Bandwidth</div>
+      <span class="ph-tag" id="bw-tag">ROSBRIDGE</span>
+    </div>
+    <div class="bw-body">
+      <div class="bw-stats">
+        <div class="bw-stat"><div class="bw-stat-label">kB/s</div><div class="bw-stat-val" id="bw-kb" style="color:var(--accent2)">0.0</div></div>
+        <div class="bw-stat"><div class="bw-stat-label">msg/s</div><div class="bw-stat-val" id="bw-msg" style="color:var(--accent)">0</div></div>
+        <div class="bw-stat"><div class="bw-stat-label">latency</div><div class="bw-stat-val" id="bw-lat" style="color:var(--warn)">--ms</div></div>
+      </div>
+      <div class="bw-graph"><canvas id="bw-canvas"></canvas></div>
+      <div style="font-family:var(--mono);font-size:8px;color:var(--dim);flex-shrink:0"><span style="color:var(--accent2)">━</span> kB/s  30s window</div>
+      <div style="flex-shrink:0">
+        <div style="font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Topic Status</div>
+        <div id="topic-health"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="panel panel-log">
+    <div class="ph">
+      <div class="ph-title">System Log</div>
+      <div style="display:flex;gap:5px;align-items:center">
+        <span class="ph-tag" id="log-count">0</span>
+        <button onclick="clearLog()" style="background:none;border:1px solid var(--border);color:var(--dim);font-family:var(--mono);font-size:8px;padding:2px 5px;cursor:pointer;">CLR</button>
+      </div>
+    </div>
+    <div class="log-body" id="log-body"></div>
+  </div>
+
+  <!-- RIGHT CONTROLS -->
+  <div class="right">
+
+    <!-- Mode -->
+    <div class="ctrl-section">
+      <div class="cs-title">Robot Mode</div>
+      <div class="mode-row">
+        <button class="mode-btn active" onclick="setMode('manual',this)">Manual</button>
+        <button class="mode-btn" onclick="setMode('simulation',this)">Sim</button>
+        <button class="mode-btn" onclick="setMode('auto',this)">Auto</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="dot ok" id="r-dot"></div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--ok)">ACTIVE</span>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="ctrl-section">
+      <div class="cs-title">Navigation</div>
+      <!-- goal inputs -->
+      <div style="margin-bottom:5px">
+        <div class="nav-input-label">Goal Pose (map frame)</div>
+        <div class="nav-goal-row">
+          <div>
+            <div class="nav-input-label">X (m)</div>
+            <input class="nav-input" id="nav-x" type="number" step="0.1" value="5.16" placeholder="X"/>
+          </div>
+          <div>
+            <div class="nav-input-label">Y (m)</div>
+            <input class="nav-input" id="nav-y" type="number" step="0.1" value="2.30" placeholder="Y"/>
+          </div>
+        </div>
+        <div class="nav-goal-row">
+          <div>
+            <div class="nav-input-label">Yaw (deg)</div>
+            <input class="nav-input" id="nav-yaw" type="number" step="5" value="0" placeholder="Yaw°"/>
+          </div>
+          <div>
+            <div class="nav-input-label">Preset</div>
+            <select class="nav-input" id="nav-preset" onchange="applyPreset()" style="color:var(--accent2)">
+              <option value="">Custom</option>
+              <option value="5.16,2.30,0">KSC Dig Zone</option>
+              <option value="0.0,0.0,0">Home (0,0)</option>
+              <option value="2.5,1.6,0">Spawn Point</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <!-- nav status -->
+      <div class="nav-status-row">
+        <div class="dot" id="nav-svc-dot"></div>
+        <span id="nav-svc-status" style="font-size:10px;color:var(--dim)">IDLE</span>
+        <span class="nav-dist" id="nav-dist-remain"></span>
+      </div>
+      <!-- nav buttons -->
+      <button class="btn success" id="btn-nav-start" onclick="startNavigation(this)"><span>▶</span>Navigate to Goal</button>
+      <button class="btn" id="btn-nav-cancel" onclick="cancelNavigation(this)" style="opacity:.6"><span>■</span>Cancel Navigation</button>
+      <button class="btn" onclick="startLocalization(this)"><span>◎</span>Start Localization</button>
+      <button class="btn rviz-btn" onclick="launchRviz(this)"><span>⬡</span>Launch RViz2</button>
+    </div>
+
+    <!-- Services -->
+    <div class="ctrl-section">
+      <div class="cs-title">Autonomous Actions</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:10px;color:var(--dim)">excavation_service</span>
+        <span class="svc-badge" id="exc-svc">IDLE</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:10px;color:var(--dim)">depositing_service</span>
+        <span class="svc-badge" id="dep-svc">IDLE</span>
+      </div>
+      <button class="btn warn-btn" onclick="callExcavation(this)"><span>⚒</span>Excavate</button>
+      <button class="btn primary"  onclick="callDeposit(this)"><span>↓</span>Deposit</button>
+      <button class="btn danger-btn" onclick="eStop(this)"><span>✕</span>E-Stop / Cancel Auto</button>
+    </div>
+
+    <!-- Teleop -->
+    <div class="ctrl-section">
+      <div class="cs-title">Keyboard Teleop</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:8px;letter-spacing:2px;color:var(--dim);margin-bottom:3px">LIFT</div>
+          <div style="display:flex;gap:3px">
+            <button class="key" id="key-lu" onmousedown="pubLift(1)" onmouseup="pubLift(0)">↑</button>
+            <button class="key" id="key-ld" onmousedown="pubLift(-1)" onmouseup="pubLift(0)">↓</button>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:8px;letter-spacing:2px;color:var(--dim);">Speed</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">Lin: <span id="sp-lin" style="color:var(--accent2)">0.35</span> m/s</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--dim)">Ang: <span id="sp-ang" style="color:var(--accent2)">0.25</span> rad/s</div>
+          <div style="font-size:8px;color:var(--dim);font-family:var(--mono);margin-top:2px">Q/Z lin · E/C ang</div>
+        </div>
+      </div>
+      <div class="keys-grid">
+        <div class="key ghost"></div>
+        <div class="key" id="key-w" onmousedown="dk('w',true)" onmouseup="dk('w',false)">W</div>
+        <div class="key ghost"></div>
+        <div class="key" id="key-a" onmousedown="dk('a',true)" onmouseup="dk('a',false)">A</div>
+        <div class="key" id="key-s" onmousedown="dk('s',true)" onmouseup="dk('s',false)">S</div>
+        <div class="key" id="key-d" onmousedown="dk('d',true)" onmouseup="dk('d',false)">D</div>
+      </div>
+    </div>
+
+    <!-- Xbox Controller -->
+    <div class="ctrl-section">
+      <div class="cs-title">Xbox Controller
+        <div style="display:flex;align-items:center;gap:5px;margin-left:auto">
+          <div class="dot" id="gp-dot-p"></div>
+          <span id="gp-label-p" style="font-family:var(--mono);font-size:8px;color:var(--dim)">NO GAMEPAD</span>
+        </div>
+      </div>
+      <!-- safety -->
+      <div class="safety-bar" style="margin-bottom:6px">
+        <div class="dot" id="safety-dot" style="background:var(--danger);box-shadow:0 0 5px var(--danger)"></div>
+        <div style="flex:1">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--danger)" id="safety-text">LOCKED — Hold LT or RT</div>
+          <div class="safety-indicator" style="margin-top:2px"><div class="safety-fill" id="safety-fill" style="background:var(--danger)"></div></div>
+        </div>
+        <span class="ph-tag" id="safety-tag" style="border-color:var(--danger);color:var(--danger);font-size:7px">⚠ LT/RT</span>
+      </div>
+      <!-- SVG diagram -->
+      <div class="ctrl-embed">
+
+  <div class="ctrl-panel">
+    <div class="ctrl-title">Xbox Controller — Live State</div>
+
+    <!-- SVG CONTROLLER -->
+    <div class="controller-svg-wrap">
+      <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="ltClip"><rect id="ltClipRect" x="50" y="12" width="42" height="0" /></clipPath>
+          <clipPath id="rtClip"><rect id="rtClipRect" x="408" y="12" width="42" height="0" /></clipPath>
+          <filter id="glow-ok"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+
+        <!-- CONTROLLER BODY -->
+        <!-- Main body shape -->
+        <path class="ctrl-body" d="M120,80 Q90,65 70,90 Q40,120 50,180 Q60,230 100,255 Q130,270 160,250 L190,220 Q200,200 220,200 L280,200 Q300,200 310,220 L340,250 Q370,270 400,255 Q440,230 450,180 Q460,120 430,90 Q410,65 380,80 L340,60 Q300,40 250,38 Q200,40 160,60 Z" />
+        <!-- Left grip -->
+        <path class="ctrl-grip" d="M90,200 Q70,230 80,260 Q90,280 110,275 Q135,268 155,245 L130,210 Z"/>
+        <!-- Right grip -->
+        <path class="ctrl-grip" d="M410,200 Q430,230 420,260 Q410,280 390,275 Q365,268 345,245 L370,210 Z"/>
+
+        <!-- ── TRIGGERS (LT / RT) ── -->
+        <!-- LT background -->
+        <rect class="trigger" x="50" y="12" width="42" height="55" rx="6" />
+        <!-- LT fill (grows downward from top based on axis value) -->
+        <rect id="lt-fill" x="51" y="13" width="40" height="0" rx="5" style="fill:rgba(0,170,255,.6);transition:height .05s;" />
+        <text class="trigger-pct" id="lt-pct" x="71" y="40">0%</text>
+        <text style="font-family:var(--mono);font-size:8px;fill:var(--dim);text-anchor:middle;dominant-baseline:middle" x="71" y="55">LT</text>
+        <!-- annotation -->
+        <line class="annotation-line" x1="71" y1="12" x2="71" y2="5"/>
+        <text class="annotation-text" id="ann-lt" x="71" y="3" text-anchor="middle">LEFT TRIGGER</text>
+
+        <!-- RT background -->
+        <rect class="trigger" x="408" y="12" width="42" height="55" rx="6" />
+        <rect id="rt-fill" x="409" y="13" width="40" height="0" rx="5" style="fill:rgba(0,170,255,.6);transition:height .05s;" />
+        <text class="trigger-pct" id="rt-pct" x="429" y="40">0%</text>
+        <text style="font-family:var(--mono);font-size:8px;fill:var(--dim);text-anchor:middle;dominant-baseline:middle" x="429" y="55">RT</text>
+        <line class="annotation-line" x1="429" y1="12" x2="429" y2="5"/>
+        <text class="annotation-text" id="ann-rt" x="429" y="3" text-anchor="middle">RIGHT TRIGGER</text>
+
+        <!-- ── BUMPERS (LB / RB) ── -->
+        <rect id="btn-lb" class="bumper" x="85" y="72" width="70" height="16" rx="5"/>
+        <text style="font-family:var(--mono);font-size:8px;fill:var(--dim);text-anchor:middle;dominant-baseline:middle" x="120" y="80">LB</text>
+        <line class="annotation-line" x1="120" y1="72" x2="105" y2="62"/>
+        <text class="annotation-text" id="ann-lb" x="95" y="60" text-anchor="middle">VIBRATOR</text>
+
+        <rect id="btn-rb" class="bumper" x="345" y="72" width="70" height="16" rx="5"/>
+        <text style="font-family:var(--mono);font-size:8px;fill:var(--dim);text-anchor:middle;dominant-baseline:middle" x="380" y="80">RB</text>
+        <line class="annotation-line" x1="380" y1="72" x2="395" y2="62"/>
+        <text class="annotation-text" id="ann-rb" x="405" y="60" text-anchor="middle">ALT MODE</text>
+
+        <!-- ── LEFT STICK ── -->
+        <circle class="stick-base" cx="155" cy="185" r="32"/>
+        <!-- range indicator -->
+        <circle cx="155" cy="185" r="22" fill="none" stroke="var(--border2)" stroke-width=".5" stroke-dasharray="2,2"/>
+        <circle id="ls-knob" class="stick-knob" cx="155" cy="185" r="16"/>
+        <circle id="ls-dot" class="stick-dot" cx="155" cy="185" r="3"/>
+        <text style="font-family:var(--mono);font-size:7px;fill:var(--dim);text-anchor:middle" x="155" y="228">LS</text>
+        <!-- annotations -->
+        <line class="annotation-line" x1="110" y1="185" x2="85" y2="185"/>
+        <text class="annotation-text" id="ann-ls" x="83" y="185" text-anchor="end">DRIVE (vel)</text>
+
+        <!-- ── RIGHT STICK ── -->
+        <circle class="stick-base" cx="300" cy="200" r="28"/>
+        <circle cx="300" cy="200" r="19" fill="none" stroke="var(--border2)" stroke-width=".5" stroke-dasharray="2,2"/>
+        <circle id="rs-knob" class="stick-knob" cx="300" cy="200" r="14"/>
+        <circle id="rs-dot" class="stick-dot" cx="300" cy="200" r="2.5"/>
+        <text style="font-family:var(--mono);font-size:7px;fill:var(--dim);text-anchor:middle" x="300" y="238">RS</text>
+        <line class="annotation-line" x1="328" y1="200" x2="355" y2="200"/>
+        <text class="annotation-text" id="ann-rs" x="357" y="200">DRIVE (slow)</text>
+
+        <!-- ── D-PAD ── -->
+        <!-- horizontal arm -->
+        <rect id="dp-left"  class="dpad-arm" x="188" y="148" width="20" height="12" rx="2"/>
+        <rect id="dp-right" class="dpad-arm" x="222" y="148" width="20" height="12" rx="2"/>
+        <!-- vertical arm -->
+        <rect id="dp-up"    class="dpad-arm" x="204" y="132" width="12" height="20" rx="2"/>
+        <rect id="dp-down"  class="dpad-arm" x="204" y="156" width="12" height="20" rx="2"/>
+        <!-- center -->
+        <rect x="204" y="148" width="12" height="12" fill="#0d1117"/>
+        <!-- annotations -->
+        <line class="annotation-line" x1="198" y1="154" x2="175" y2="170"/>
+        <text class="annotation-text" id="ann-dp" x="174" y="172" text-anchor="end">TILT ← →</text>
+        <line class="annotation-line" x1="210" y1="132" x2="210" y2="118"/>
+        <text class="annotation-text" id="ann-dpud" x="210" y="116" text-anchor="middle">LIFT ↑ ↓</text>
+
+        <!-- ── FACE BUTTONS ── -->
+        <!-- A (bottom) -->
+        <circle id="btn-a" class="face-btn face-btn-a" cx="370" cy="175" r="11"/>
+        <text class="face-label lbl-a" x="370" y="175">A</text>
+        <!-- B (right) -->
+        <circle id="btn-b" class="face-btn face-btn-b" cx="384" cy="161" r="11"/>
+        <text class="face-label lbl-b" x="384" y="161">B</text>
+        <!-- X (left) -->
+        <circle id="btn-x" class="face-btn face-btn-x" cx="356" cy="161" r="11"/>
+        <text class="face-label lbl-x" x="356" y="161">X</text>
+        <!-- Y (top) -->
+        <circle id="btn-y" class="face-btn face-btn-y" cx="370" cy="147" r="11"/>
+        <text class="face-label lbl-y" x="370" y="147">Y</text>
+        <!-- annotations -->
+        <line class="annotation-line" x1="370" y1="186" x2="370" y2="295"/>
+        <text class="annotation-text" id="ann-a" x="370" y="297" text-anchor="middle">EXCAVATE</text>
+        <line class="annotation-line" x1="395" y1="161" x2="430" y2="150"/>
+        <text class="annotation-text" id="ann-b" x="432" y="150">CANCEL AUTO</text>
+        <line class="annotation-line" x1="345" y1="161" x2="310" y2="150"/>
+        <text class="annotation-text" id="ann-x" x="308" y="150" text-anchor="end">RESET BUCKET</text>
+        <line class="annotation-line" x1="370" y1="136" x2="370" y2="120"/>
+        <text class="annotation-text" id="ann-y" x="370" y="118" text-anchor="middle">DEPOSIT</text>
+
+        <!-- ── CENTER BUTTONS ── -->
+        <!-- Back/Window -->
+        <rect id="btn-back" class="center-btn" x="224" y="118" width="16" height="10" rx="3"/>
+        <text style="font-family:var(--mono);font-size:6px;fill:var(--dim);text-anchor:middle;dominant-baseline:middle" x="232" y="123">◫</text>
+        <!-- Xbox button -->
+        <circle id="btn-xbox" class="center-btn" cx="250" cy="118" r="9"/>
+        <circle class="xbox-ring" id="xbox-ring" cx="250" cy="118" r="7"/>
+        <text style="font-family:var(--mono);font-size:7px;fill:var(--dim);text-anchor:middle;dominant-baseline:middle" x="250" y="118">X</text>
+        <!-- Start/Menu -->
+        <rect id="btn-start" class="center-btn" x="260" y="118" width="16" height="10" rx="3"/>
+        <text style="font-family:var(--mono);font-size:6px;fill:var(--dim);text-anchor:middle;dominant-baseline:middle" x="268" y="123">≡</text>
+        <!-- annotations -->
+        <line class="annotation-line" x1="232" y1="118" x2="220" y2="108"/>
+        <text class="annotation-text" id="ann-back" x="218" y="107" text-anchor="end">FULL CYCLE</text>
+      </svg>
+    </div>
+
+    <!-- STICK VISUALIZERS + AXES -->
+    <div class="axes-row">
+      <div class="axis-widget">
+        <div class="axis-label">Left Stick — Drive</div>
+        <div class="axis-thumb">
+          <div class="thumb-canvas-wrap">
+            <canvas id="ls-canvas" width="60" height="60"></canvas>
+          </div>
+          <div style="flex:1">
+            <div style="margin-bottom:4px">
+              <div style="font-family:var(--mono);font-size:8px;color:var(--dim);margin-bottom:2px">H <span style="font-size:7px">(turn)</span></div>
+              <div class="axis-track">
+                <div class="axis-center"></div>
+                <div class="axis-fill" id="ls-h-fill"></div>
+              </div>
+              <div class="axis-val" id="ls-h-val">0.00</div>
+            </div>
+            <div>
+              <div style="font-family:var(--mono);font-size:8px;color:var(--dim);margin-bottom:2px">V <span style="font-size:7px">(fwd/rev)</span></div>
+              <div class="axis-track">
+                <div class="axis-center"></div>
+                <div class="axis-fill" id="ls-v-fill" style="background:var(--accent2)"></div>
+              </div>
+              <div class="axis-val" id="ls-v-val">0.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="axis-widget">
+        <div class="axis-label">Right Stick — Slow Drive</div>
+        <div class="axis-thumb">
+          <div class="thumb-canvas-wrap">
+            <canvas id="rs-canvas" width="60" height="60"></canvas>
+          </div>
+          <div style="flex:1">
+            <div style="margin-bottom:4px">
+              <div style="font-family:var(--mono);font-size:8px;color:var(--dim);margin-bottom:2px">H <span style="font-size:7px">(slow turn)</span></div>
+              <div class="axis-track">
+                <div class="axis-center"></div>
+                <div class="axis-fill" id="rs-h-fill"></div>
+              </div>
+              <div class="axis-val" id="rs-h-val">0.00</div>
+            </div>
+            <div>
+              <div style="font-family:var(--mono);font-size:8px;color:var(--dim);margin-bottom:2px">V <span style="font-size:7px">(slow fwd)</span></div>
+              <div class="axis-track">
+                <div class="axis-center"></div>
+                <div class="axis-fill" id="rs-v-fill" style="background:var(--accent2)"></div>
+              </div>
+              <div class="axis-val" id="rs-v-val">0.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+      </div>
+      <!-- status content -->
+      <div class="ctrl-status-embed">
+
+
+    <!-- Safety lock status -->
+    <div class="sp-section">
+      <div class="sp-title">Safety Lock</div>
+      <div class="safety-bar">
+        <div class="dot" id="safety-dot" style="background:var(--danger);box-shadow:0 0 5px var(--danger)"></div>
+        <div style="flex:1">
+          <div style="font-family:var(--mono);font-size:10px" id="safety-text">LOCKED — Hold LT or RT to enable motors</div>
+          <div class="safety-indicator" style="margin-top:3px">
+            <div class="safety-fill" id="safety-fill" style="background:var(--danger)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Decoded Robot Action -->
+    <div class="sp-section">
+      <div class="sp-title">Active Command</div>
+      <div id="action-a" class="action-card"><div class="action-name">EXCAVATE (A)</div><div class="action-desc">→ excavation_service</div></div>
+      <div id="action-b" class="action-card"><div class="action-name">CANCEL AUTO (B)</div><div class="action-desc">→ pkill navigation_client</div></div>
+      <div id="action-x" class="action-card"><div class="action-name">RESET BUCKET (X)</div><div class="action-desc">→ SetPosition(0,0)</div></div>
+      <div id="action-y" class="action-card"><div class="action-name">DEPOSIT (Y)</div><div class="action-desc">→ depositing_service</div></div>
+      <div id="action-lb" class="action-card"><div class="action-name">VIBRATOR TOGGLE (RB)</div><div class="action-desc">→ SetDutyCycle(±1.0)</div></div>
+      <div id="action-rb" class="action-card"><div class="action-name">ALT MODE (LB)</div><div class="action-desc">→ dual joystick duty cycle</div></div>
+      <div id="action-dp-ud" class="action-card"><div class="action-name">LIFT ↑↓ (D-PAD)</div><div class="action-desc">→ leftLift/rightLift duty</div></div>
+      <div id="action-dp-lr" class="action-card"><div class="action-name">TILT ←→ (D-PAD)</div><div class="action-desc">→ tilt.SetDutyCycle(±1)</div></div>
+      <div id="action-back" class="action-card"><div class="action-name">FULL CYCLE (WINDOW)</div><div class="action-desc">→ odometry_node</div></div>
+    </div>
+
+    <!-- Button index matrix -->
+    <div class="sp-section">
+      <div class="sp-title">Button Matrix <span style="font-size:8px;font-weight:400;color:var(--dim);letter-spacing:1px">/joy.buttons[]</span></div>
+      <div class="btn-matrix" id="btn-matrix"></div>
+    </div>
+
+    <!-- Publish rate -->
+    <div class="sp-section">
+      <div class="sp-title">Publisher</div>
+      <div style="background:var(--surface2);border:1px solid var(--border);padding:8px 10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--dim)">/joy</span>
+          <span class="ph-tag" id="pub-tag">20 Hz</span>
+        </div>
+        <div style="font-family:var(--mono);font-size:8px;color:var(--dim)">
+          frame_id: <span id="pub-frame" style="color:var(--accent2)">0</span>&nbsp;&nbsp;
+          axes: <span id="pub-axes" style="color:var(--text)">4</span>&nbsp;&nbsp;
+          buttons: <span id="pub-btns" style="color:var(--text)">17</span>
+        </div>
+      </div>
+    </div>
+
+  
+      </div>
+    </div>
+
+
+    <!-- Fisheye -->
+    <div class="ctrl-section">
+      <div class="cs-title">Rear Rotation</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:4px">
+        <button class="btn" style="margin:0;padding:5px;justify-content:center;font-size:10px" onclick="rotateFish(-45)">←45°</button>
+        <button class="btn" style="margin:0;padding:5px;justify-content:center;font-size:10px" onclick="rotateFish(0)">CTR</button>
+        <button class="btn" style="margin:0;padding:5px;justify-content:center;font-size:10px" onclick="rotateFish(45)">45°→</button>
+      </div>
+      <button class="btn" style="margin:0;padding:5px;justify-content:center;font-size:10px;width:100%" onclick="rotateFish(180)">180°</button>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--accent2);text-align:center;padding:4px;background:var(--surface2);border:1px solid var(--border);margin-top:4px" id="fish-pos">0°</div>
+    </div>
+
+
+  <!-- 3D WORLD VIEW -->
+  <div class="panel panel-3d">
+    <div class="ph">
+      <div class="ph-title">3D World View <span style="font-size:9px;font-weight:400;color:var(--dim);letter-spacing:1px">ros3djs</span></div>
+      <div style="display:flex;gap:5px;align-items:center">
+        <span class="ph-tag" id="v3d-map-tag" style="border-color:var(--dim);color:var(--dim)">MAP: --</span>
+        <span class="ph-tag" id="v3d-robot-tag" style="border-color:var(--dim);color:var(--dim)">ROBOT: --</span>
+        <span class="ph-tag" id="v3d-status" style="border-color:var(--dim);color:var(--dim)">LOADING</span>
+      </div>
+    </div>
+    <div class="view3d-wrap" id="view3d-wrap">
+      <div id="viewer3d" style="width:100%;height:100%;"></div>
+      <!-- legend -->
+      <div class="view3d-legend">
+        <div class="vl-item"><div class="vl-dot" style="background:#00aaff"></div>Robot</div>
+        <div class="vl-item"><div class="vl-dot" style="background:#00ff88"></div>Map</div>
+        <div class="vl-item"><div class="vl-dot" style="background:#ff4422"></div>Laser</div>
+        <div class="vl-item"><div class="vl-dot" style="background:#ffaa00"></div>Path</div>
+      </div>
+      <!-- controls -->
+      <div class="view3d-controls">
+        <button class="view3d-btn active" id="btn-layer-map"     onclick="toggleLayer('map')">MAP</button>
+        <button class="view3d-btn active" id="btn-layer-robot"   onclick="toggleLayer('robot')">ROBOT</button>
+        <button class="view3d-btn active" id="btn-layer-scan"    onclick="toggleLayer('scan')">SCAN</button>
+        <button class="view3d-btn active" id="btn-layer-path"    onclick="toggleLayer('path')">PATH</button>
+        <button class="view3d-btn active" id="btn-layer-grid"    onclick="toggleLayer('grid')">GRID</button>
+        <button class="view3d-btn"        id="btn-3d-reset"      onclick="resetView3d()">RESET CAM</button>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /right -->
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// ROSBRIDGE
+// ═══════════════════════════════════════════════════════════
+let ws = null, connected = false;
+const svcCbs = {}, actionCbs = {};
+let byteCount=0, msgCount=0, byteRate=0, msgRate=0;
+let bwHist = Array(60).fill(0);
+let pingT = 0;
+const topicSeen={}, topicHzCnt={}, topicHzVal={}, topicHzLast={};
+
+function toggleConnect(){connected?disconnect():connect(document.getElementById('ws-url').value);}
+
+function connect(url){
+  log('SYS',`Connecting → ${url}`,'info');
+  document.getElementById('conn-btn').textContent='Connecting…';
+  try{ws=new WebSocket(url);}catch(e){log('SYS','WS error: '+e.message,'error');return;}
+  ws.onopen=()=>{
+    connected=true; setDot('ws-dot','ok');
+    document.getElementById('ws-label').style.color='var(--ok)';
+    document.getElementById('ws-label').textContent='CONNECTED';
+    document.getElementById('conn-btn').textContent='Disconnect';
+    log('SYS','Connected to rosbridge','ok');
+    advertise('/cmd_vel','geometry_msgs/Twist');
+    subscribeAll(); doPing();
+    updateCamFeeds(); // start image subscriptions
+    // Init 3D viewer with a separate ROSLIB connection sharing same URL
+    try {
+      const ros3dConn = new ROSLIB.Ros({url: url});
+      ros3dConn.on('connection', ()=> init3DViewer(ros3dConn));
+      ros3dConn.on('error', ()=> log('SYS','3D viewer WS error','warn'));
+    } catch(e) { log('SYS','ros3djs unavailable: '+e.message,'warn'); }
+  };
+  ws.onclose=()=>{
+    connected=false; setDot('ws-dot',''); setDot('hb-dot','');
+    document.getElementById('ws-label').style.color='var(--dim)';
+    document.getElementById('ws-label').textContent='DISCONNECTED';
+    document.getElementById('conn-btn').textContent='Connect';
+    log('SYS','Disconnected','warn');
+  };
+  ws.onerror=()=>log('SYS','WS error — start rosbridge:  ros2 launch rosbridge_server rosbridge_websocket_launch.xml','error');
+  ws.onmessage=(e)=>{
+    byteCount+=e.data.length; msgCount++;
+    try{dispatch(JSON.parse(e.data));}catch(_){}
+  };
+}
+function disconnect(){ws?.close();}
+function send(obj){if(connected&&ws.readyState===1)ws.send(JSON.stringify(obj));}
+function advertise(t,type){send({op:'advertise',topic:t,type});}
+function sub(topic,type,throttle=80){send({op:'subscribe',id:'s_'+topic.replace(/\//g,'_'),topic,type,throttle_rate:throttle,queue_length:1});}
+function callSvc(service,type,args,cb){const id='svc_'+Date.now();svcCbs[id]=cb;send({op:'call_service',id,service,type,args});}
+function callAction(server,type,goal,onResult,onFeedback){
+  const goalId='goal_'+Date.now();
+  actionCbs[goalId]={result:onResult,feedback:onFeedback};
+  send({op:'send_action_goal',id:goalId,action:server,action_type:type,goal});
+  return goalId;
+}
+function cancelAction(server){send({op:'cancel_action_goal',action:server});}
+
+function dispatch(msg){
+  if(msg.op==='service_response'){const cb=svcCbs[msg.id];if(cb){cb(msg.values);delete svcCbs[msg.id];}return;}
+  if(msg.op==='action_feedback'){
+    const cbs=Object.values(actionCbs)[0];
+    if(cbs?.feedback)cbs.feedback(msg.values?.feedback||msg.feedback);return;
+  }
+  if(msg.op==='action_result'){
+    const cbs=Object.values(actionCbs)[0];
+    if(cbs?.result){cbs.result(msg.values||msg);Object.keys(actionCbs).forEach(k=>delete actionCbs[k]);}return;
+  }
+  if(msg.op!=='publish')return;
+  const t=msg.topic, d=msg.msg;
+  const now=Date.now();
+  topicSeen[t]=now;
+  if(!topicHzCnt[t]){topicHzCnt[t]=0;topicHzLast[t]=now;topicHzVal[t]=0;}
+  topicHzCnt[t]++;
+  if(now-topicHzLast[t]>=1000){topicHzVal[t]=topicHzCnt[t];topicHzCnt[t]=0;topicHzLast[t]=now;}
+  if(t==='/health_topic')onHealth(d);
+  else if(t==='/odometry/filtered')onOdom(d);
+  else if(t==='/heartbeat')onHeartbeat(d);
+  else if(t==='/navigate_to_pose/_action/feedback')onNavFeedback(d);
+  else if(t==='/_pong')onPong();
+  else if(camTopicHandlers[t])camTopicHandlers[t](d);
+}
+
+function subscribeAll(){
+  advertiseJoy();
+  sub('/health_topic','interfaces_pkg/msg/MotorHealth',100);
+  sub('/odometry/filtered','nav_msgs/Odometry',100);
+  sub('/heartbeat','std_msgs/String',1000);
+  sub('/navigate_to_pose/_action/feedback','nav2_msgs/action/NavigateToPose_FeedbackMessage',500);
+  log('SYS','Subscribed: /health_topic /odometry/filtered /heartbeat /navigate_to_pose feedback','ok');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CAMERA FEEDS via rosbridge image_tools / compressed topics
+// ═══════════════════════════════════════════════════════════
+// Each camera panel can show either /d456 or /d455 raw image via rosbridge
+// rosbridge sends sensor_msgs/CompressedImage as base64 jpg
+// We subscribe to /d456/color/image_raw/compressed and /d455/color/image_raw/compressed
+
+const camState = {
+  front: 'd456',   // which topic to show in front panel
+  rear:  'd455',   // which topic to show in rear panel
+};
+const camTopicHandlers = {};
+const camFrameCount = {d456:0, d455:0};
+const camFpsDisplay = {d456:'--', d455:'--'};
+let camFpsTimer = {};
+
+const camTopicMap = {
+  d456: '/d456/color/image_raw',
+  d455: '/d455/color/image_raw',
+};
+
+function setCamMode(panel, source){
+  camState[panel] = source;
+  // update tab highlights
+  ['d456','d455','sim'].forEach(s=>{
+    const el = document.getElementById(`tab-${panel[0]}-${s}`);
+    if(el) el.classList.toggle('active', s===source);
+  });
+  updateCamFeeds();
+}
+
+function updateCamFeeds(){
+  if(!connected) return;
+  // Subscribe to whichever topics are being shown
+  const needed = new Set([camState.front, camState.rear].filter(s=>s!=='sim'));
+  needed.forEach(src=>{
+    const topic = camTopicMap[src];
+    if(!topic) return;
+    // subscribe (safe to re-subscribe)
+    send({op:'subscribe',id:'cam_'+src,topic,type:'sensor_msgs/Image',throttle_rate:250,queue_length:1});
+    camTopicHandlers[topic] = (d) => onCamImage(src, d);
+  });
+}
+
+const camCanvas = {
+  front: null, rear: null,
+  frontCtx: null, rearCtx: null,
+};
+
+function onCamImage(src, data){
+  camFrameCount[src]++;
+  // sensor_msgs/Image: decode base64 → raw pixel bytes → ImageData
+  try {
+    const encoding = data.encoding || 'rgb8';
+    const w = data.width, h = data.height;
+    // data.data is base64-encoded raw pixel bytes
+    const b64 = data.data;
+    const binary = atob(b64);
+    const len = binary.length;
+    const bytes = new Uint8ClampedArray(len);
+    for(let i=0;i<len;i++) bytes[i] = binary.charCodeAt(i);
+
+    // Build RGBA ImageData from rgb8 or bgr8
+    const rgba = new Uint8ClampedArray(w * h * 4);
+    const isBGR = encoding.startsWith('bgr');
+    for(let i=0,j=0; i<w*h*4; i+=4,j+=3){
+      if(isBGR){
+        rgba[i]   = bytes[j+2]; // R
+        rgba[i+1] = bytes[j+1]; // G
+        rgba[i+2] = bytes[j];   // B
+      } else {
+        rgba[i]   = bytes[j];   // R
+        rgba[i+1] = bytes[j+1]; // G
+        rgba[i+2] = bytes[j+2]; // B
+      }
+      rgba[i+3] = 255; // A
+    }
+
+    const imgData = new ImageData(rgba, w, h);
+
+    ['front','rear'].forEach(panel=>{
+      if(camState[panel] !== src) return;
+      const canvas = document.getElementById(`cam-${panel}-canvas`);
+      if(!canvas) return;
+      const wrap = canvas.parentElement;
+      canvas.width  = wrap.clientWidth  || 320;
+      canvas.height = wrap.clientHeight || 200;
+      const ctx = canvas.getContext('2d');
+      // draw to offscreen at native res, then scale
+      const off = new OffscreenCanvas(w, h);
+      off.getContext('2d').putImageData(imgData, 0, 0);
+      ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+    });
+  } catch(e){
+    // fallback: try compressed path (in case topic switches)
+    try {
+      const img = new Image();
+      img.onload = () => {
+        ['front','rear'].forEach(panel=>{
+          if(camState[panel]!==src)return;
+          const canvas=document.getElementById(`cam-${panel}-canvas`);
+          if(!canvas)return;
+          const wrap=canvas.parentElement;
+          canvas.width=wrap.clientWidth||320;
+          canvas.height=wrap.clientHeight||200;
+          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        });
+      };
+      img.src='data:image/jpeg;base64,'+data.data;
+    } catch(_){}
+  }
+  updateCamStatus(src);
+}
+
+function updateCamStatus(src){
+  ['front','rear'].forEach(panel=>{
+    if(camState[panel]!==src) return;
+    document.getElementById(`cam-${panel[0]}-st`).textContent='LIVE';
+    document.getElementById(`cam-${panel[0]}-info`).textContent=camTopicMap[src]||'';
+  });
+  const fps = topicHzVal[camTopicMap[src]] || 0;
+  const fpsBadge = src==='d456'?'d456-fps':'d455-fps';
+  document.getElementById(fpsBadge).textContent = fps+'fps';
+  document.getElementById(fpsBadge).className = fps>5?'ph-tag live':'ph-tag warn';
+}
+
+// sim drawing (used when source==='sim' or no signal)
+function drawSimCam(canvasId,seed){
+  const c=document.getElementById(canvasId); if(!c)return;
+  const wrap=c.parentElement;
+  c.width=wrap.clientWidth||320; c.height=wrap.clientHeight||200;
+  const ctx=c.getContext('2d'), w=c.width, h=c.height, t=Date.now()/1000;
+  ctx.fillStyle='#030507'; ctx.fillRect(0,0,w,h);
+  const hor=h*.44+Math.sin(t*.2+seed)*3;
+  const fg=ctx.createLinearGradient(0,hor,0,h);
+  fg.addColorStop(0,'#131313'); fg.addColorStop(1,'#070707');
+  ctx.fillStyle=fg; ctx.fillRect(0,hor,w,h-hor);
+  ctx.fillStyle='#05050a'; ctx.fillRect(0,0,w,hor);
+  // perspective lines
+  ctx.lineWidth=1;
+  for(let i=0;i<8;i++){
+    const x=w/2+(i-3.5)*60+Math.sin(t*.1+seed)*5;
+    ctx.strokeStyle=`rgba(50,80,110,${.07+.01*i})`;
+    ctx.beginPath();ctx.moveTo(w/2,hor);ctx.lineTo(x,h);ctx.stroke();
+  }
+  for(let r=1;r<4;r++){
+    const y=hor+(h-hor)*(r/4);
+    ctx.strokeStyle=`rgba(50,80,110,${.04+r*.02})`;
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
+  }
+  // rocks
+  for(let r=0;r<5;r++){
+    const rx=w*(.1+r*.2)+Math.sin(t*.06+r+seed)*4;
+    const ry=hor+(h-hor)*(.25+r*.12), rs=5+r*3;
+    ctx.fillStyle='#1c1c1c';
+    ctx.beginPath();ctx.ellipse(rx,ry,rs,rs*.5,.2,0,Math.PI*2);ctx.fill();
+  }
+  for(let y=0;y<h;y+=4){ctx.fillStyle='rgba(0,0,0,.05)';ctx.fillRect(0,y,w,1);}
+}
+
+// ═══════════════════════════════════════════════════════════
+// CALLBACKS
+// ═══════════════════════════════════════════════════════════
+function onHealth(d){
+  updateHealthGrid(d);
+  sv('t-ll',d.left_lift_position,'rev'); sv('t-rl',d.right_lift_position,'rev');
+  sv('t-ti',d.tilt_position,'rev'); sv('t-vc',d.vibrator_current,'A');
+  const delta=Math.abs((d.left_lift_position||0)-(d.right_lift_position||0));
+  const el=document.getElementById('t-ld');
+  el.innerHTML=delta.toFixed(2)+'<span class="tc-unit">rev</span>';
+  el.className='tc-val'+(delta>.5?' danger':delta>.2?' warn':'');
+  document.getElementById('health-tag').className='ph-tag live';
+}
+
+function onOdom(d){
+  const p=d.pose?.pose?.position, tw=d.twist?.twist;
+  if(p){sv('t-px',p.x,'m');sv('t-py',p.y,'m');}
+  if(tw){sv('t-lv',tw.linear?.x,'m/s');sv('t-av',tw.angular?.z,'rad/s');}
+  document.getElementById('odom-tag').className='ph-tag live';
+}
+
+function onHeartbeat(d){
+  const el=document.getElementById('t-hb'); el.textContent=d.data||'OK';
+  el.style.color='var(--ok)'; setDot('hb-dot','ok');
+  setTimeout(()=>el.style.color='',500);
+}
+
+function onNavFeedback(d){
+  const dist=d?.feedback?.distance_remaining ?? d?.distance_remaining;
+  if(dist!==undefined){
+    document.getElementById('t-navdist').innerHTML=dist.toFixed(2)+'<span class="tc-unit">m</span>';
+    document.getElementById('nav-dist-remain').textContent=dist.toFixed(2)+' m remaining';
+  }
+}
+
+function onPong(){
+  const lat=Date.now()-pingT;
+  document.getElementById('bw-lat').textContent=lat+'ms';
+}
+function doPing(){
+  if(!connected)return;
+  pingT=Date.now(); send({op:'publish',topic:'/_ping',msg:{}}); 
+  setTimeout(doPing,3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION via navigate_to_pose action
+// ═══════════════════════════════════════════════════════════
+let navActive = false;
+
+function applyPreset(){
+  const val=document.getElementById('nav-preset').value;
+  if(!val)return;
+  const [x,y,yaw]=val.split(',').map(Number);
+  document.getElementById('nav-x').value=x;
+  document.getElementById('nav-y').value=y;
+  document.getElementById('nav-yaw').value=yaw;
+}
+
+function yawToQuat(yawDeg){
+  const r=yawDeg*Math.PI/180, cy=Math.cos(r/2), sy=Math.sin(r/2);
+  return {x:0,y:0,z:sy,w:cy};
+}
+
+function startNavigation(el){
+  if(!connected){toast('NOT CONNECTED');return;}
+  const x=parseFloat(document.getElementById('nav-x').value)||0;
+  const y=parseFloat(document.getElementById('nav-y').value)||0;
+  const yaw=parseFloat(document.getElementById('nav-yaw').value)||0;
+  const q=yawToQuat(yaw);
+
+  navActive=true;
+  setSvcDot('nav-svc-dot','warn');
+  document.getElementById('nav-svc-status').textContent='NAVIGATING…';
+  document.getElementById('nav-svc-status').style.color='var(--warn)';
+  setDot('nav-dot','warn');
+  document.getElementById('nav-label').textContent='NAV2 ACTIVE';
+  document.getElementById('nav-label').style.color='var(--warn)';
+  document.getElementById('btn-nav-cancel').style.opacity='1';
+
+  log('NAV',`Goal → (${x.toFixed(2)}, ${y.toFixed(2)}) yaw:${yaw}°`,'warn');
+  toast('NAVIGATING TO GOAL');
+
+  // Send via rosbridge action (requires rosbridge to support action goals)
+  // This publishes to /navigate_to_pose goal topic via action bridge
+  send({
+    op: 'call_service',
+    id: 'nav_svc_'+Date.now(),
+    service: '/navigate_to_pose',
+    type: 'nav2_msgs/action/NavigateToPose',
+    args: {
+      goal: {
+        pose: {
+          header: {stamp:{sec:0,nanosec:0}, frame_id:'map'},
+          pose: {
+            position:{x,y,z:0},
+            orientation:q
+          }
+        },
+        behavior_tree:''
+      }
+    }
+  });
+
+  // Also publish directly to /goal_pose (simpler, works with Nav2)
+  send({
+    op:'publish',
+    topic:'/goal_pose',
+    msg:{
+      header:{stamp:{sec:0,nanosec:0},frame_id:'map'},
+      pose:{position:{x,y,z:0},orientation:q}
+    }
+  });
+  advertise('/goal_pose','geometry_msgs/PoseStamped');
+
+  if(el) flash(el);
+}
+
+function cancelNavigation(el){
+  pubCmdVel(0,0);
+  navActive=false;
+  setSvcDot('nav-svc-dot','');
+  document.getElementById('nav-svc-status').textContent='CANCELLED';
+  document.getElementById('nav-svc-status').style.color='var(--danger)';
+  setDot('nav-dot','');
+  document.getElementById('nav-label').textContent='NAV2 IDLE';
+  document.getElementById('nav-label').style.color='var(--dim)';
+  document.getElementById('t-navdist').innerHTML='--<span class="tc-unit">m</span>';
+  document.getElementById('nav-dist-remain').textContent='';
+  // Send cancel to Nav2 cancel topic
+  send({op:'publish',topic:'/navigate_to_pose/_action/cancel_goal',msg:{goal_info:{goal_id:{uuid:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},stamp:{sec:0,nanosec:0}}}});
+  log('NAV','Navigation cancelled','warn');
+  toast('NAVIGATION CANCELLED');
+  if(el) flash(el);
+}
+
+function startLocalization(el){
+  if(!connected){toast('NOT CONNECTED');return;}
+  log('LOC','Sending localization_action goal…','warn');
+  toast('LOCALIZATION STARTED');
+  // Send action goal to localization_action server
+  send({op:'call_service',id:'loc_'+Date.now(),service:'/localization_action',type:'msg_pkg/action/Localization',args:{goal:{}}});
+  if(el) flash(el);
+}
+
+function launchRviz(el){ launchRvizFlask(el);
+  // This can only trigger on the robot's local machine
+  // We publish a std_msgs/String to /gui_cmd so a small helper script can launch rviz2
+  if(connected){
+    advertise('/gui_cmd','std_msgs/String');
+    send({op:'publish',topic:'/gui_cmd',msg:{data:'launch_rviz'}});
+    log('SYS','Published /gui_cmd: launch_rviz','ok');
+  }
+  log('SYS','RViz2 cmd:  ros2 launch sim_pkg robot_view.launch.py','info');
+  log('SYS','Or:  rviz2 -d $(ros2 pkg prefix config_pkg)/share/config_pkg/rviz/robot_view.rviz','info');
+  toast('RVIZ2 LAUNCH SIGNAL SENT');
+  if(el) flash(el);
+}
+
+// ═══════════════════════════════════════════════════════════
+// PUBLISH
+// ═══════════════════════════════════════════════════════════
+function pubCmdVel(lx,az){
+  send({op:'publish',topic:'/cmd_vel',msg:{linear:{x:lx,y:0,z:0},angular:{x:0,y:0,z:az}}});
+}
+
+// ═══════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════
+function callExcavation(el){
+  if(!connected){toast('NOT CONNECTED');return;}
+  setSvc('exc-svc','busy','RUNNING');
+  log('EXC','Calling excavation_service…','warn');
+  callSvc('excavation_service','interfaces_pkg/srv/ExcavationRequest',{start_excavation:true},(res)=>{
+    if(res?.excavation_successful){setSvc('exc-svc','ok','DONE');log('EXC','Excavation OK','ok');toast('EXCAVATION COMPLETE');}
+    else{setSvc('exc-svc','err','FAILED');log('EXC','Excavation FAILED','error');}
+    setTimeout(()=>setSvc('exc-svc','','IDLE'),3000);
+  });
+  flash(el);
+}
+function callDeposit(el){
+  if(!connected){toast('NOT CONNECTED');return;}
+  setSvc('dep-svc','busy','RUNNING');
+  log('DEP','Calling depositing_service…','warn');
+  callSvc('depositing_service','interfaces_pkg/srv/DepositingRequest',{start_depositing:true},(res)=>{
+    if(res?.depositing_successful){setSvc('dep-svc','ok','DONE');log('DEP','Depositing OK','ok');toast('DEPOSITING COMPLETE');}
+    else{setSvc('dep-svc','err','FAILED');log('DEP','Depositing FAILED','error');}
+    setTimeout(()=>setSvc('dep-svc','','IDLE'),3000);
+  });
+  flash(el);
+}
+function eStop(el){
+  pubCmdVel(0,0);
+  if(navActive) cancelNavigation(null);
+  log('SYS','E-STOP — /cmd_vel zeroed','warn');
+  toast('E-STOP SENT'); flash(el);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TELEOP
+// ═══════════════════════════════════════════════════════════
+const activeKeys=new Set();
+const S={linSpeed:0.35,angSpeed:0.25};
+function dk(k,down){
+  const el=document.getElementById('key-'+k);
+  if(down){activeKeys.add(k);el?.classList.add('active');}
+  else{activeKeys.delete(k);el?.classList.remove('active');}
+  let lx=0,az=0;
+  if(activeKeys.has('w'))lx=S.linSpeed;
+  if(activeKeys.has('s'))lx=-S.linSpeed;
+  if(activeKeys.has('a'))az=S.angSpeed;
+  if(activeKeys.has('d'))az=-S.angSpeed;
+  pubCmdVel(lx,az);
+}
+function pubLift(dir){log('LIFT',dir>0?'Lift UP':dir<0?'Lift DOWN':'Lift STOP','info');}
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  const k=e.key.toLowerCase();
+  if(['w','a','s','d'].includes(k)&&!e.repeat)dk(k,true);
+  if(k==='q'){S.linSpeed=Math.min(1,+(S.linSpeed+.05).toFixed(2));upd();}
+  if(k==='z'){S.linSpeed=Math.max(.05,+(S.linSpeed-.05).toFixed(2));upd();}
+  if(k==='e'){S.angSpeed=Math.min(1.5,+(S.angSpeed+.05).toFixed(2));upd();}
+  if(k==='c'){S.angSpeed=Math.max(.05,+(S.angSpeed-.05).toFixed(2));upd();}
+});
+document.addEventListener('keyup',e=>{
+  if(e.target.tagName==='INPUT')return;
+  const k=e.key.toLowerCase();
+  if(['w','a','s','d'].includes(k))dk(k,false);
+});
+function upd(){
+  document.getElementById('sp-lin').textContent=S.linSpeed.toFixed(2);
+  document.getElementById('sp-ang').textContent=S.angSpeed.toFixed(2);
+}
+function rotateFish(a){document.getElementById('fish-pos').textContent=a+'°';log('CAM','Fisheye → '+a+'°','info');}
+
+// ═══════════════════════════════════════════════════════════
+// HEALTH GRID
+// ═══════════════════════════════════════════════════════════
+const mDefs=[
+  {id:'lm',label:'L Drive',vel:'left_motor_velocity',curr:'left_motor_current',volt:'left_motor_voltage',temp:'left_motor_temperature'},
+  {id:'rm',label:'R Drive',vel:'right_motor_velocity',curr:'right_motor_current',volt:'right_motor_voltage',temp:'right_motor_temperature'},
+  {id:'ll',label:'L Lift', pos:'left_lift_position', curr:'left_lift_current',volt:'left_lift_voltage'},
+  {id:'rl',label:'R Lift', pos:'right_lift_position',curr:'right_lift_current',volt:'right_lift_voltage'},
+  {id:'ti',label:'Tilt',   pos:'tilt_position',      curr:'tilt_current',      volt:'tilt_voltage'},
+  {id:'vi',label:'Vibrator',curr:'vibrator_current', volt:'vibrator_voltage'},
+];
+function buildHealthGrid(){
+  document.getElementById('health-grid').innerHTML=mDefs.map(m=>`
+    <div class="motor-card">
+      <div class="mc-title">${m.label}</div>
+      ${m.vel!==undefined?`<div class="mc-row"><span class="mc-label">VEL</span><span class="mc-val" id="mh-${m.id}-v">--</span></div>`:''}
+      ${m.pos!==undefined?`<div class="mc-row"><span class="mc-label">POS</span><span class="mc-val" id="mh-${m.id}-p">--</span></div>`:''}
+      <div class="mc-row"><span class="mc-label">CURR</span><span class="mc-val" id="mh-${m.id}-c">--</span></div>
+      <div class="mc-row"><span class="mc-label">VOLT</span><span class="mc-val" id="mh-${m.id}-vo">--</span></div>
+      ${m.temp!==undefined?`<div class="mc-row"><span class="mc-label">TEMP</span><span class="mc-val" id="mh-${m.id}-t">--</span></div>`:''}
+      <div class="bar-track"><div class="bar-fill" id="mh-${m.id}-b" style="width:0%"></div></div>
+    </div>`).join('');
+}
+function updateHealthGrid(d){
+  mDefs.forEach(m=>{
+    if(m.vel!==undefined)setMH(`mh-${m.id}-v`,d[m.vel],' rpm');
+    if(m.pos!==undefined)setMH(`mh-${m.id}-p`,d[m.pos],'');
+    setMH(`mh-${m.id}-c`,d[m.curr],' A');
+    setMH(`mh-${m.id}-vo`,d[m.volt],' V');
+    if(m.temp!==undefined){
+      const el=document.getElementById(`mh-${m.id}-t`),v=d[m.temp];
+      if(el&&v!==undefined){el.textContent=v.toFixed(1)+'°C';el.className='mc-val'+(v>80?' crit':v>60?' hi':'');}
+    }
+    const c=d[m.curr];
+    if(c!==undefined){
+      const pct=Math.min(100,Math.abs(c)/40*100);
+      const b=document.getElementById(`mh-${m.id}-b`);
+      if(b){b.style.width=pct+'%';b.className='bar-fill'+(pct>80?' crit':pct>60?' warn':'');}
+    }
+  });
+}
+function setMH(id,val,unit){const el=document.getElementById(id);if(!el||val===undefined)return;el.textContent=(typeof val==='number'?val.toFixed(2):val)+unit;}
+
+// ═══════════════════════════════════════════════════════════
+// TOPIC HEALTH
+// ═══════════════════════════════════════════════════════════
+const watchTopics=['/health_topic','/odometry/filtered','/heartbeat','/cmd_vel','/scan','/icp_odom','/d456/color/image_raw','/d455/color/image_raw'];
+function buildTopicHealth(){
+  document.getElementById('topic-health').innerHTML=watchTopics.map(t=>`
+    <div class="th-row">
+      <div style="display:flex;align-items:center;gap:5px">
+        <div class="dot" id="th-${t.replace(/\//g,'_').replace(/\./g,'_')}"></div>
+        <span class="th-topic">${t.length>30?'…'+t.slice(-28):t}</span>
+      </div>
+      <span class="th-hz" id="thz-${t.replace(/\//g,'_').replace(/\./g,'_')}">--</span>
+    </div>`).join('');
+}
+function updateTopicHealth(){
+  const now=Date.now();
+  watchTopics.forEach(t=>{
+    const k=t.replace(/\//g,'_').replace(/\./g,'_');
+    const alive=topicSeen[t]&&(now-topicSeen[t])<2500;
+    setDot('th-'+k,alive?'ok':'');
+    const hz=document.getElementById('thz-'+k);
+    if(hz){hz.textContent=alive?(topicHzVal[t]||0)+'Hz':'NO DATA';hz.style.color=alive?'var(--accent2)':'var(--dim)';}
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// BANDWIDTH GRAPH
+// ═══════════════════════════════════════════════════════════
+function drawBW(){
+  const canvas=document.getElementById('bw-canvas');
+  const r=canvas.parentElement.getBoundingClientRect();
+  if(!r.width)return;
+  canvas.width=r.width;canvas.height=r.height;
+  const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+  ctx.clearRect(0,0,w,h);
+  const max=Math.max(...bwHist,1);
+  ctx.beginPath();ctx.strokeStyle='rgba(0,255,200,.8)';ctx.lineWidth=1.5;
+  bwHist.forEach((v,i)=>{const x=(i/(bwHist.length-1))*w,y=h-(v/max)*(h-4)-2;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.stroke();
+  ctx.beginPath();
+  bwHist.forEach((v,i)=>{const x=(i/(bwHist.length-1))*w,y=h-(v/max)*(h-4)-2;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();
+  ctx.fillStyle='rgba(0,255,200,.06)';ctx.fill();
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════
+function sv(id,val,unit=''){
+  const el=document.getElementById(id);if(!el||val===undefined)return;
+  el.innerHTML=(typeof val==='number'?val.toFixed(2):val)+(unit?`<span class="tc-unit">${unit}</span>`:'');
+}
+function setDot(id,st){const el=document.getElementById(id);if(el)el.className='dot'+(st?' '+st:'');}
+function setSvcDot(id,st){setDot(id,st);}
+function setSvc(id,cls,txt){const el=document.getElementById(id);if(el){el.className='svc-badge'+(cls?' '+cls:'');el.textContent=txt;}}
+function setMode(mode,btn){document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');log('SYS','Mode → '+mode.toUpperCase(),'info');toast('MODE: '+mode.toUpperCase());}
+function flash(el){if(!el)return;el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),400);}
+let toastT=null;
+function toast(msg){const el=document.getElementById('toast');el.textContent='// '+msg;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2200);}
+
+// ═══════════════════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════════════════
+let logN=0;
+function log(src,msg,type='info'){
+  const area=document.getElementById('log-body');
+  const n=new Date();
+  const t=[n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>String(v).padStart(2,'0')).join(':');
+  const line=document.createElement('div');
+  line.className='log-line';
+  line.innerHTML=`<span class="log-time">${t}</span><span class="log-src">${src}</span><span class="log-msg ${type}">${msg}</span>`;
+  area.appendChild(line);area.scrollTop=area.scrollHeight;
+  document.getElementById('log-count').textContent=++logN;
+  if(area.children.length>400)area.removeChild(area.firstChild);
+}
+function clearLog(){document.getElementById('log-body').innerHTML='';logN=0;document.getElementById('log-count').textContent='0';}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════════════
+let tick=0;
+function loop(){
+  tick++;
+  const n=new Date();
+  document.getElementById('clock').textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>String(v).padStart(2,'0')).join(':');
+
+  if(tick%20===0){
+    byteRate=byteCount;msgRate=msgCount;byteCount=0;msgCount=0;
+    bwHist.push(byteRate/1024);bwHist.shift();
+    document.getElementById('bw-kb').textContent=(byteRate/1024).toFixed(1);
+    document.getElementById('bw-msg').textContent=msgRate;
+    document.getElementById('bw-tag').className='ph-tag'+(connected?' live':'');
+  }
+
+  // draw sim feed for panels in 'sim' mode, or when no live signal
+  ['front','rear'].forEach(panel=>{
+    const src=camState[panel];
+    const canvasId=`cam-${panel}-canvas`;
+    const topicAlive = src!=='sim' && topicSeen[camTopicMap[src]] && (Date.now()-topicSeen[camTopicMap[src]])<3000;
+    if(src==='sim'||!topicAlive){
+      drawSimCam(canvasId, panel==='front'?0:42);
+      document.getElementById(`cam-${panel[0]}-st`).textContent=topicAlive?'LIVE':'NO SIGNAL';
+      document.getElementById(`cam-${panel[0]}-info`).textContent=src==='sim'?'SIM MODE':(!connected?'DISCONNECTED':camTopicMap[src]||'');
+    }
+  });
+
+  drawBW();updateTopicHealth();
+  requestAnimationFrame(loop);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// FLASK INTEGRATION – node launch / kill via /launch_node
+// ═══════════════════════════════════════════════════════════
+async function launchNode(nodeKey, el){
+  if(!el) el=document.getElementById('nb-'+nodeKey);
+  try{
+    const r=await fetch('/launch_node',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({node:nodeKey})
+    });
+    const d=await r.json();
+    if(d.ok){
+      if(el){el.className='nbtn running';el.title+=' (PID '+d.pid+')';}
+      log('SYS','Launched '+nodeKey+' (PID '+d.pid+')','ok');
+      toast(nodeKey.toUpperCase()+' LAUNCHED');
+    } else {
+      if(el) el.className='nbtn stopped';
+      log('SYS','Launch failed: '+d.error,'error');
+    }
+  }catch(e){
+    log('SYS','Flask /launch_node error: '+e.message,'error');
+  }
+}
+
+async function killNode(nodeKey){
+  try{
+    const r=await fetch('/kill_node',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({node:nodeKey})
+    });
+    const d=await r.json();
+    if(d.ok){
+      const el=document.getElementById('nb-'+nodeKey);
+      if(el) el.className='nbtn';
+      log('SYS','Killed '+nodeKey,'warn');
+    }
+  }catch(e){}
+}
+
+async function refreshNodeStatus(){
+  try{
+    const r=await fetch('/node_status');
+    const d=await r.json();
+    Object.entries(d).forEach(([k,v])=>{
+      const el=document.getElementById('nb-'+k);
+      if(el) el.className='nbtn '+(v==='running'?'running':'stopped');
+    });
+    log('SYS','Node status refreshed','info');
+  }catch(e){}
+}
+
+// Also wire the RViz button in the right panel to Flask
+async function launchRvizFlask(el){
+  try{
+    const r=await fetch('/gui_cmd',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cmd:'launch_rviz'})
+    });
+    const d=await r.json();
+    if(d.ok){log('SYS','RViz2 launched via Flask (PID '+d.pid+')','ok');toast('RVIZ2 LAUNCHED');}
+    else{log('SYS','RViz2 launch failed: '+d.error,'error');}
+  }catch(e){log('SYS','Flask /gui_cmd error','error');}
+  if(el) flash(el);
+}
+
+// Poll node status every 10s
+setInterval(refreshNodeStatus, 10000);
+// Initial poll after 2s
+setTimeout(refreshNodeStatus, 2000);
+
+// Also fetch active ros2 nodes and update topic health from /get_active_nodes
+async function fetchRosInfo(){
+  try{
+    const r=await fetch('/get_active_nodes');
+    const d=await r.json();
+    log('ROS',d.number_nodes+' nodes  '+d.number_topics+' topics  '+d.number_services+' services','info');
+  }catch(e){}
+}
+setTimeout(fetchRosInfo, 3000);
+setInterval(fetchRosInfo, 30000);
+
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLLER NODE BUTTON/AXIS MAP (from controller_node.cpp)
+// ═══════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLLER NODE BUTTON/AXIS MAP (from controller_node.cpp)
+// ═══════════════════════════════════════════════════════════
+const BTN = {
+  A:             0,   // Excavation Autonomy
+  B:             1,   // Stop Automation
+  X:             2,   // Excavation Reset
+  Y:             3,   // Deposit Autonomy
+  LEFT_BUMPER:   4,   // Alt mode toggle
+  RIGHT_BUMPER:  5,   // Vibration Toggle
+  LEFT_TRIGGER:  6,   // Safety
+  RIGHT_TRIGGER: 7,   // Safety
+  WINDOW_KEY:    8,   // Full cycle
+  D_PAD_UP:      12,
+  D_PAD_DOWN:    13,
+  D_PAD_LEFT:    14,
+  D_PAD_RIGHT:   15,
+  XBOX_KEY:      16,
+};
+const AXIS = {
+  LEFT_H:  0,
+  LEFT_V:  1,
+  RIGHT_H: 2,
+  RIGHT_V: 3,
+};
+
+// Button display info
+const BTN_DEFS = [
+  {idx:0,  name:'A',          color:'var(--btn-a)'},
+  {idx:1,  name:'B',          color:'var(--btn-b)'},
+  {idx:2,  name:'X',          color:'var(--btn-x)'},
+  {idx:3,  name:'Y',          color:'var(--btn-y)'},
+  {idx:4,  name:'LB',         color:'var(--accent)'},
+  {idx:5,  name:'RB',         color:'var(--accent)'},
+  {idx:6,  name:'LT',         color:'var(--accent)'},
+  {idx:7,  name:'RT',         color:'var(--accent)'},
+  {idx:8,  name:'WINDOW',     color:'var(--dim)'},
+  {idx:9,  name:'MENU',       color:'var(--dim)'},
+  {idx:10, name:'LS CLICK',   color:'var(--dim)'},
+  {idx:11, name:'RS CLICK',   color:'var(--dim)'},
+  {idx:12, name:'D↑',         color:'var(--ok)'},
+  {idx:13, name:'D↓',         color:'var(--ok)'},
+  {idx:14, name:'D←',         color:'var(--ok)'},
+  {idx:15, name:'D→',         color:'var(--ok)'},
+  {idx:16, name:'XBOX',       color:'var(--accent)'},
+];
+
+// ═══════════════════════════════════════════════════════════
+// GAMEPAD STATE
+// ═══════════════════════════════════════════════════════════
+let GAMEPAD = null;
+let GAMEPAD_INDEX = -1;
+let FRAME_ID = 0;
+let pubCount = 0;
+let lastPubTime = Date.now();
+
+window.addEventListener('gamepadconnected', (e) => {
+  GAMEPAD = navigator.getGamepads()[e.gamepad.index];
+  GAMEPAD_INDEX = e.gamepad.index;
+  FRAME_ID = 0;
+  setDot('gp-dot-p','ok');
+  document.getElementById('gp-label-p').style.color='var(--ok)';
+  document.getElementById('gp-label-p').textContent = e.gamepad.id.slice(0,32);
+  console.log('Gamepad connected:', e.gamepad.id);
+});
+
+window.addEventListener('gamepaddisconnected', (e) => {
+  if (GAMEPAD_INDEX === e.gamepad.index) {
+    GAMEPAD = null; GAMEPAD_INDEX = -1;
+  }
+  setDot('gp-dot-p','err');
+  document.getElementById('gp-label-p').style.color='var(--danger)';
+  document.getElementById('gp-label-p').textContent='DISCONNECTED';
+});
+
+function getGamepad(){
+  if (GAMEPAD_INDEX < 0) return null;
+  try { return navigator.getGamepads()[GAMEPAD_INDEX]; } catch(e){ return null; }
+}
+
+function deadzone(v, dz=0.05){ return Math.abs(v)<dz?0:v; }
+
+function toIntButtons(arr){
+  return arr.map(b => {
+    if (typeof b==='boolean') return b?1:0;
+    if (typeof b==='number')  return b>0.5?1:0;
+    return (b&&(b.pressed||(b.value&&b.value>0.5)))?1:0;
+  });
+}
+
+// /joy publisher — uses pilot's existing rosbridge ws connection
+function advertiseJoy(){
+  send({op:'advertise',topic:'/joy',type:'sensor_msgs/Joy'});
+}
+
+// ═══════════════════════════════════════════════════════════
+// PUBLISH JOY
+// ═══════════════════════════════════════════════════════════
+function publishJoy(gp){
+  const rawAxes    = Array.from(gp.axes);
+  const rawButtons = Array.from(gp.buttons);
+  const axes    = rawAxes.map(a => deadzone(a));
+  const buttons = toIntButtons(rawButtons);
+
+  FRAME_ID++;
+  const now = Date.now();
+  const sec     = Math.floor(now/1000);
+  const nanosec = Math.floor((now%1000)*1e6);
+
+  send({op:'publish',topic:'/joy',msg:{
+    header:{stamp:{sec,nanosec},frame_id:`${FRAME_ID}`},
+    axes,
+    buttons
+  }});
+
+  pubCount++;
+  document.getElementById('pub-frame').textContent = FRAME_ID;
+  document.getElementById('pub-axes').textContent  = axes.length;
+  document.getElementById('pub-btns').textContent  = buttons.length;
+  return {axes, buttons};
+}
+
+// ═══════════════════════════════════════════════════════════
+// UPDATE CONTROLLER VISUAL
+// ═══════════════════════════════════════════════════════════
+function updateVisual(axes, buttons){
+  const b = buttons;
+  const ax = axes;
+
+  // Safety lock
+  const triggered = b[BTN.LEFT_TRIGGER]||b[BTN.RIGHT_TRIGGER];
+  const safeEl = document.getElementById('safety-dot');
+  const safeTxt = document.getElementById('safety-text');
+  const safeFill = document.getElementById('safety-fill');
+  const safeTag = document.getElementById('safety-tag');
+  if(triggered){
+    safeEl.style.background='var(--ok)'; safeEl.style.boxShadow='0 0 5px var(--ok)';
+    safeTxt.textContent='UNLOCKED — Motors enabled';safeTxt.style.color='var(--ok)';
+    safeFill.style.width='100%';safeFill.style.background='var(--ok)';
+    safeTag.style.borderColor='var(--ok)';safeTag.style.color='var(--ok)';
+    safeTag.textContent='✓ SAFETY ACTIVE';
+  } else {
+    safeEl.style.background='var(--danger)'; safeEl.style.boxShadow='0 0 5px var(--danger)';
+    safeTxt.textContent='LOCKED — Hold LT or RT to enable motors';safeTxt.style.color='var(--danger)';
+    safeFill.style.width='0%';
+    safeTag.style.borderColor='var(--danger)';safeTag.style.color='var(--danger)';
+    safeTag.textContent='⚠ TRIGGER REQUIRED';
+  }
+
+  // Triggers (digital — ROS reports as button 6/7, not analog in this mapping)
+  const ltPct = (b[BTN.LEFT_TRIGGER]||0)*100;
+  const rtPct = (b[BTN.RIGHT_TRIGGER]||0)*100;
+  setTrigger('lt', ltPct);
+  setTrigger('rt', rtPct);
+
+  // Bumpers
+  toggleClass('btn-lb', 'active', b[BTN.LEFT_BUMPER]);
+  toggleClass('btn-rb', 'active', b[BTN.RIGHT_BUMPER]);
+  annotate('ann-lb', b[BTN.LEFT_BUMPER]);
+  annotate('ann-rb', b[BTN.RIGHT_BUMPER]);
+
+  // Face buttons
+  toggleClass('btn-a','active',b[BTN.A]);
+  toggleClass('btn-b','active',b[BTN.B]);
+  toggleClass('btn-x','active',b[BTN.X]);
+  toggleClass('btn-y','active',b[BTN.Y]);
+  annotate('ann-a',b[BTN.A]);
+  annotate('ann-b',b[BTN.B]);
+  annotate('ann-x',b[BTN.X]);
+  annotate('ann-y',b[BTN.Y]);
+
+  // D-pad
+  toggleClass('dp-up',   'active',b[BTN.D_PAD_UP]);
+  toggleClass('dp-down', 'active',b[BTN.D_PAD_DOWN]);
+  toggleClass('dp-left', 'active',b[BTN.D_PAD_LEFT]);
+  toggleClass('dp-right','active',b[BTN.D_PAD_RIGHT]);
+  const dpLR = b[BTN.D_PAD_LEFT]||b[BTN.D_PAD_RIGHT];
+  const dpUD = b[BTN.D_PAD_UP]||b[BTN.D_PAD_DOWN];
+  annotate('ann-dp',dpLR);
+  annotate('ann-dpud',dpUD);
+
+  // Xbox / Window
+  toggleClass('btn-xbox','active',b[BTN.XBOX_KEY]);
+  toggleClass('xbox-ring','active',b[BTN.XBOX_KEY]);
+  toggleClass('btn-back','active',b[BTN.WINDOW_KEY]);
+  annotate('ann-back',b[BTN.WINDOW_KEY]);
+
+  // Left stick
+  const lh = ax[AXIS.LEFT_H]||0, lv = ax[AXIS.LEFT_V]||0;
+  updateStickSVG('ls-knob','ls-dot', 155, 185, 22, lh, -lv);
+  updateStickCanvas('ls-canvas', lh, lv);
+  updateAxisBar('ls-h-fill','ls-h-val', lh);
+  updateAxisBar('ls-v-fill','ls-v-val', -lv);
+  annotate('ann-ls', Math.abs(lh)>.05||Math.abs(lv)>.05);
+
+  // Right stick
+  const rh = ax[AXIS.RIGHT_H]||0, rv = ax[AXIS.RIGHT_V]||0;
+  updateStickSVG('rs-knob','rs-dot', 300, 200, 19, rh, -rv);
+  updateStickCanvas('rs-canvas', rh, rv);
+  updateAxisBar('rs-h-fill','rs-h-val', rh);
+  updateAxisBar('rs-v-fill','rs-v-val', -rv);
+  annotate('ann-rs', Math.abs(rh)>.05||Math.abs(rv)>.05);
+
+  // Action cards
+  setAction('action-a',   b[BTN.A]);
+  setAction('action-b',   b[BTN.B]);
+  setAction('action-x',   b[BTN.X]);
+  setAction('action-y',   b[BTN.Y]);
+  setAction('action-lb',  b[BTN.RIGHT_BUMPER]); // RB = vibrator
+  setAction('action-rb',  b[BTN.LEFT_BUMPER]);  // LB = alt mode
+  setAction('action-dp-ud', dpUD);
+  setAction('action-dp-lr', dpLR);
+  setAction('action-back', b[BTN.WINDOW_KEY]);
+
+  // Button matrix
+  updateBtnMatrix(b);
+}
+
+// ─── HELPERS ──────────────────────────────────────────────
+function setTrigger(side, pct){
+  const fill = document.getElementById(side+'-fill');
+  const txt  = document.getElementById(side+'-pct');
+  if(!fill) return;
+  const maxH = 50;
+  const h = (pct/100)*maxH;
+  fill.setAttribute('height', h.toFixed(1));
+  if(txt) txt.textContent = Math.round(pct)+'%';
+  fill.style.fill = pct>10 ? 'rgba(0,170,255,.7)' : 'rgba(0,170,255,.2)';
+}
+
+function updateStickSVG(knobId, dotId, cx, cy, range, nx, ny){
+  const knob = document.getElementById(knobId);
+  const dot  = document.getElementById(dotId);
+  if(!knob) return;
+  const dx = nx * range, dy = ny * range;
+  knob.setAttribute('cx', cx+dx);
+  knob.setAttribute('cy', cy+dy);
+  dot.setAttribute('cx',  cx+dx);
+  dot.setAttribute('cy',  cy+dy);
+  knob.classList.toggle('active', Math.abs(nx)>.05||Math.abs(ny)>.05);
+}
+
+function updateStickCanvas(id, nx, ny){
+  const c = document.getElementById(id); if(!c) return;
+  const ctx = c.getContext('2d'), w=c.width, h=c.height, cx=w/2, cy=h/2, r=w/2-4;
+  ctx.clearRect(0,0,w,h);
+  // bg
+  ctx.fillStyle='#090c10'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#162030'; ctx.lineWidth=1; ctx.stroke();
+  // range ring
+  ctx.strokeStyle='#1e3050'; ctx.beginPath(); ctx.arc(cx,cy,r*.75,0,Math.PI*2); ctx.stroke();
+  // center cross
+  ctx.strokeStyle='#1e3050'; ctx.lineWidth=.5;
+  ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,cy-r);ctx.lineTo(cx,cy+r);ctx.stroke();
+  // stick position dot
+  const sx=cx+nx*r*.75, sy=cy+ny*r*.75;
+  ctx.fillStyle='rgba(0,170,255,.3)'; ctx.beginPath(); ctx.arc(sx,sy,8,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='var(--accent)';
+  // Use hex since CSS var doesn't work in canvas fillStyle
+  ctx.fillStyle='#00aaff'; ctx.beginPath(); ctx.arc(sx,sy,4,0,Math.PI*2); ctx.fill();
+  // trail line from center
+  ctx.strokeStyle='rgba(0,170,255,.3)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(sx,sy); ctx.stroke();
+}
+
+function updateAxisBar(fillId, valId, v){
+  const fill = document.getElementById(fillId);
+  const val  = document.getElementById(valId);
+  if(!fill) return;
+  // center bar: left half for negative, right half for positive
+  const pct = Math.abs(v)*50;
+  if(v>=0){
+    fill.style.left='50%'; fill.style.width=pct+'%';
+  } else {
+    fill.style.left=(50-pct)+'%'; fill.style.width=pct+'%';
+  }
+  if(val) val.textContent = v.toFixed(2);
+}
+
+function toggleClass(id, cls, on){
+  const el=document.getElementById(id); if(!el) return;
+  el.classList.toggle(cls, !!on);
+}
+
+function annotate(id, lit){
+  const el=document.getElementById(id); if(!el) return;
+  el.classList.toggle('lit', !!lit);
+}
+
+function setAction(id, active){
+  const el=document.getElementById(id); if(!el) return;
+  el.classList.toggle('active', !!active);
+}
+
+// setDot already defined above
+
+// ─── BUTTON MATRIX ────────────────────────────────────────
+function buildBtnMatrix(){
+  const wrap = document.getElementById('btn-matrix');
+  BTN_DEFS.forEach(d=>{
+    const cell = document.createElement('div');
+    cell.className='bm-cell';
+    cell.id='bmc-'+d.idx;
+    cell.innerHTML=`<span class="bm-name" style="color:${d.color}">${d.name}</span><span class="bm-idx">[${d.idx}]</span>`;
+    wrap.appendChild(cell);
+  });
+}
+
+function updateBtnMatrix(buttons){
+  BTN_DEFS.forEach(d=>{
+    const cell=document.getElementById('bmc-'+d.idx);
+    if(cell) cell.classList.toggle('active', !!(buttons[d.idx]));
+  });
+}
+
+// ─── PUB RATE DISPLAY ─────────────────────────────────────
+setInterval(()=>{
+  const now=Date.now();
+  const dt=(now-lastPubTime)/1000;
+  const hz=Math.round(pubCount/dt);
+  pubCount=0; lastPubTime=now;
+  const phz=document.getElementById('pub-hz');if(phz)phz.textContent=hz+' msg/s';
+  const ptag=document.getElementById('pub-tag');if(ptag)ptag.textContent=hz+' Hz';
+},1000);
+
+// ═══════════════════════════════════════════════════════════
+// GAMEPAD LOOP
+// ═══════════════════════════════════════════════════════════
+function gpTick(){
+  const gp = getGamepad();
+  if(gp){
+    const {axes, buttons} = publishJoy(gp);
+    updateVisual(axes, buttons);
+  } else {
+    // Render idle state
+    updateStickCanvas('ls-canvas',0,0);
+    updateStickCanvas('rs-canvas',0,0);
+  }
+}
+
+// Build static UI
+buildBtnMatrix();
+
+// Gesture unlock for Gamepad API
+['click','keydown','pointerdown'].forEach(evt=>{
+  window.addEventListener(evt, ()=>{}, {once:true, capture:false});
+});
+
+// 20 Hz publish loop (50ms interval — matches existing gamepad.js)
+setInterval(gpTick, 50);
+
+
+
+// ═══════════════════════════════════════════════════════════
+// ROS3D WORLD VIEWER
+// ═══════════════════════════════════════════════════════════
+let viewer3d = null;
+let ros3d_layers = {};
+let ros3d_visible = {map:true, robot:true, scan:true, path:true, grid:true};
+
+function init3DViewer(rosConn) {
+  const wrap = document.getElementById('viewer3d');
+  if (!wrap || typeof ROS3D === 'undefined') {
+    setTimeout(()=>init3DViewer(rosConn), 800);
+    return;
+  }
+  try {
+    viewer3d = new ROS3D.Viewer({
+      divID:     'viewer3d',
+      width:     wrap.offsetWidth  || 800,
+      height:    wrap.offsetHeight || 260,
+      antialias: true,
+      background:'#020608',
+    });
+    viewer3d.camera.position.set(0, -4, 6);
+    viewer3d.camera.lookAt(0, 0, 0);
+
+    // Grid floor
+    ros3d_layers.grid = new ROS3D.Grid({color:'#162030', cellSize:0.5, num_cells:20});
+    viewer3d.scene.add(ros3d_layers.grid);
+
+    const tfClient = new ROSLIB.TFClient({
+      ros: rosConn, angularThres:0.01, transThres:0.01, rate:10.0, fixedFrame:'/map',
+    });
+
+    // Occupancy map
+    ros3d_layers.map = new ROS3D.OccupancyGridClient({
+      ros: rosConn, tfClient, topic:'/map', continuous:true,
+      color:{r:0, g:255, b:136, a:180},
+    });
+    viewer3d.addObject(ros3d_layers.map);
+
+    // Laser scan
+    ros3d_layers.scan = new ROS3D.LaserScan({
+      ros: rosConn, tfClient, topic:'/scan',
+      pointSize:2, maxPts:5000,
+      material:{size:2, color:0xff4422},
+    });
+    viewer3d.addObject(ros3d_layers.scan);
+
+    // Robot axes (base_link frame marker)
+    ros3d_layers.robot = new ROS3D.Axes({
+      ros: rosConn, tfClient, frameID:'/base_link', lineType:'arrow',
+    });
+    viewer3d.addObject(ros3d_layers.robot);
+
+    // Nav path
+    ros3d_layers.path = new ROS3D.Path({
+      ros: rosConn, tfClient, topic:'/plan', color:0xffaa00,
+    });
+    viewer3d.addObject(ros3d_layers.path);
+
+    // Resize
+    new ResizeObserver(()=>{
+      if(viewer3d && wrap) viewer3d.resize(wrap.offsetWidth, wrap.offsetHeight);
+    }).observe(wrap);
+
+    document.getElementById('v3d-status').textContent='LIVE';
+    document.getElementById('v3d-status').style.borderColor='var(--ok)';
+    document.getElementById('v3d-status').style.color='var(--ok)';
+    document.getElementById('v3d-map-tag').textContent='MAP: /map';
+    document.getElementById('v3d-map-tag').style.borderColor='var(--accent)';
+    document.getElementById('v3d-robot-tag').textContent='ROBOT: /base_link';
+    document.getElementById('v3d-robot-tag').style.borderColor='var(--accent)';
+    log('SYS','3D viewer ready — ros3djs /map /scan /plan','ok');
+  } catch(err) {
+    log('SYS','3D viewer error: '+err.message,'warn');
+    document.getElementById('v3d-status').textContent='ERROR';
+  }
+}
+
+function toggleLayer(name) {
+  ros3d_visible[name] = !ros3d_visible[name];
+  const obj = ros3d_layers[name];
+  if (obj) obj.visible = ros3d_visible[name];
+  const btn = document.getElementById('btn-layer-'+name);
+  if (btn) btn.classList.toggle('active', ros3d_visible[name]);
+}
+
+function resetView3d() {
+  if (!viewer3d) return;
+  viewer3d.camera.position.set(0, -4, 6);
+  viewer3d.camera.lookAt(0,0,0);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+buildHealthGrid();buildTopicHealth();buildBtnMatrix();
+log('SYS','EDT Lunabotics 2026 GUI ready','ok');
+log('SYS','Start rosbridge:  ros2 launch rosbridge_server rosbridge_websocket_launch.xml','info');
+log('SYS','Camera feeds via /d456/color/image_raw + /d455/color/image_raw (sensor_msgs/Image raw)','info');
+log('SYS','Navigation publishes to /goal_pose (geometry_msgs/PoseStamped, frame: map)','info');
+log('SYS','RViz2 launch signal → /gui_cmd (std_msgs/String)  data: "launch_rviz"','info');
+loop();
+// Start gamepad polling at 20Hz
+setInterval(gpTick, 50);
+['click','keydown','pointerdown'].forEach(evt=>window.addEventListener(evt,()=>{},{once:true}));
+</script>
+
+<script src="/static/js/three.min.js"></script>
+<script src="/static/js/ros3d.min.js"></script>
+<script src="/static/js/roslib.min.js"></script>
+<script src="{{url_for('static', filename='js/resources/roslib.min.js')}}"></script>
+<script src="{{url_for('static', filename='js/resources/eventemitter2.min.js')}}"></script>
+<script src="{{url_for('static', filename='js/ros_setup.js')}}"></script>
+<script src="{{url_for('static', filename='js/gamepad_setup.js')}}" defer></script>
+<script src="{{url_for('static', filename='js/pilot.js')}}" defer></script>
 </body>
 </html>
-

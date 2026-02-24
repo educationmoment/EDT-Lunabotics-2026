@@ -21,6 +21,9 @@ SparkMax vibrator("can0", 6);
  * @returns None
  */
 void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrator) {
+    const float HIGH_PASS_FILTER = 0.38; // 0.38 position units
+    const float KP_LIFT = 8.0f; // Proportional gain
+    
     auto timer_start = std::chrono::high_resolution_clock::now();
     bool leftLiftReached = (fabs(lift_setpoint - leftLift.GetPosition() ) <=  ERROR);
     bool rightLiftReached = (fabs(lift_setpoint - rightLift.GetPosition() ) <=  ERROR);
@@ -28,20 +31,48 @@ void MoveBucket (float lift_setpoint, float tilt_setpoint, bool activate_vibrato
 
     while (!((leftLiftReached && rightLiftReached) && tiltReached)){
         std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
-        if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.2){
-            if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.75){
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "WARNING: ACTUATORS GREATELY MISALIGNEDT");
-                rclcpp::shutdown();
-            }
-            leftLift.SetPosition(rightLift.GetPosition());
-            rightLift.SetPosition(rightLift.GetPosition());
-
-        } //block for lift realignment
-        else {
-            leftLift.SetPosition(lift_setpoint);
-            rightLift.SetPosition(lift_setpoint);
-            tilt.SetPosition(tilt_setpoint);
-        } //block for normal bucket movement
+        
+        // ---- LIFT POSITION SYNC (from controller_node) ---- //
+        // Compute lift error (right - left)
+        float lift_error = rightLift.GetPosition() - leftLift.GetPosition();
+        
+        // High-pass deadband
+        if (fabs(lift_error) < HIGH_PASS_FILTER)
+            lift_error = 0.0f;
+        
+        // Determine direction to move towards setpoint
+        float left_position_error = lift_setpoint - leftLift.GetPosition();
+        float right_position_error = lift_setpoint - rightLift.GetPosition();
+        
+        // Base duty cycles (direction towards setpoint)
+        float left_duty = (left_position_error > ERROR) ? 1.0f : 
+                         ((left_position_error < -ERROR) ? -1.0f : 0.0f);
+        float right_duty = (right_position_error > ERROR) ? 1.0f : 
+                          ((right_position_error < -ERROR) ? -1.0f : 0.0f);
+        
+        // Proportional correction (slows the higher side)
+        float correction = KP_LIFT * fabs(lift_error);
+        
+        // Apply correction: subtract from whichever side is higher
+        if (lift_error > 0) {
+            // Right is higher → slow right
+            right_duty = right_duty - correction;
+        }
+        else if (lift_error < 0) {
+            // Left is higher → slow left
+            left_duty = left_duty - correction;
+        }
+        
+        // Clamp duties to valid range
+        left_duty = std::clamp(left_duty, -1.0f, 1.0f);
+        right_duty = std::clamp(right_duty, -1.0f, 1.0f);
+        
+        // Set lift duties with alignment correction
+        leftLift.SetDutyCycle(left_duty);
+        rightLift.SetDutyCycle(right_duty);
+        
+        // Set tilt position
+        tilt.SetPosition(tilt_setpoint);
 
         if (activate_vibrator) vibrator.SetDutyCycle(VIBRATOR_DUTY);
 
@@ -79,7 +110,7 @@ void Deposit(const std::shared_ptr<interfaces_pkg::srv::DepositingRequest::Reque
         RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Stage 1 complete");
 
         auto jiggleout_start = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - jiggleout_start).count() < 20) {
+        while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - jiggleout_start).count() < 10) {
             std::this_thread::sleep_for(std::chrono::milliseconds(5)); //prevents CAN buffer from overflowing
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
         } //Vibrates sand out of bucket
