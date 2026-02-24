@@ -3,9 +3,9 @@
 <package format="3">
   <name>controller_pkg</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="example@domain.com">ubuntu</maintainer>
-  <license>TODO: License declaration</license>
+  <description>controllerpkg</description>
+  <maintainer email="abaja5@uic.edu">Aakash Bajaj</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -15,7 +15,6 @@
   <depend>sparkcan</depend>
   <depend>interfaces_pkg</depend>
 
-  <!-- ✅ Add this -->
   <depend>rosidl_typesupport_cpp</depend>
 
   <test_depend>ament_lint_auto</test_depend>

@@ -1,24 +1,78 @@
-<!-- HTML: index -->
- <!DOCTYPE html>
- <html lang="en">
- <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Page</title>
-     <!-- <link rel="stylesheet" href="../static/css/index.css"/> -->
-     <link rel="stylesheet" href="{{url_for('static', filename='css/index.css')}}">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EDT Lunabotics UIC 2026</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+:root{--bg:#06080b;--surface:#0b0f14;--border:#162030;--accent:#0af;--ok:#0f8;--warn:#f80;--dim:#3a5060;--text:#9bb8cc;--bright:#def0ff;--mono:'JetBrains Mono',monospace;--ui:'Rajdhani',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--ui);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.logo{font-size:36px;font-weight:700;letter-spacing:8px;color:var(--bright);text-transform:uppercase;margin-bottom:4px;}
+.logo span{color:var(--accent);}
+.sub{font-family:var(--mono);font-size:11px;letter-spacing:4px;color:var(--dim);margin-bottom:48px;}
+.cards{display:grid;grid-template-columns:repeat(3,200px);gap:12px;}
+.card{
+  background:var(--surface);border:1px solid var(--border);padding:24px 20px;
+  text-decoration:none;color:var(--text);transition:all .2s;position:relative;overflow:hidden;
+}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:.2s;}
+.card:hover{border-color:var(--accent);color:var(--bright);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,170,255,.1);}
+.card:hover::before{opacity:1;}
+.card-icon{font-size:28px;margin-bottom:10px;}
+.card-title{font-size:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.card-desc{font-size:11px;color:var(--dim);font-family:var(--mono);}
+.card.pilot .card-icon{color:var(--accent);}
+.card.engineer .card-icon{color:var(--ok);}
+.card.network .card-icon{color:var(--warn);}
+/* node status strip */
+.status-strip{margin-top:32px;font-family:var(--mono);font-size:10px;color:var(--dim);display:flex;gap:20px;align-items:center;}
+.sd{display:flex;align-items:center;gap:5px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--dim);}
+.dot.ok{background:var(--ok);box-shadow:0 0 5px var(--ok);}
+.dot.err{background:#f24;box-shadow:0 0 5px #f24;}
+</style>
+</head>
+<body>
+<div class="logo">fuck<span>fred</span></div>
+<div class="sub">developer gui</div>
 
+<div class="cards">
+  <a class="card pilot" href="/pilot">
+    <div class="card-title">developer gui</div>
+    <div class="card-desc">Full control panel</div>
+  </a>
+  <a class="card engineer" href="/pilot_old">
+    <div class="card-title">old pilot gui</div>
+    <div class="card-desc">old pilot gui</div>
+  </a>
+</div>
 
- </head>
- <body>
-    <!-- <img src="../static/images/background.jpg"/> -->
-    <div class="header-div">
-        <p>Home Page</p>
-    </div>
-    <div class="body-div" style="display: grid; grid-template-rows: repeat(1fr, 3);">
-        <div class="links"><a href="/pilot">Pilot GUI</a></div>
-        <div class="links"><a class="links" href="/internal_systems">Internal Systems</a></div>
-        <div class="links"><a class="links" href="/networking">Networking</a></div>
-    </div>
- </body>
- </html>
+<div class="status-strip">
+  <div class="sd"><div class="dot" id="d-nodes"></div><span id="s-nodes">-- nodes</span></div>
+  <div class="sd"><div class="dot" id="d-topics"></div><span id="s-topics">-- topics</span></div>
+  <div class="sd"><div class="dot" id="d-services"></div><span id="s-services">-- services</span></div>
+</div>
+
+<script>
+async function poll(){
+  try{
+    const r=await fetch('/get_active_nodes');
+    const d=await r.json();
+    document.getElementById('s-nodes').textContent=d.number_nodes+' nodes';
+    document.getElementById('s-topics').textContent=d.number_topics+' topics';
+    document.getElementById('s-services').textContent=d.number_services+' services';
+    ['nodes','topics','services'].forEach(k=>{
+      document.getElementById('d-'+k).className='dot ok';
+    });
+  }catch(e){
+    ['nodes','topics','services'].forEach(k=>{
+      document.getElementById('d-'+k).className='dot err';
+    });
+  }
+}
+poll();setInterval(poll,5000);
+</script>
+</body>
+</html>

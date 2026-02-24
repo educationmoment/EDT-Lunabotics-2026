@@ -5,10 +5,14 @@ package_name = 'webgui_pkg'
 setup(
     name=package_name,
     version='0.0.0',
-    # packages=find_packages(exclude=['test']),
     packages=['webgui_pkg'],
-    package_data={'webgui_pkg': ['templates/*', 'static/**/*', 'static/**/**/*']},
-
+    package_data={
+        'webgui_pkg': [
+            'templates/*.html',
+            'static/**/*',
+            'static/**/**/*',
+        ]
+    },
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -17,13 +21,15 @@ setup(
     install_requires=['setuptools', 'Flask'],
     zip_safe=True,
     maintainer='edt',
-    maintainer_email='catherineschuch0@gmail.com',
-    description='Web GUI Server Node',
-    license='TODO: License declaration',
+    maintainer_email='abaja5@uic.edu',
+    description='Lunabotics web GUI – pilot, engineer, networking views',
+    license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "webgui_server = webgui_pkg.app:app.run",
+            # Run with: ros2 run webgui_pkg webgui_server
+            # Or set rosbridge URL: ROSBRIDGE_URL=ws://192.168.1.100:9090 ros2 run webgui_pkg webgui_server
+            'webgui_server = webgui_pkg.app:main',
         ],
     },
 )
