@@ -29,6 +29,12 @@
 for the NASA Lunabotics 2026 competition.</p>
 
 <h2>Potential Bugs and their fixes.</h2>
+<p>Default ("Zeroed") Lift / Tilt Positions:</p>
+
+    tilts: 5 5/8 inches
+
+    lifts: 6 13/16 inches
+    
 <p>Video Cameras not showing (and not throwing the error: "Failed to open USB RGB camera 1 (/dev/video6)")" etc</p> 
 
     fix: run "v4l2-ctl --list-devices" in /home/Desktop/robot_WS
