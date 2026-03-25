@@ -11,18 +11,70 @@ Routes:
   /launch_node        → POST: launch a ROS2 node by name
   /kill_node          → POST: kill a ROS2 node by name
   /gui_cmd            → POST: receive GUI commands (e.g. launch_rviz)
+  /video_feed         → MJPEG stream from /dev/video0 (OpenCV compressed)
 """
 
 import os
 import subprocess
 import threading
-from flask import Flask, render_template, jsonify, request
+import cv2
+from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 
 app = Flask(__name__)
 
 # ── background process registry ────────────────────────────
 _launched_procs: dict[str, subprocess.Popen] = {}
 _lock = threading.Lock()
+
+
+# ── CAMERA STREAM (OpenCV / MJPEG) ─────────────────────────
+
+DEVICE_INDEX   = 0     # /dev/video0 → 0, /dev/video2 → 1, etc.
+CAPTURE_WIDTH  = 1280
+CAPTURE_HEIGHT = 720
+CAPTURE_FPS    = 30
+JPEG_QUALITY   = 70    # 0–100; lower = smaller frames
+
+def _open_camera():
+    cap = cv2.VideoCapture(DEVICE_INDEX, cv2.CAP_V4L2)
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open /dev/video{DEVICE_INDEX}")
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  CAPTURE_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
+    cap.set(cv2.CAP_PROP_FPS,          CAPTURE_FPS)
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+    return cap
+
+def _generate_frames():
+    encode_params = [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY]
+    cap = None
+    try:
+        cap = _open_camera()
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                cap.release()
+                cap = _open_camera()
+                continue
+            success, buffer = cv2.imencode(".jpg", frame, encode_params)
+            if not success:
+                continue
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n"
+                + buffer.tobytes()
+                + b"\r\n"
+            )
+    finally:
+        if cap is not None:
+            cap.release()
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(
+        stream_with_context(_generate_frames()),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
 
 
 # ── ROUTES ─────────────────────────────────────────────────
@@ -201,7 +253,6 @@ def gui_cmd():
 
 if __name__ == '__main__' or __name__ == 'webgui_pkg.app':
     app.run(host='0.0.0.0', port=59440, debug=True)
-
 
 
 def main():

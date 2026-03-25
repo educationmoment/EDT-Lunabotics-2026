@@ -39,13 +39,20 @@ def generate_launch_description():
         package="image_transport", executable="republish", name="d456_republish",
         arguments=["raw", "compressed"],
         remappings=[("in", "/d456/color/image_raw"), ("out/compressed", "/d456/color/image_raw/compressed")],
-        parameters=[{"use_sim_time": True}],
+        parameters=[{
+            "use_sim_time": True,
+            "compressed.jpeg_quality": 20, 
+
+        }],
     )
     d455_compress_node = Node(
         package="image_transport", executable="republish", name="d455_republish",
         arguments=["raw", "compressed"],
         remappings=[("in", "/d455/color/image_raw"), ("out/compressed", "/d455/color/image_raw/compressed")],
-        parameters=[{"use_sim_time": True}],
+        parameters=[{
+            "use_sim_time": True,
+            "compressed.jpeg_quality": 20,
+        }],
     )
 
     topic_remapper_node = Node(package="util_pkg", executable="topic_remapper")

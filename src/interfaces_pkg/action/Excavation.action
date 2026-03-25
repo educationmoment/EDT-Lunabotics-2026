@@ -1,5 +1,0 @@
-bool excavation_request
----
-bool excavation_result
----
-float32 excavation_feedback
