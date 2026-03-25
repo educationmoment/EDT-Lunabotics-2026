@@ -18,11 +18,15 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Find required packages
+find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 # Generate interfaces
-rosidl_generate_interfaces(${PROJECT_NAME} "action/Localization.action"
-                           "action/Excavation.action")
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "action/Localization.action"
+  "action/Excavation.action"
+  "action/Depositing.action"
+)
 
 # Export the package
 ament_package()

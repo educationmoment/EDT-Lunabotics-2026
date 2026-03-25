@@ -113,25 +113,29 @@ function publishGamepadMessage() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 
+// ROS compressed image subscriber — overwrites MJPEG fallback when topic is live
+////////////////////////////////////////////////////////////////////////////////////////
 const listener = new ROSLIB.Topic({
     ros: ROS,
-    name: 'rgb_cam1/compressed',
+    name: '/d455/color/image_raw/compressed',
     messageType: 'sensor_msgs/msg/CompressedImage'
 });
 
-listener.subscribe((message)=>{
+listener.subscribe((message) => {
+    // Targets #main-camera-frame (same element as /video_feed fallback src)
+    // When the ROS topic is publishing, this takes over from the MJPEG stream.
     const imgEl = document.getElementById('main-camera-frame');
-    console.log("Updating Image");
-    if(imgEl) {
-        imgEl.src = "data:image/jpeg;base64, " + message.data;
+    if (imgEl) {
+        imgEl.src = "data:image/jpeg;base64," + message.data;
     }
 });
+////////////////////////////////////////////////////////////////////////////////////////
+
 
 // Main Code
 ////////////////////////////////////////////////////////////////////////////////////////
 console.log("[ Main ] Running");
 function main() {
-    
 
     console.log("[ Main ] Running");
 
@@ -156,4 +160,3 @@ function main() {
 }
 ////////////////////////////////////////////////////////////////////////////////////////
 main();
-

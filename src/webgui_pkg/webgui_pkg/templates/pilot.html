@@ -298,7 +298,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);height:100vh;o
 
 <!-- ── TOPBAR ── -->
 <div class="topbar">
-  <div class="logo">FUCK<span>MIT</span><span style="font-size:10px;font-weight:400;letter-spacing:2px;color:var(--dim);margin-left:8px">EDT UIC 2026</span></div>
+  <div class="logo">FRED UIC</span><span style="font-size:10px;font-weight:400;letter-spacing:2px;color:var(--dim);margin-left:8px">EDT UIC 2026</span></div>
   <div class="vsep"></div>
   <div class="conn-status"><div class="dot" id="ws-dot"></div><span id="ws-label" style="color:var(--dim)">DISCONNECTED</span></div>
   <div class="conn-status"><div class="dot" id="hb-dot"></div><span style="color:var(--dim)">/heartbeat</span></div>
@@ -438,12 +438,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);height:100vh;o
     </div>
     <div class="bw-body">
       <div class="bw-stats">
-        <div class="bw-stat"><div class="bw-stat-label">kB/s</div><div class="bw-stat-val" id="bw-kb" style="color:var(--accent2)">0.0</div></div>
+        <div class="bw-stat"><div class="bw-stat-label">kb/s</div><div class="bw-stat-val" id="bw-kb" style="color:var(--accent2)">0.0</div></div>
         <div class="bw-stat"><div class="bw-stat-label">msg/s</div><div class="bw-stat-val" id="bw-msg" style="color:var(--accent)">0</div></div>
         <div class="bw-stat"><div class="bw-stat-label">latency</div><div class="bw-stat-val" id="bw-lat" style="color:var(--warn)">--ms</div></div>
       </div>
       <div class="bw-graph"><canvas id="bw-canvas"></canvas></div>
-      <div style="font-family:var(--mono);font-size:8px;color:var(--dim);flex-shrink:0"><span style="color:var(--accent2)">━</span> kB/s  30s window</div>
+      <div style="font-family:var(--mono);font-size:8px;color:var(--dim);flex-shrink:0"><span style="color:var(--accent2)">━</span> kb/s  30s window</div>
       <div style="flex-shrink:0">
         <div style="font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:4px">Topic Status</div>
         <div id="topic-health"></div>
@@ -989,8 +989,8 @@ const camFpsDisplay = {d456:'--', d455:'--'};
 let camFpsTimer = {};
 
 const camTopicMap = {
-  d456: '/d456/color/image_raw',
-  d455: '/d455/color/image_raw',
+  d456: '/d456/color/image_raw/compressed',
+  d455: '/d455/color/image_raw/compressed',
 };
 
 function setCamMode(panel, source){
@@ -1011,7 +1011,7 @@ function updateCamFeeds(){
     const topic = camTopicMap[src];
     if(!topic) return;
     // subscribe (safe to re-subscribe)
-    send({op:'subscribe',id:'cam_'+src,topic,type:'sensor_msgs/Image',throttle_rate:250,queue_length:1});
+    send({op:'subscribe',id:'cam_'+src,topic,type:'sensor_msgs/CompressedImage',throttle_rate:250,queue_length:1});
     camTopicHandlers[topic] = (d) => onCamImage(src, d);
   });
 }
@@ -1023,66 +1023,19 @@ const camCanvas = {
 
 function onCamImage(src, data){
   camFrameCount[src]++;
-  // sensor_msgs/Image: decode base64 → raw pixel bytes → ImageData
-  try {
-    const encoding = data.encoding || 'rgb8';
-    const w = data.width, h = data.height;
-    // data.data is base64-encoded raw pixel bytes
-    const b64 = data.data;
-    const binary = atob(b64);
-    const len = binary.length;
-    const bytes = new Uint8ClampedArray(len);
-    for(let i=0;i<len;i++) bytes[i] = binary.charCodeAt(i);
-
-    // Build RGBA ImageData from rgb8 or bgr8
-    const rgba = new Uint8ClampedArray(w * h * 4);
-    const isBGR = encoding.startsWith('bgr');
-    for(let i=0,j=0; i<w*h*4; i+=4,j+=3){
-      if(isBGR){
-        rgba[i]   = bytes[j+2]; // R
-        rgba[i+1] = bytes[j+1]; // G
-        rgba[i+2] = bytes[j];   // B
-      } else {
-        rgba[i]   = bytes[j];   // R
-        rgba[i+1] = bytes[j+1]; // G
-        rgba[i+2] = bytes[j+2]; // B
-      }
-      rgba[i+3] = 255; // A
-    }
-
-    const imgData = new ImageData(rgba, w, h);
-
-    ['front','rear'].forEach(panel=>{
+  const img = new Image();
+  img.onload = () => {
+    ['front','rear'].forEach(panel => {
       if(camState[panel] !== src) return;
       const canvas = document.getElementById(`cam-${panel}-canvas`);
       if(!canvas) return;
       const wrap = canvas.parentElement;
       canvas.width  = wrap.clientWidth  || 320;
       canvas.height = wrap.clientHeight || 200;
-      const ctx = canvas.getContext('2d');
-      // draw to offscreen at native res, then scale
-      const off = new OffscreenCanvas(w, h);
-      off.getContext('2d').putImageData(imgData, 0, 0);
-      ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
     });
-  } catch(e){
-    // fallback: try compressed path (in case topic switches)
-    try {
-      const img = new Image();
-      img.onload = () => {
-        ['front','rear'].forEach(panel=>{
-          if(camState[panel]!==src)return;
-          const canvas=document.getElementById(`cam-${panel}-canvas`);
-          if(!canvas)return;
-          const wrap=canvas.parentElement;
-          canvas.width=wrap.clientWidth||320;
-          canvas.height=wrap.clientHeight||200;
-          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-        });
-      };
-      img.src='data:image/jpeg;base64,'+data.data;
-    } catch(_){}
-  }
+  };
+  img.src = 'data:image/jpeg;base64,' + data.data;
   updateCamStatus(src);
 }
 
@@ -1138,7 +1091,7 @@ function drawSimCam(canvasId,seed){
 function onHealth(d){
   updateHealthGrid(d);
   sv('t-ll',d.left_lift_position,'rev'); sv('t-rl',d.right_lift_position,'rev');
-  sv('t-ti',d.tilt_position,'rev'); sv('t-vc',d.vibrator_current,'A');
+  sv('t-lti',d.left_tilt_position,'rev'); sv('t-rti',d.right_tilt_position,'rev'); sv('t-vc',d.vibrator_current,'A');
   const delta=Math.abs((d.left_lift_position||0)-(d.right_lift_position||0));
   const el=document.getElementById('t-ld');
   el.innerHTML=delta.toFixed(2)+'<span class="tc-unit">rev</span>';
@@ -1375,7 +1328,8 @@ const mDefs=[
   {id:'rm',label:'R Drive',vel:'right_motor_velocity',curr:'right_motor_current',volt:'right_motor_voltage',temp:'right_motor_temperature'},
   {id:'ll',label:'L Lift', pos:'left_lift_position', curr:'left_lift_current',volt:'left_lift_voltage'},
   {id:'rl',label:'R Lift', pos:'right_lift_position',curr:'right_lift_current',volt:'right_lift_voltage'},
-  {id:'ti',label:'Tilt',   pos:'tilt_position',      curr:'tilt_current',      volt:'tilt_voltage'},
+  {id:'lti',label:'L Tilt',   pos:'left_tilt_position',      curr:'left_tilt_current',      volt:'left_tilt_voltage'},
+  {id:'rti',label:'R Tilt',   pos:'right_tilt_position',      curr:'right_tilt_current',      volt:'right_tilt_voltage'},
   {id:'vi',label:'Vibrator',curr:'vibrator_current', volt:'vibrator_voltage'},
 ];
 function buildHealthGrid(){
@@ -1498,8 +1452,8 @@ function loop(){
 
   if(tick%20===0){
     byteRate=byteCount;msgRate=msgCount;byteCount=0;msgCount=0;
-    bwHist.push(byteRate/1024);bwHist.shift();
-    document.getElementById('bw-kb').textContent=(byteRate/1024).toFixed(1);
+    bwHist.push(byteRate/1024*8);bwHist.shift();
+    document.getElementById('bw-kb').textContent=(byteRate/1024*8).toFixed(1);
     document.getElementById('bw-msg').textContent=msgRate;
     document.getElementById('bw-tag').className='ph-tag'+(connected?' live':'');
   }

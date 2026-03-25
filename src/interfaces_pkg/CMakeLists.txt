@@ -13,13 +13,7 @@ find_package(action_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/DepositingRequest.srv"
-  "srv/ExcavationRequest.srv"
-  "srv/NavigationRequest.srv"
   "msg/MotorHealth.msg"
-  "action/Excavation.action"
-  "action/Depositing.action"
-  "action/Navigation.action"
   DEPENDENCIES action_msgs std_msgs
 )
 

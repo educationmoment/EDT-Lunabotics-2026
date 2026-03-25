@@ -1,5 +1,0 @@
-bool depositing_request
----
-bool depositing_result
----
-float32 depositing_feedback

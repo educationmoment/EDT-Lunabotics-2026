@@ -85,6 +85,8 @@ private:
     static constexpr double ALIGN_ROTATION_SPEED = 0.15;
     static constexpr double YAW_TOLERANCE = 0.05;
     static constexpr double TARGET_YAW = 1.57;
+    static constexpr double TARGET_BEARING   = M_PI;  // tag is behind robot (rear camera)
+    static constexpr double BEARING_TOLERANCE = 0.1;   // slightly looser — ±6°
 
     void stopRobot()
     {
@@ -101,25 +103,36 @@ private:
 
     /**
      * @brief Try to find Tag 7 from either camera. Returns true if found.
-     */
-    bool lookupTag7(double &depth, double &lateral, double &yaw)
+        */
+    bool lookupTag7(double &depth, double &lateral, double &bearing)
     {
-        // Try D455 first
         try
         {
-            auto tag_tf = tf_buffer_->lookupTransform("base_link", "tag36h11:7", tf2::TimePointZero);
-            depth = -tag_tf.transform.translation.x;
-            lateral = -tag_tf.transform.translation.y;
+            // Only accept transforms newer than 500ms
+            auto when = tf2_ros::toMsg(tf2::TimePoint(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()) -
+                std::chrono::milliseconds(500)));
 
-            tf2::Quaternion q;
-            tf2::fromMsg(tag_tf.transform.rotation, q);
-            yaw = tf2::getYaw(q);
+            auto tag_tf = tf_buffer_->lookupTransform(
+                "base_link", "tag36h11:7",
+                tf2::TimePointZero,
+                tf2::durationFromSec(0.1));  // 100ms timeout
+
+            // Check transform age manually
+            auto transform_time = tf_buffer_->lookupTransform("base_link", "tag36h11:7", tf2::TimePointZero);
+            auto age = this->now() - transform_time.header.stamp;
+            if (age.seconds() > 0.5)
+            {
+                return false;  // transform too old, treat as not visible
+            }
+
+            depth   = transform_time.transform.translation.x;
+            lateral = transform_time.transform.translation.y;
+            bearing = std::atan2(lateral, depth);
             return true;
         }
-        catch (tf2::TransformException &)
-        {
-            return false;
-        }
+        catch (tf2::TransformException &) { return false; }
     }
 
     rclcpp_action::GoalResponse handle_goal(
@@ -187,14 +200,14 @@ private:
 
     void localize()
     {
-        double depth, lateral, yaw;
-        tag7_visible_ = lookupTag7(depth, lateral, yaw);
+        double depth, lateral, bearing;
+        tag7_visible_ = lookupTag7(depth, lateral, bearing);
 
         if (tag7_visible_)
         {
-            depth_distance_ = depth;
+            depth_distance_   = depth;
             lateral_distance_ = lateral;
-            current_yaw_ = yaw;
+            current_yaw_      = bearing;
         }
 
         switch (search_state_)
@@ -203,57 +216,28 @@ private:
             if (tag7_visible_)
             {
                 stopRobot();
-                RCLCPP_INFO(get_logger(), "Tag 7 found! depth=%.2f, lateral=%.2f, yaw=%.2f",
+                RCLCPP_INFO(get_logger(), "Tag 7 found! depth=%.2f, lateral=%.2f, bearing=%.2f",
                             depth_distance_, lateral_distance_, current_yaw_);
-                search_state_ = SearchState::ALIGNING;
+                success_ = true;
+                search_state_ = SearchState::LOCALIZED;
             }
             else
             {
                 rotateInPlace(ROTATION_SPEED * rotation_direction_);
-                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000,
-                                     "Searching for Tag 7...");
+                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000, "Searching for Tag 7...");
             }
             break;
 
         case SearchState::ALIGNING:
-            if (tag7_visible_)
-            {
-                double yaw_error = current_yaw_ - TARGET_YAW;
-                while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
-                while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
-
-                RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 500,
-                                     "Aligning: yaw=%.3f, target=%.3f, error=%.3f",
-                                     current_yaw_, TARGET_YAW, yaw_error);
-
-                if (std::abs(yaw_error) < YAW_TOLERANCE)
-                {
-                    stopRobot();
-                    success_ = true;
-                    search_state_ = SearchState::LOCALIZED;
-                    RCLCPP_INFO(get_logger(),
-                                "\033[1;32mLocalization complete! depth=%.2f, lateral=%.2f, yaw=%.2f\033[0m",
-                                depth_distance_, lateral_distance_, current_yaw_);
-                }
-                else
-                {
-                    double dir = (yaw_error > 0) ? -1.0 : 1.0;
-                    rotateInPlace(ALIGN_ROTATION_SPEED * dir);
-                }
-            }
-            else
-            {
-                rotateInPlace(ALIGN_ROTATION_SPEED * 0.5);
-                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
-                                     "Lost Tag 7 during alignment, searching...");
-            }
+            // No longer used — kept to avoid enum warning
+            search_state_ = SearchState::SEARCHING;
             break;
 
         case SearchState::LOCALIZED:
             break;
         }
     }
-};
+    };
 
 int main(int argc, char *argv[])
 {

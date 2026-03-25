@@ -15,7 +15,11 @@ float64 right_lift_position
 float64 right_lift_current
 float64 right_lift_voltage
 float64 tilt_position
-float64 tilt_current
-float64 tilt_voltage
+float64 left_tilt_position
+float64 left_tilt_current
+float64 left_tilt_voltage
+float64 right_tilt_position
+float64 right_tilt_current
+float64 right_tilt_voltage
 float64 vibrator_current
 float64 vibrator_voltage
