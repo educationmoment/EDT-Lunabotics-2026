@@ -89,9 +89,12 @@ for the NASA Lunabotics 2026 competition.</p>
 
     git clone git@github.com/educationmoment/EDT-Lunabotics-2026.git && cd EDT-Lunabotics-2026/
 
-<p>From within a computer running Ubuntu 22.04, run <em>install.sh</em> script with root privileges using</p>
+<p>Setup UDEV RULES and General Installation Scripts:</p>
     
-    sudo echo install.sh | bash
+    cd src/scripts
+    chmod +x setup_udev_rules.sh
+    chmod +x install_dependencies.sh
+    sudo ./setup_udev_rules.sh && ./install_dependencies.sh
 
 <p>The script periodically asks for user input and was designed to run inside a Docker container.
 It updates the system, installs the Robotics Operating System (ROS2 Humble), and several dependencies.</p>
@@ -111,7 +114,6 @@ Configure the CAN interface using</p>
 
     sudo ip link set can0 up type can bitrate 1000000
 
-
 <p>At this point, launch the robot using</p>
 
     ros2 launch neptune_bringup test.launch.py
@@ -123,6 +125,3 @@ Configure the CAN interface using</p>
 <p>You can also view the health status of the robot with </p>
 
     ros2 topic echo health_topic
-<p>Before UCF and then KSC, make sure to copy over the appropriate version of odometry onto odometry_node.cpp. Also, note that the pilot needs to be clicked into the WebGUI for this to work. To run it, use</p>
-
-    ros2 run controller_pkg odometry_node
