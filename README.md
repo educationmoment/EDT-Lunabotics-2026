@@ -101,7 +101,7 @@ It updates the system, installs the Robotics Operating System (ROS2 Humble), and
 
 <h2>Control Diagram</h2>
 
-<img src="https://i.imgur.com/vq8L5NY.png" style="width: 1000px" alt="EDT-Logo"></img>
+<img src="https://i.imgur.com/vq8L5NY.png" style="width: 1200px" alt="EDT-Logo"></img>
 
 <h2>Setup</h2>
 <hr>
