@@ -42,12 +42,12 @@ for the NASA Lunabotics 2026 competition.</p>
 
 <p>"ROS Webbridge is overloaded- restarting in 2ms"</p>
 
-    fix: okay so we started the robot too many times on the same uptime for the jetson. The cache is overloaded- and unfourtently the only fix is to restart the Jetson entirely. This happens after starting the robot 5+ times on the same uptime.
+    fix: okay so we started the robot too many times on the same uptime for the nuc. The cache is overloaded- and unfourtently the only fix is to restart the nuc entirely. This happens after starting the robot 5+ times on the same uptime.
 
 <p>/joy topic not found</p>
 
     there should be /joy topic always, run ros topic list and look for /joy. then echo ros topic echo /joy
-    if nothing comes up, something is wrong, likely the ROS bridge being overloaded. restart the jetson.
+    if nothing comes up, something is wrong, likely the ROS bridge being overloaded. restart the nuc.
 
 <p>Building and sourcing throwing an error.</p>
 
@@ -75,9 +75,9 @@ for the NASA Lunabotics 2026 competition.</p>
 
 <p>Clock Skew</p>
 
-    fix: run "date" on the jetson. you might get a date/time that is off from the current time / date. then, run "sudo date -s "2025-05-15 10:00:00" (change the date to the current date) and run colcon build.
+    fix: run "date" on the nuc. you might get a date/time that is off from the current time / date. then, run "sudo date -s "2025-05-15 10:00:00" (change the date to the current date) and run colcon build.
 
-    if you still encounter clock skew after this, you will have to "touch" all files to replace their time and date- "find . -exec touch {} +" IN THE ROOT OF THE WORKSPACE (ROBOT_WS)! !! DOING THIS OUTSIDE WILL BREAK THE JETSON!
+    if you still encounter clock skew after this, you will have to "touch" all files to replace their time and date- "find . -exec touch {} +" IN THE ROOT OF THE WORKSPACE (ROBOT_WS)! !! DOING THIS OUTSIDE WILL BREAK THE nuc!
 
     then you may need to clear artificatsion, in robot_WS do "rm -rf build/ install/ log/" and then finally build again, "colcon build --symlink-install"
 
