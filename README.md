@@ -137,3 +137,6 @@ Configure the CAN interface using</p>
 
     ros2 topic echo health_topic
 
+
+<h2>Special Credits</h2>
+<p>Big shoutout to Grayson from COD (@grayson-arendt) for giving us his Maps to use for our robot, as well as the NUC, and many other small helping hands he has given me.</p>
