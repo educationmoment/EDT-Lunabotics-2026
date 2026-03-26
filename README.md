@@ -96,9 +96,6 @@ for the NASA Lunabotics 2026 competition.</p>
     chmod +x install_dependencies.sh
     sudo ./setup_udev_rules.sh && ./install_dependencies.sh
 
-<p>The script periodically asks for user input and was designed to run inside a Docker container.
-It updates the system, installs the Robotics Operating System (ROS2 Humble), and several dependencies.</p>
-
 <h2>Control Diagram</h2>
 
 <img src="https://i.imgur.com/vq8L5NY.png" style="width: 1200px" alt="ControlDiagram"></img>
