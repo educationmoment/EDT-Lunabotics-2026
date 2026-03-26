@@ -101,7 +101,17 @@ It updates the system, installs the Robotics Operating System (ROS2 Humble), and
 
 <h2>Control Diagram</h2>
 
-<img src="https://i.imgur.com/vq8L5NY.png" style="width: 1200px" alt="EDT-Logo"></img>
+<img src="https://i.imgur.com/vq8L5NY.png" style="width: 1200px" alt="ControlDiagram"></img>
+
+<h2>Media</h2>
+
+<p>Simulated Bot</p>
+<img src="https://i.imgur.com/FDQ2jEP.png" style="width: 200px" alt="bot1"></img>
+<img src="https://i.imgur.com/6yCUJSa.png" style="width: 200px" alt="bot2"></img>
+
+<p>WebGUI</p>
+
+<img src="https://i.imgur.com/Bghv52n.png" style="width: 700px" alt="web"></img>
 
 <h2>Setup</h2>
 <hr>
@@ -129,3 +139,4 @@ Configure the CAN interface using</p>
 <p>You can also view the health status of the robot with </p>
 
     ros2 topic echo health_topic
+
