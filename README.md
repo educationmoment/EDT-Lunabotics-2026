@@ -111,7 +111,7 @@ It updates the system, installs the Robotics Operating System (ROS2 Humble), and
 
 <p>WebGUI</p>
 
-<img src="https://i.imgur.com/siKAxiW.png" style="width: 700px" alt="web"></img>
+<img src="https://i.imgur.com/siKAxiW.png" style="width: 1100px" alt="web"></img>
 
 <h2>Setup</h2>
 <hr>
