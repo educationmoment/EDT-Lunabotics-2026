@@ -1,6 +1,6 @@
 <h1>EDT-Lunabotics-2026</h1>
 
-<img src="https://i.imgur.com/KgdN7f8.png" style="width: 400px" alt="EDT-Logo"></img>
+<img src="https://i.imgur.com/KgdN7f8.png" style="width: 200px" alt="EDT-Logo"></img>
 <hr>
 <h2>Packages</h2>
     <ul>
@@ -98,6 +98,10 @@ for the NASA Lunabotics 2026 competition.</p>
 
 <p>The script periodically asks for user input and was designed to run inside a Docker container.
 It updates the system, installs the Robotics Operating System (ROS2 Humble), and several dependencies.</p>
+
+<h2>Control Diagram</h2>
+
+<img src="https://i.imgur.com/vq8L5NY.png" style="width: 200px" alt="EDT-Logo"></img>
 
 <h2>Setup</h2>
 <hr>
