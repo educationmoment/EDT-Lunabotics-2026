@@ -1226,7 +1226,7 @@ function startLocalization(el){
   log('LOC','Sending localization_action goal…','warn');
   toast('LOCALIZATION STARTED');
   // Send action goal to localization_action server
-  send({op:'call_service',id:'loc_'+Date.now(),service:'/localization_action',type:'msg_pkg/action/Localization',args:{goal:{}}});
+  callAction('/localization_action','msg_pkg/action/Localization',{});
   if(el) flash(el);
 }
 

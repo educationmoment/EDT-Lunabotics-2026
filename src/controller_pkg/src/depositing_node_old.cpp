@@ -1,0 +1,197 @@
+#include "SparkMax.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "msg_pkg/action/depositing.hpp"  // Depositing.action → depositing.hpp → msg_pkg::action::Depositing
+
+#include <algorithm>
+#include <chrono>
+#include <memory>
+#include <thread>
+
+const float VIBRATOR_DUTY    = 1.0f;
+const float ERROR            = 0.1f;
+const float HIGH_PASS_FILTER = 0.38f;
+const float KP_LIFT          = 8.0f;
+const float KP_TILT          = 8.0f;
+
+// ── MOTOR CONTROLLERS ────────────────────────────────────────────────────────
+SparkMax leftLift("can0", 3);
+SparkMax rightLift("can0", 4);
+SparkMax leftTilt("can0", 5);
+SparkMax vibrator("can0", 6);
+SparkMax rightTilt("can0", 7);
+
+// ── TYPE ALIASES ─────────────────────────────────────────────────────────────
+// ROS 2 codegen rule:  <FileName>.action  →  msg_pkg::action::<FileName>
+//   Depositing.action  →  msg_pkg::action::Depositing   (NOT DepositingAction)
+using DepositingAction     = msg_pkg::action::Depositing;
+using GoalHandleDepositing = rclcpp_action::ServerGoalHandle<DepositingAction>;
+
+// ── SYNC HELPERS ─────────────────────────────────────────────────────────────
+void SyncedMoveTilt(float tilt_setpoint)
+{
+    float left_pos   = leftTilt.GetPosition();
+    float right_pos  = rightTilt.GetPosition();
+    float tilt_error = right_pos - left_pos;
+
+    if (fabs(tilt_error) < HIGH_PASS_FILTER)
+        tilt_error = 0.0f;
+
+    float left_pos_err  = tilt_setpoint - left_pos;
+    float right_pos_err = tilt_setpoint - right_pos;
+
+    float left_duty  = (left_pos_err  >  ERROR) ? 1.0f : ((left_pos_err  < -ERROR) ? -1.0f : 0.0f);
+    float right_duty = (right_pos_err >  ERROR) ? 1.0f : ((right_pos_err < -ERROR) ? -1.0f : 0.0f);
+
+    float correction = KP_TILT * fabs(tilt_error);
+    if (tilt_error > 0)      right_duty -= correction;
+    else if (tilt_error < 0) left_duty  -= correction;
+
+    leftTilt.SetDutyCycle(std::clamp(left_duty,  -1.0f, 1.0f));
+    rightTilt.SetDutyCycle(std::clamp(right_duty, -1.0f, 1.0f));
+}
+
+void SetTiltDutyCycle(float duty)
+{
+    leftTilt.SetDutyCycle(duty);
+    rightTilt.SetDutyCycle(duty);
+}
+
+// ── MOVE BUCKET ───────────────────────────────────────────────────────────────
+bool MoveBucket(float lift_setpoint, float tilt_setpoint, bool activate_vibrator,
+                std::shared_ptr<GoalHandleDepositing> goal_handle)
+{
+    auto timer_start = std::chrono::high_resolution_clock::now();
+
+    auto leftLiftDone  = [&]{ return fabs(lift_setpoint - leftLift.GetPosition())  <= ERROR; };
+    auto rightLiftDone = [&]{ return fabs(lift_setpoint - rightLift.GetPosition()) <= ERROR; };
+    auto tiltDone      = [&]{ return fabs(tilt_setpoint - leftTilt.GetPosition())  <= ERROR
+                                  && fabs(tilt_setpoint - rightTilt.GetPosition()) <= ERROR; };
+
+    while (!(leftLiftDone() && rightLiftDone() && tiltDone()))
+    {
+        if (goal_handle->is_canceling())
+        {
+            vibrator.SetDutyCycle(0.0f);
+            return false;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+        // ---- LIFT SYNC ---- //
+        float lift_error = rightLift.GetPosition() - leftLift.GetPosition();
+        if (fabs(lift_error) < HIGH_PASS_FILTER) lift_error = 0.0f;
+
+        float l_lift_err  = lift_setpoint - leftLift.GetPosition();
+        float r_lift_err  = lift_setpoint - rightLift.GetPosition();
+        float l_lift_duty = (l_lift_err >  ERROR) ? 1.0f : ((l_lift_err < -ERROR) ? -1.0f : 0.0f);
+        float r_lift_duty = (r_lift_err >  ERROR) ? 1.0f : ((r_lift_err < -ERROR) ? -1.0f : 0.0f);
+        float lift_corr   = KP_LIFT * fabs(lift_error);
+        if (lift_error > 0)      r_lift_duty -= lift_corr;
+        else if (lift_error < 0) l_lift_duty -= lift_corr;
+        leftLift.SetDutyCycle(std::clamp(l_lift_duty, -1.0f, 1.0f));
+        rightLift.SetDutyCycle(std::clamp(r_lift_duty, -1.0f, 1.0f));
+        // ---- LIFT SYNC ---- //
+
+        SyncedMoveTilt(tilt_setpoint);
+
+        if (activate_vibrator) vibrator.SetDutyCycle(VIBRATOR_DUTY);
+
+        if (std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::high_resolution_clock::now() - timer_start).count() > 5)
+        {
+            RCLCPP_ERROR(rclcpp::get_logger("depositing_node"), "Stage timeout — skipping");
+            break;
+        }
+    }
+    return true;
+}
+
+// ── ACTION SERVER NODE ────────────────────────────────────────────────────────
+class DepositingNode : public rclcpp::Node
+{
+public:
+    explicit DepositingNode() : Node("depositing_node")
+    {
+        action_server_ = rclcpp_action::create_server<DepositingAction>(
+            this, "depositing_action",
+            std::bind(&DepositingNode::handle_goal,     this, std::placeholders::_1, std::placeholders::_2),
+            std::bind(&DepositingNode::handle_cancel,   this, std::placeholders::_1),
+            std::bind(&DepositingNode::handle_accepted, this, std::placeholders::_1));
+
+        RCLCPP_INFO(get_logger(), "Depositing Action Server Initialized");
+    }
+
+private:
+    rclcpp_action::Server<DepositingAction>::SharedPtr action_server_;
+
+    rclcpp_action::GoalResponse handle_goal(
+        const rclcpp_action::GoalUUID &,
+        std::shared_ptr<const DepositingAction::Goal>)
+    {
+        RCLCPP_INFO(get_logger(), "Depositing goal received");
+        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    }
+
+    rclcpp_action::CancelResponse handle_cancel(
+        const std::shared_ptr<GoalHandleDepositing>)
+    {
+        RCLCPP_WARN(get_logger(), "Depositing cancel requested");
+        return rclcpp_action::CancelResponse::ACCEPT;
+    }
+
+    void handle_accepted(const std::shared_ptr<GoalHandleDepositing> goal_handle)
+    {
+        std::thread([this, goal_handle]() { execute(goal_handle); }).detach();
+    }
+
+    void send_feedback(const std::shared_ptr<GoalHandleDepositing> & gh, const std::string & msg)
+    {
+        auto fb = std::make_shared<DepositingAction::Feedback>();
+        fb->feedback_message = msg;
+        gh->publish_feedback(fb);
+        RCLCPP_INFO(get_logger(), "[Feedback] %s", msg.c_str());
+    }
+
+    void execute(const std::shared_ptr<GoalHandleDepositing> goal_handle)
+    {
+        auto result = std::make_shared<DepositingAction::Result>();
+
+        // ── STAGE 1: Raise to dump position ──────────────────────────────────
+        send_feedback(goal_handle, "Stage 1: Raising to dump position");
+        if (!MoveBucket(1.49f, 0.29f, false, goal_handle))
+        { result->success = false; goal_handle->canceled(result); return; }
+        send_feedback(goal_handle, "Stage 1 complete");
+
+        // ── STAGE 2: Vibrate material out ─────────────────────────────────────
+        send_feedback(goal_handle, "Stage 2: Vibrating (10s)");
+        auto jiggle_start = std::chrono::high_resolution_clock::now();
+        while (std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::high_resolution_clock::now() - jiggle_start).count() < 10)
+        {
+            if (goal_handle->is_canceling())
+            { vibrator.SetDutyCycle(0.0f); result->success = false;
+            goal_handle->canceled(result); return; }
+            vibrator.SetDutyCycle(VIBRATOR_DUTY);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        vibrator.SetDutyCycle(0.0f);
+        send_feedback(goal_handle, "Stage 2 complete");
+
+        // ── STAGE 3: Return home ──────────────────────────────────────────────
+        send_feedback(goal_handle, "Stage 3: Returning to home");
+        if (!MoveBucket(0.0f, 0.0f, false, goal_handle))
+        { result->success = false; goal_handle->canceled(result); return; }
+
+        result->success = true;
+        goal_handle->succeed(result);
+    }
+};
+
+int main(int argc, char **argv)
+{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<DepositingNode>());
+    rclcpp::shutdown();
+    return 0;
+}

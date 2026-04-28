@@ -2,121 +2,211 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "interfaces_pkg/msg/motor_health.hpp"
-#include "msg_pkg/action/excavation.hpp"  // Excavation.action → excavation.hpp → msg_pkg::action::Excavation
+#include "msg_pkg/action/excavation.hpp"
 
 #include <algorithm>
 #include <chrono>
 #include <memory>
 #include <thread>
+#include <mutex>
 
-const float VIBRATOR_DUTY    = 1.0f;
-const float ERROR            = 0.1f;
-const float HIGH_PASS_FILTER = 0.38f;
-const float KP_LIFT          = 8.0f;
-const float KP_TILT          = 8.0f;
+// ═════════════════════════════════════════════════════════════════════════════
+// TUNE THESE TONIGHT — all position setpoints in rotations
+// ═════════════════════════════════════════════════════════════════════════════
+static constexpr float LIFT_APPROACH    = -0.70f;
+static constexpr float LIFT_DIG         = -0.77f;
+static constexpr float TILT_APPROACH    = -1.08f;
+static constexpr float TILT_DIG         = -1.04f;
+static constexpr float LIFT_HOME        =  0.0f;
+static constexpr float TILT_HOME        =  0.0f;
+// ═════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
 
-// ── MOTOR CONTROLLERS ────────────────────────────────────────────────────────
-SparkMax leftDrive("can0", 1);
+// ── TUNING CONSTANTS ──────────────────────────────────────────────────────────
+const float VIBRATOR_DUTY  = 1.0f;
+const float POS_TOLERANCE  = 0.12f;   // rotations — stop within this of target
+const float SYNC_DEADBAND  = 0.08f;   // rotations — ignore sync error below this
+const float KP_LIFT        = 1.3f;    // matches controller_node
+const float KP_TILT        = 0.5f;    // matches controller_node
+
+// ── MOTOR CONTROLLERS ─────────────────────────────────────────────────────────
+SparkMax leftDrive ("can0", 1);
 SparkMax rightDrive("can0", 2);
-SparkMax leftLift("can0", 3);
-SparkMax rightLift("can0", 4);
-SparkMax leftTilt("can0", 5);
-SparkMax vibrator("can0", 6);
-SparkMax rightTilt("can0", 7);
+SparkMax leftLift  ("can0", 3);
+SparkMax rightLift ("can0", 4);
+SparkMax leftTilt  ("can0", 5);
+SparkMax vibrator  ("can0", 6);
+SparkMax rightTilt ("can0", 7);
 
-// ── TYPE ALIASES ─────────────────────────────────────────────────────────────
-// ROS 2 codegen rule:  <FileName>.action  →  msg_pkg::action::<FileName>
-//   Excavation.action  →  msg_pkg::action::Excavation   (NOT ExcavationAction)
 using ExcavationAction     = msg_pkg::action::Excavation;
 using GoalHandleExcavation = rclcpp_action::ServerGoalHandle<ExcavationAction>;
 
-// ── SYNC HELPERS ─────────────────────────────────────────────────────────────
-void SyncedMoveTilt(float tilt_setpoint)
+// ── SYNCED LIFT TO POSITION ───────────────────────────────────────────────────
+bool SyncedLiftToPos(float target, float duty,
+                     std::shared_ptr<GoalHandleExcavation> gh,
+                     float timeout_s = 5.0f)
 {
-    float left_pos   = leftTilt.GetPosition();
-    float right_pos  = rightTilt.GetPosition();
-    float tilt_error = right_pos - left_pos;
+    RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
+        "LIFT start — target=%.3f  L=%.3f  R=%.3f  duty=%.2f",
+        target, leftLift.GetPosition(), rightLift.GetPosition(), duty);
 
-    if (fabs(tilt_error) < HIGH_PASS_FILTER)
-        tilt_error = 0.0f;
+    auto t0       = std::chrono::high_resolution_clock::now();
+    int  log_tick = 0;
 
-    float left_pos_err  = tilt_setpoint - left_pos;
-    float right_pos_err = tilt_setpoint - right_pos;
-
-    float left_duty  = (left_pos_err  >  ERROR) ? 1.0f : ((left_pos_err  < -ERROR) ? -1.0f : 0.0f);
-    float right_duty = (right_pos_err >  ERROR) ? 1.0f : ((right_pos_err < -ERROR) ? -1.0f : 0.0f);
-
-    float correction = KP_TILT * fabs(tilt_error);
-    if (tilt_error > 0)      right_duty -= correction;
-    else if (tilt_error < 0) left_duty  -= correction;
-
-    leftTilt.SetDutyCycle(std::clamp(left_duty,  -1.0f, 1.0f));
-    rightTilt.SetDutyCycle(std::clamp(right_duty, -1.0f, 1.0f));
-}
-
-void SetTiltDutyCycle(float duty)
-{
-    leftTilt.SetDutyCycle(duty);
-    rightTilt.SetDutyCycle(duty);
-}
-
-// ── MOVE BUCKET ───────────────────────────────────────────────────────────────
-bool MoveBucket(float lift_setpoint, float tilt_setpoint,
-                bool activate_vibrator, float drive_speed,
-                std::shared_ptr<GoalHandleExcavation> goal_handle)
-{
-    auto timer_start = std::chrono::high_resolution_clock::now();
-
-    auto leftLiftDone  = [&]{ return fabs(lift_setpoint - leftLift.GetPosition())  <= ERROR; };
-    auto rightLiftDone = [&]{ return fabs(lift_setpoint - rightLift.GetPosition()) <= ERROR; };
-    auto tiltDone      = [&]{ return fabs(tilt_setpoint - leftTilt.GetPosition())  <= ERROR
-                                  && fabs(tilt_setpoint - rightTilt.GetPosition()) <= ERROR; };
-
-    while (!(leftLiftDone() && rightLiftDone() && tiltDone()))
+    while (true)
     {
-        if (goal_handle->is_canceling())
+        if (gh->is_canceling())
         {
-            leftDrive.SetDutyCycle(0.0f);
-            rightDrive.SetDutyCycle(0.0f);
-            vibrator.SetDutyCycle(0.0f);
+            leftLift.SetDutyCycle(0.0f);
+            rightLift.SetDutyCycle(0.0f);
+            RCLCPP_WARN(rclcpp::get_logger("excavation_node"), "LIFT cancelled");
             return false;
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-
-        // ---- LIFT SYNC ---- //
-        float lift_error = rightLift.GetPosition() - leftLift.GetPosition();
-        if (fabs(lift_error) < HIGH_PASS_FILTER) lift_error = 0.0f;
-
-        if (fabs(leftLift.GetPosition() - rightLift.GetPosition()) >= 0.7)
-            RCLCPP_WARN(rclcpp::get_logger("excavation_node"), "WARNING: LIFT ACTUATORS GREATLY MISALIGNED");
-
-        float l_lift_err  = lift_setpoint - leftLift.GetPosition();
-        float r_lift_err  = lift_setpoint - rightLift.GetPosition();
-        float l_lift_duty = (l_lift_err >  ERROR) ? 1.0f : ((l_lift_err < -ERROR) ? -1.0f : 0.0f);
-        float r_lift_duty = (r_lift_err >  ERROR) ? 1.0f : ((r_lift_err < -ERROR) ? -1.0f : 0.0f);
-        float lift_corr   = KP_LIFT * fabs(lift_error);
-        if (lift_error > 0)      r_lift_duty -= lift_corr;
-        else if (lift_error < 0) l_lift_duty -= lift_corr;
-        leftLift.SetDutyCycle(std::clamp(l_lift_duty, -1.0f, 1.0f));
-        rightLift.SetDutyCycle(std::clamp(r_lift_duty, -1.0f, 1.0f));
-        // ---- LIFT SYNC ---- //
-
-        SyncedMoveTilt(tilt_setpoint);
-
-        if (activate_vibrator) vibrator.SetDutyCycle(VIBRATOR_DUTY);
-        leftDrive.SetVelocity(drive_speed);
-        rightDrive.SetVelocity(drive_speed);
-
-        if (std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::high_resolution_clock::now() - timer_start).count() > 5)
+        float elapsed = std::chrono::duration_cast<std::chrono::duration<float>>(
+            std::chrono::high_resolution_clock::now() - t0).count();
+        if (elapsed > timeout_s)
         {
-            RCLCPP_ERROR(rclcpp::get_logger("excavation_node"), "Stage timeout — skipping");
+            RCLCPP_ERROR(rclcpp::get_logger("excavation_node"),
+                "LIFT timeout — target=%.3f  L=%.3f  R=%.3f",
+                target, leftLift.GetPosition(), rightLift.GetPosition());
             break;
         }
+
+        float l_pos  = leftLift.GetPosition();
+        float r_pos  = rightLift.GetPosition();
+        bool  l_done = fabs(l_pos - target) <= POS_TOLERANCE;
+        bool  r_done = fabs(r_pos - target) <= POS_TOLERANCE;
+
+        if (++log_tick % 40 == 0)
+            RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
+                "LIFT moving — target=%.3f  L=%.3f(done=%d)  R=%.3f(done=%d)",
+                target, l_pos, l_done, r_pos, r_done);
+
+        if (l_done && r_done)
+        {
+            RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
+                "LIFT reached — target=%.3f  L=%.3f  R=%.3f", target, l_pos, r_pos);
+            break;
+        }
+
+        float dir    = (target > l_pos) ? 1.0f : -1.0f;
+        float l_duty = l_done ? 0.0f
+            : std::clamp(fabsf(l_pos - target) * 3.0f, 0.12f, duty);
+        float r_duty = r_done ? 0.0f
+            : std::clamp(fabsf(r_pos - target) * 3.0f, 0.12f, duty);
+
+        float sync_error = r_pos - l_pos;
+        if (fabs(sync_error) > SYNC_DEADBAND)
+        {
+            float correction = KP_LIFT * fabs(sync_error);
+            float factor     = std::max(0.0f, 1.0f - correction);
+            if (sync_error > 0) r_duty = duty * factor;
+            else                l_duty = duty * factor;
+
+            RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
+                "LIFT sync — err=%.3f  factor=%.3f  L_duty=%.3f  R_duty=%.3f",
+                sync_error, factor, l_duty * dir, r_duty * dir);
+        }
+
+        leftLift.SetDutyCycle(l_duty * dir);
+        rightLift.SetDutyCycle(r_duty * dir);
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
+
+    leftLift.SetDutyCycle(0.0f);
+    rightLift.SetDutyCycle(0.0f);
     return true;
 }
+
+// ── SYNCED TILT TO POSITION ───────────────────────────────────────────────────
+bool SyncedTiltToPos(float target, float duty,
+                     std::shared_ptr<GoalHandleExcavation> gh,
+                     float timeout_s = 5.0f)
+{
+    RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
+        "TILT start — target=%.3f  L=%.3f  R=%.3f  duty=%.2f",
+        target, leftTilt.GetPosition(), rightTilt.GetPosition(), duty);
+
+    auto t0       = std::chrono::high_resolution_clock::now();
+    int  log_tick = 0;
+
+    while (true)
+    {
+        if (gh->is_canceling())
+        {
+            leftTilt.SetDutyCycle(0.0f);
+            rightTilt.SetDutyCycle(0.0f);
+            RCLCPP_WARN(rclcpp::get_logger("excavation_node"), "TILT cancelled");
+            return false;
+        }
+
+        float elapsed = std::chrono::duration_cast<std::chrono::duration<float>>(
+            std::chrono::high_resolution_clock::now() - t0).count();
+        if (elapsed > timeout_s)
+        {
+            RCLCPP_ERROR(rclcpp::get_logger("excavation_node"),
+                "TILT timeout — target=%.3f  L=%.3f  R=%.3f",
+                target, leftTilt.GetPosition(), rightTilt.GetPosition());
+            break;
+        }
+
+        float l_pos  = leftTilt.GetPosition();
+        float r_pos  = rightTilt.GetPosition();
+        bool  l_done = fabs(l_pos - target) <= POS_TOLERANCE;
+        bool  r_done = fabs(r_pos - target) <= POS_TOLERANCE;
+
+        if (++log_tick % 40 == 0)
+            RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
+                "TILT moving — target=%.3f  L=%.3f(done=%d)  R=%.3f(done=%d)",
+                target, l_pos, l_done, r_pos, r_done);
+
+        if (l_done && r_done)
+        {
+            RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
+                "TILT reached — target=%.3f  L=%.3f  R=%.3f", target, l_pos, r_pos);
+            break;
+        }
+
+        float dir    = (target > l_pos) ? 1.0f : -1.0f;
+        float l_duty = l_done ? 0.0f
+            : std::clamp(fabsf(l_pos - target) * 3.1f, 0.13f, duty);
+        float r_duty = r_done ? 0.0f
+            : std::clamp(fabsf(r_pos - target) * 3.1f, 0.13f, duty);
+
+        float sync_error = r_pos - l_pos;
+        if (fabs(sync_error) > SYNC_DEADBAND)
+        {
+            float correction = KP_TILT * fabs(sync_error);
+            float factor     = std::max(0.0f, 1.0f - correction);
+            if (sync_error > 0) r_duty = duty * factor;
+            else                l_duty = duty * factor;
+
+            RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
+                "TILT sync — err=%.3f  factor=%.3f  L_duty=%.3f  R_duty=%.3f",
+                sync_error, factor, l_duty * dir, r_duty * dir);
+        }
+
+        leftTilt.SetDutyCycle(l_duty * dir);
+        rightTilt.SetDutyCycle(r_duty * dir);
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+
+    leftTilt.SetDutyCycle(0.0f);
+    rightTilt.SetDutyCycle(0.0f);
+    return true;
+}
+
+// ── CANCEL CHECK MACRO ────────────────────────────────────────────────────────
+#define CHECK(call) \
+    if (!(call)) { \
+        leftDrive.SetDutyCycle(0.0f); \
+        rightDrive.SetDutyCycle(0.0f); \
+        vibrator.SetDutyCycle(0.0f); \
+        result->success = false; \
+        goal_handle->canceled(result); \
+        return; \
+    }
 
 // ── ACTION SERVER NODE ────────────────────────────────────────────────────────
 class ExcavationNode : public rclcpp::Node
@@ -126,7 +216,8 @@ public:
     {
         action_server_ = rclcpp_action::create_server<ExcavationAction>(
             this, "excavation_action",
-            std::bind(&ExcavationNode::handle_goal,     this, std::placeholders::_1, std::placeholders::_2),
+            std::bind(&ExcavationNode::handle_goal,     this,
+                      std::placeholders::_1, std::placeholders::_2),
             std::bind(&ExcavationNode::handle_cancel,   this, std::placeholders::_1),
             std::bind(&ExcavationNode::handle_accepted, this, std::placeholders::_1));
 
@@ -140,10 +231,13 @@ public:
 private:
     rclcpp_action::Server<ExcavationAction>::SharedPtr action_server_;
     rclcpp::Subscription<interfaces_pkg::msg::MotorHealth>::SharedPtr health_subscriber_;
-    float buffer_ = 0.0f;
+
+    std::mutex buffer_mutex_;
+    float      buffer_ = 0.0f;
 
     void update_tilt_position(const interfaces_pkg::msg::MotorHealth::SharedPtr msg)
     {
+        std::lock_guard<std::mutex> lock(buffer_mutex_);
         buffer_ = msg->tilt_position;
     }
 
@@ -167,7 +261,8 @@ private:
         std::thread([this, goal_handle]() { execute(goal_handle); }).detach();
     }
 
-    void send_feedback(const std::shared_ptr<GoalHandleExcavation> & gh, const std::string & msg)
+    void send_feedback(const std::shared_ptr<GoalHandleExcavation> & gh,
+                       const std::string & msg)
     {
         auto fb = std::make_shared<ExcavationAction::Feedback>();
         fb->feedback_message = msg;
@@ -179,81 +274,163 @@ private:
     {
         auto result = std::make_shared<ExcavationAction::Result>();
 
-        send_feedback(goal_handle, "Excavation started, buffer=" + std::to_string(buffer_));
-
-        send_feedback(goal_handle, "Stage 1: Approaching position");
-        if (!MoveBucket(-2.5f, -2.6f + buffer_, false, 0.0f, goal_handle))
-        { result->success = false; goal_handle->canceled(result); return; }
-        send_feedback(goal_handle, "Stage 1 complete");
-
-        send_feedback(goal_handle, "Stage 2: Initial dig at 1500 RPM");
-        MoveBucket(-3.0f, -2.6f + buffer_, true, 1500.0f, goal_handle);
-        auto dig_timer1 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(
-                   std::chrono::high_resolution_clock::now() - dig_timer1).count() < 2)
+        float buffer;
         {
-            if (goal_handle->is_canceling()) { result->success = false; goal_handle->canceled(result); return; }
-            leftDrive.SetVelocity(1500.0f); rightDrive.SetVelocity(1500.0f);
+            std::lock_guard<std::mutex> lock(buffer_mutex_);
+            buffer = buffer_;
+        }
+
+        RCLCPP_INFO(get_logger(),
+            "PRE-EXEC — LL=%.3f  RL=%.3f  LT=%.3f  RT=%.3f  buffer=%.3f",
+            leftLift.GetPosition(), rightLift.GetPosition(),
+            leftTilt.GetPosition(), rightTilt.GetPosition(), buffer);
+
+        // ── STAGE 1A: Lift descends to approach height ────────────────────
+        // Lift moves FIRST. Tilt does not move until lift confirms arrival.
+        // Change LIFT_APPROACH at the top of the file.
+// ── STAGE 1: Lift and Tilt move to approach position simultaneously ───────
+        send_feedback(goal_handle, "Stage 1: Lift to approach height + Tilt to approach angle (parallel)");
+        {
+            bool lift_ok = true, tilt_ok = true;
+
+            std::thread lift_thread([&]() {
+                lift_ok = SyncedLiftToPos(LIFT_APPROACH, 0.9f, goal_handle);
+            });
+            std::thread tilt_thread([&]() {
+                tilt_ok = SyncedTiltToPos(TILT_APPROACH + buffer, 0.8f, goal_handle);
+            });
+
+            lift_thread.join();
+            tilt_thread.join();
+
+            if (!lift_ok || !tilt_ok)
+            {
+                leftDrive.SetDutyCycle(0.0f);
+                rightDrive.SetDutyCycle(0.0f);
+                vibrator.SetDutyCycle(0.0f);
+                result->success = false;
+                goal_handle->canceled(result);
+                return;
+            }
+        }
+        send_feedback(goal_handle, "Stage 1 complete — at approach position");
+
+        // ── STAGE 2: Drive forward, deepen tilt to full dig angle ─────────
+        // Robot motion carries bucket into material.
+        // Tilt deepens to TILT_DIG during forward travel — gradual entry.
+        // Change TILT_DIG at the top of the file.
+        send_feedback(goal_handle, "Stage 2: Entry drive + tilt to dig angle");
+        auto t2 = std::chrono::high_resolution_clock::now();
+        while (std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::high_resolution_clock::now() - t2).count() < 7000)
+        {
+            if (goal_handle->is_canceling())
+            {
+                leftDrive.SetDutyCycle(0.0f);
+                rightDrive.SetDutyCycle(0.0f);
+                vibrator.SetDutyCycle(0.0f);
+                result->success = false;
+                goal_handle->canceled(result);
+                return;
+            }
+
+            leftDrive.SetVelocity(1400.0f);
+            rightDrive.SetVelocity(1400.0f);
             vibrator.SetDutyCycle(VIBRATOR_DUTY);
-            MoveBucket(-2.5f, -2.6f + buffer_, true, 1500.0f, goal_handle);
+
+            // Inline tilt sync toward full dig angle
+            float l_pos      = leftTilt.GetPosition();
+            float r_pos      = rightTilt.GetPosition();
+            float dig_target = TILT_DIG + buffer;
+            float dir        = (dig_target > l_pos) ? 1.0f : -1.0f;
+            float l_duty     = (fabs(l_pos - dig_target) > POS_TOLERANCE) ? 0.8f : 0.0f;
+            float r_duty     = (fabs(r_pos - dig_target) > POS_TOLERANCE) ? 0.8f : 0.0f;
+            float sync_err   = r_pos - l_pos;
+            if (fabs(sync_err) > SYNC_DEADBAND)
+            {
+                float factor = std::max(0.0f, 1.0f - KP_TILT * fabsf(sync_err));
+                if (sync_err > 0) r_duty = 0.8f * factor;
+                else              l_duty = 0.8f * factor;
+            }
+            leftTilt.SetDutyCycle(l_duty * dir);
+            rightTilt.SetDutyCycle(r_duty * dir);
+
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
         send_feedback(goal_handle, "Stage 2 complete");
 
-        send_feedback(goal_handle, "Stage 3: Deeper dig at 1000 RPM");
-        auto dig_timer2 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(
-                   std::chrono::high_resolution_clock::now() - dig_timer2).count() < 2)
-        {
-            if (goal_handle->is_canceling()) { result->success = false; goal_handle->canceled(result); return; }
-            leftDrive.SetVelocity(1000.0f); rightDrive.SetVelocity(1000.0f);
-            vibrator.SetDutyCycle(VIBRATOR_DUTY);
-            MoveBucket(-2.7f, -2.1f + buffer_, true, 1000.0f, goal_handle);
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        }
-        send_feedback(goal_handle, "Stage 3 complete");
+		// ── STAGE 3: Slow scoop — lift drops to dig depth ────────────────────
+		// Speed reduced so material loads into bucket.
+		// Lift drops from LIFT_APPROACH to LIFT_DIG inline while driving.
+		// Change LIFT_DIG at the top of the file.
+		send_feedback(goal_handle, "Stage 3: Slow scoop at 800 RPM + lift to dig depth");
+		auto t3 = std::chrono::high_resolution_clock::now();
+		while (std::chrono::duration_cast<std::chrono::milliseconds>(
+				   std::chrono::high_resolution_clock::now() - t3).count() < 8000)
+		{
+			if (goal_handle->is_canceling())
+			{
+				leftDrive.SetDutyCycle(0.0f);
+				rightDrive.SetDutyCycle(0.0f);
+				vibrator.SetDutyCycle(0.0f);
+				result->success = false;
+				goal_handle->canceled(result);
+				return;
+			}
 
-        send_feedback(goal_handle, "Stage 4: Scoop at 1000 RPM");
-        auto dig_timer3 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(
-                   std::chrono::high_resolution_clock::now() - dig_timer3).count() < 2)
-        {
-            if (goal_handle->is_canceling()) { result->success = false; goal_handle->canceled(result); return; }
-            leftDrive.SetVelocity(1000.0f); rightDrive.SetVelocity(1000.0f);
-            vibrator.SetDutyCycle(VIBRATOR_DUTY);
-            MoveBucket(-1.91f, -2.5f + buffer_, true, 1000.0f, goal_handle);
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        }
+			leftDrive.SetVelocity(1000.0f);
+			rightDrive.SetVelocity(1000.0f);
+			vibrator.SetDutyCycle(VIBRATOR_DUTY);
 
-        send_feedback(goal_handle, "Stage 5: Slow scoop at 500 RPM");
-        auto dig_timer4 = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(
-                   std::chrono::high_resolution_clock::now() - dig_timer4).count() < 4)
-        {
-            if (goal_handle->is_canceling()) { result->success = false; goal_handle->canceled(result); return; }
-            leftDrive.SetVelocity(500.0f); rightDrive.SetVelocity(500.0f);
-            vibrator.SetDutyCycle(VIBRATOR_DUTY);
-            MoveBucket(-1.91f, -2.5f + buffer_, true, 500.0f, goal_handle);
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        }
-        send_feedback(goal_handle, "Stage 5 complete — stopping drivetrain");
+			// Inline lift sync toward dig depth — same factor pattern
+			float l_pos  = leftLift.GetPosition();
+			float r_pos  = rightLift.GetPosition();
+			float dir    = (LIFT_DIG > l_pos) ? 1.0f : -1.0f;
+			float l_duty = (fabs(l_pos - LIFT_DIG) > POS_TOLERANCE) ? 0.8f : 0.0f;
+			float r_duty = (fabs(r_pos - LIFT_DIG) > POS_TOLERANCE) ? 0.8f : 0.0f;
+			float sync_err = r_pos - l_pos;
+			if (fabs(sync_err) > SYNC_DEADBAND)
+			{
+				float factor = std::max(0.0f, 1.0f - KP_LIFT * fabsf(sync_err));
+				if (sync_err > 0) r_duty = 0.8f * factor;
+				else              l_duty = 0.8f * factor;
+			}
+			leftLift.SetDutyCycle(l_duty * dir);
+			rightLift.SetDutyCycle(r_duty * dir);
 
+			std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		}
+		leftLift.SetDutyCycle(0.0f);
+		rightLift.SetDutyCycle(0.0f);
+		send_feedback(goal_handle, "Stage 3 complete");
+
+        // ── STAGE 4: Stop drive and vibrator ─────────────────────────────
         leftDrive.SetDutyCycle(0.0f);
         rightDrive.SetDutyCycle(0.0f);
         vibrator.SetDutyCycle(0.0f);
 
-        send_feedback(goal_handle, "Resetting bucket to home");
-        MoveBucket(0.0f, 0.0f + buffer_, false, 0.0f, goal_handle);
+        // ── STAGE 5: Tilt returns home FIRST ─────────────────────────────
+        // Tilt must return to TILT_HOME before lift rises.
+        // Lift rising with tilt still at dig angle risks chassis contact.
+        // Change TILT_HOME at the top of the file.
+        //send_feedback(goal_handle, "Stage 5: Tilt returning to home (0.0)");
+        //CHECK(SyncedTiltToPos(TILT_HOME + buffer, 0.5f, goal_handle))
+        //send_feedback(goal_handle, "Stage 5 complete");
 
-        auto reset_tilt = std::chrono::high_resolution_clock::now();
-        while (std::chrono::duration_cast<std::chrono::seconds>(
-                   std::chrono::high_resolution_clock::now() - reset_tilt).count() < 1)
-        {
-            SetTiltDutyCycle(1.0f);
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        }
+        // ── STAGE 6: Lift returns home ────────────────────────────────────
+        // Tilt confirmed at home. Lift rises back to zero.
+        // Change LIFT_HOME at the top of the file.
+        send_feedback(goal_handle, "Stage 6: Lift returning to home (0.0)");
+        CHECK(SyncedTiltToPos(TILT_HOME + buffer, 0.8f, goal_handle))
 
-        send_feedback(goal_handle, "Excavation complete");
+        CHECK(SyncedLiftToPos(LIFT_HOME, 0.9f, goal_handle))
+
+        RCLCPP_INFO(get_logger(),
+            "POST-EXEC — LL=%.3f  RL=%.3f  LT=%.3f  RT=%.3f",
+            leftLift.GetPosition(), rightLift.GetPosition(),
+            leftTilt.GetPosition(), rightTilt.GetPosition());
+
+        send_feedback(goal_handle, "Excavation complete — reset to home");
         result->success = true;
         goal_handle->succeed(result);
     }

@@ -20,7 +20,7 @@ public:
     port_ = this->get_parameter("port").as_string();
     const int baud = this->get_parameter("baud").as_int();
 
-    pub_ = this->create_publisher<std_msgs::msg::Int32>("arduino/raw", 10);
+    pub_ = this->create_publisher<std_msgs::msg::String>("arduino/raw", 10);
 
     try {
       serial_.Open(port_);

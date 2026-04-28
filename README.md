@@ -1,6 +1,6 @@
 <h1>EDT-Lunabotics-2026</h1>
 
-<img src="https://i.imgur.com/KgdN7f8.png" style="width: 200px" alt="EDT-Logo"></img>
+<img src="https://i.imgur.com/KgdN7f8.png" style="width: 400px" alt="EDT-Logo"></img>
 <hr>
 <h2>Packages</h2>
     <ul>
