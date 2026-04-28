@@ -54,14 +54,14 @@
       <geometry>
         <mesh filename="file:///$(find description_pkg)/meshes/uic_bot/d456_camera.stl" />
       </geometry>
-      <origin xyz="0 -${camera_sim_link_offset} 0" rpy="0 0 0" />
+    <!--  <origin xyz="0 -${camera_sim_link_offset} 0" rpy="0 0 0" /> -->
       <material name="camera_grey" />
     </visual>
     <collision>
       <geometry>
         <mesh filename="file:///$(find description_pkg)/meshes/uic_bot/d456_camera.stl" />
       </geometry>
-      <origin xyz="0 -${camera_sim_link_offset} 0" rpy="0 0 0" />
+    <!--  <origin xyz="0 -${camera_sim_link_offset} 0" rpy="0 0 0" /> -->
     </collision>
   </link>
 
@@ -72,14 +72,14 @@
       <geometry>
         <mesh filename="file:///$(find description_pkg)/meshes/uic_bot/d455_camera.stl" />
       </geometry>
-      <origin xyz="0 -${camera_sim_link_offset} 0" rpy="0 0 0" />
+    <!--  <origin xyz="0 -${camera_sim_link_offset} 0" rpy="0 0 0" /> -->
       <material name="camera_grey" />
     </visual>
     <collision>
       <geometry>
         <mesh filename="file:///$(find description_pkg)/meshes/uic_bot/d455_camera.stl" />
       </geometry>
-      <origin xyz="0 -${camera_sim_link_offset} 0" rpy="0 0 0" />
+    <!--  <origin xyz="0 -${camera_sim_link_offset} 0" rpy="0 0 0" /> -->
     </collision>
   </link>
 
@@ -199,7 +199,7 @@
   <joint name="base_d455_joint" type="fixed">
     <parent link="base_link" />
     <child link="d455_link" />
-    <origin xyz="-0.42 0 0.37" rpy="0 0.523599 3.14" />
+    <origin xyz="-0.42 0 0.37" rpy="0 -0.2618 3.14" />
   </joint>
 
   <joint name="d455_optical_joint" type="fixed">
@@ -211,7 +211,7 @@
   <joint name="base_d456_joint" type="fixed">
     <parent link="base_link" />
     <child link="d456_link" />
-    <origin xyz="0.535 -0.28 0.141" rpy="0 0 0" />
+    <origin xyz="0.535 -0.28 0.141" rpy="0 -0.2618 0" />
   </joint>
 
   <joint name="d456_optical_joint" type="fixed">
@@ -223,7 +223,7 @@
   <joint name="base_s3_lidar_joint" type="fixed">
     <parent link="base_link" />
     <child link="s3_lidar_link" />
-    <origin xyz="-0.38 -0.0889 0.2811" rpy="0 0 0" />
+    <origin xyz="0.0 0.102 0.470" rpy="0 0 0" />
   </joint>
 
   <joint name="imu_joint" type="fixed">

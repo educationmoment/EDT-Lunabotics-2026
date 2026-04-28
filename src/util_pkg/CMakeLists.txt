@@ -27,8 +27,10 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
+find_package(apriltag_msgs REQUIRED)
+find_package(rtabmap_msgs REQUIRED)
 find_library(SERIAL_LIB serial)
 
 
@@ -39,16 +41,24 @@ add_executable(imu_rotator src/imu_rotator.cpp)
 add_executable(topic_remapper src/topic_remapper.cpp)
 add_executable(actuator_position src/actuator_position.cpp)
 add_executable(arduino_serial_node src/arduino_serial_node.cpp)
-
+add_executable(apriltag_to_landmarks src/apriltag_to_landmarks.cpp)
 
 target_link_libraries(arduino_serial_node ${SERIAL_LIB})
 ament_target_dependencies(arduino_serial_node rclcpp std_msgs)
+
 # Set target dependencies
 ament_target_dependencies(blade_joint_controller rclcpp sensor_msgs)
 ament_target_dependencies(hardware_monitor rclcpp sensor_msgs)
 ament_target_dependencies(imu_rotator rclcpp sensor_msgs tf2)
 ament_target_dependencies(topic_remapper rclcpp geometry_msgs nav_msgs)
 ament_target_dependencies(actuator_position rclcpp std_msgs sensor_msgs)
+ament_target_dependencies(apriltag_to_landmarks
+  rclcpp
+  apriltag_msgs
+  rtabmap_msgs
+  geometry_msgs
+  tf2_geometry_msgs
+)
 
 # Install targets
 install(TARGETS
@@ -58,6 +68,7 @@ install(TARGETS
   topic_remapper
   actuator_position
   arduino_serial_node
+  apriltag_to_landmarks
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

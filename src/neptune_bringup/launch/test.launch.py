@@ -76,6 +76,7 @@ def generate_launch_description():
             "enable_gyro": "true", "enable_accel": "true", "unite_imu_method": "2",
             "depth_module.depth_profile": "640x480x30",
             "rgb_camera.color_profile": "640x480x30",
+            "pointcloud.enable": "true",
         }.items(),
     )
     d456_launch = IncludeLaunchDescription(
@@ -86,6 +87,7 @@ def generate_launch_description():
             "enable_gyro": "true", "enable_accel": "true", "unite_imu_method": "2",
             "depth_module.depth_profile": "640x480x30",
             "rgb_camera.color_profile": "640x480x30",
+            "pointcloud.enable": "true",
         }.items(),
     )
 
@@ -137,24 +139,31 @@ def generate_launch_description():
 
     # ── APRILTAG ──────────────────────────────────────────────────────────────
     apriltag_d455_node = Node(
-        package="apriltag_ros", executable="apriltag_node", output="screen",
+        package="apriltag_ros", executable="apriltag_node",
+        name="apriltag_d455",          # ← give each a unique name
+        output="screen",
         parameters=[apriltag_params_file],
-        remappings=[("/image_rect", "/d455/color/image_raw"), ("/camera_info", "/d455/color/camera_info")],
+        remappings=[("/image_rect", "/d455/color/image_raw"),
+                    ("/camera_info", "/d455/color/camera_info")],
     )
     apriltag_d456_node = Node(
-        package="apriltag_ros", executable="apriltag_node", output="screen",
+        package="apriltag_ros", executable="apriltag_node",
+        name="apriltag_d456",          # ← unique name
+        output="screen",
         parameters=[apriltag_params_file],
-        remappings=[("/image_rect", "/d456/color/image_raw"), ("/camera_info", "/d456/color/camera_info")],
+        remappings=[("/image_rect", "/d456/color/image_raw"),
+                    ("/camera_info", "/d456/color/camera_info")],
     )
 
     # ── ODOMETRY: rf2o ONLY → UKF ─────────────────────────────────────────────
     # Single source. Never run icp or rgbd_odom at the same time — causes UKF jumps.
     rf2o_odometry_node = Node(
         package="rf2o_laser_odometry", executable="rf2o_laser_odometry_node",
-        name="rf2o_laser_odometry", output="screen",
+        output="screen",
+        respawn=False,
         parameters=[{
             "laser_scan_topic": "/scan", "odom_topic": "/rf2o_odom", #maybe change to scan_raw? idk
-            "publish_tf": False,                # UKF owns odom TF
+            "publish_tf": False,                 # rf2o owns odom TF (UKF bypassed)
             "base_frame_id": "base_link",
             "odom_frame_id": "odom",
             "laser_frame_id": "s3_lidar_link",  # real robot needs this
@@ -190,7 +199,7 @@ def generate_launch_description():
                 "approx_sync_max_interval": 0.1,
                 "sync_queue_size": 1000,
                 "topic_queue_size": 30,
-                "subscribe_scan_cloud": False, "subscribe_scan": False,
+                "subscribe_scan_cloud": False, "subscribe_scan": True,
                 "wait_imu_to_init": False,      # real robot: IMU already stable at launch
                 "imu_topic": "/d455/imu/data",
             },
@@ -198,10 +207,61 @@ def generate_launch_description():
         remappings=[
             ("rgbd_image0", "/d456/rgbd_image"),
             ("rgbd_image1", "/d455/rgbd_image"),
-            #("scan", "/scan"),
+            ("scan", "/scan"),
         ],
         arguments=["--ros-args", "--log-level", "warn"],
     )
+
+    apriltag_to_landmarks_node = Node(
+        package="util_pkg",
+        executable="apriltag_to_landmarks",
+        name="apriltag_to_landmarks",
+        output="screen",
+        parameters=[{
+           "tag_linear_variance":  0.01,   
+            "tag_angular_variance": 0.05,
+            "reference_frame": "d455_color_optical_frame",
+        }],
+    )
+
+    crater_scan_d455_node = Node(
+        package="depthimage_to_laserscan",
+        executable="depthimage_to_laserscan_node",
+        name="crater_scan_d455",
+        output="screen",
+        remappings=[
+            ("depth",             "/d455/depth/image_rect_raw"),
+            ("depth_camera_info", "/d455/depth/camera_info"),
+            ("scan",              "/crater_scan_rear"),
+        ],
+        parameters=[{
+            "scan_height":    10,     # rows of depth image to sample
+            "scan_time":      0.1,
+            "range_min":      0.3,
+            "range_max":      2.5,    # D455 at 0.37m height, 15deg down → ground at ~1.4m
+            "output_frame":   "d455_depth_optical_frame",
+        }],
+    )
+
+    crater_scan_d456_node = Node(
+        package="depthimage_to_laserscan",
+        executable="depthimage_to_laserscan_node",
+        name="crater_scan_d456",
+        output="screen",
+        remappings=[
+            ("depth",             "/d456/depth/image_rect_raw"),
+            ("depth_camera_info", "/d456/depth/camera_info"),
+            ("scan",              "/crater_scan_front"),
+        ],
+        parameters=[{
+            "scan_height":    10,
+            "scan_time":      0.1,
+            "range_min":      0.2,
+            "range_max":      1.5,    # D456 at 0.141m height, 15deg down → ground at ~0.53m
+            "output_frame":   "d456_depth_optical_frame",
+        }],
+    )
+
 
     # ── NAV2 ──────────────────────────────────────────────────────────────────
     controller_server_node = Node(
@@ -233,34 +293,34 @@ def generate_launch_description():
         ],
     )
 
-    base_to_d456_tf = Node(
-    package="tf2_ros",
-    executable="static_transform_publisher",
-    name="base_to_d456_tf",
+    #base_to_d456_tf = Node(
+    #package="tf2_ros",
+    #executable="static_transform_publisher",
+    #name="base_to_d456_tf",
     # x=0.457 (front), y=-0.289 (right of center), z=0.210 (height)
     # rpy=0 0 0 (forward-facing, level)
-    arguments=["0.457", "-0.289", "0.210", "0", "0", "0",
-               "base_link", "d456_link"],
-    )
+   # arguments=["0.457", "-0.289", "0.210", "0", "0", "0",
+   #            "base_link", "d456_link"],
+   # )
 
-    base_to_d455_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="base_to_d455_tf",
-        # x=-0.556 (behind rear), y=0.032 (slightly left), z=0.464 (height)
-        # rpy: roll=0, pitch=0.5236 (30° down), yaw=3.14159 (rear-facing)
-        arguments=["-0.556", "0.032", "0.464", "0", "0.0", "3.14159",
-                "base_link", "d455_link"],
-    )
+    #base_to_d455_tf = Node(
+    #    package="tf2_ros",
+    #    executable="static_transform_publisher",
+    #    name="base_to_d455_tf",
+    #    # x=-0.556 (behind rear), y=0.032 (slightly left), z=0.464 (height)
+    #    # rpy: roll=0, pitch=0.5236 (30° down), yaw=3.14159 (rear-facing)
+    #    arguments=["-0.556", "0.032", "0.464", "0", "0.0", "3.14159",
+    #            "base_link", "d455_link"],
+    #)
 
-    base_to_s3_lidar_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="base_to_s3_lidar_tf",
-        # x=0.0 (centered), y=0.102 (left of center), z=0.470 (height)
-        arguments=["0.0", "0.102", "0.470", "0", "0", "0",
-                "base_link", "s3_lidar_link"],
-    )
+   # base_to_s3_lidar_tf = Node(
+    #    package="tf2_ros",
+    #    executable="static_transform_publisher",
+    #    name="base_to_s3_lidar_tf",
+    #    # x=0.0 (centered), y=0.102 (left of center), z=0.470 (height)
+    #    arguments=["0.0", "0.102", "0.470", "0", "0", "0",
+    #            "base_link", "s3_lidar_link"],
+   # )
 
     # ── NAVIGATION SERVERS ────────────────────────────────────────────────────
     excavation_server_node = Node(
@@ -318,15 +378,16 @@ def generate_launch_description():
 
     # Always-on
     
-    #ld.add_action(robot_state_publisher_node)
-    ld.add_action(base_to_d456_tf)
-    ld.add_action(base_to_d455_tf)
-    ld.add_action(base_to_s3_lidar_tf)
-    #ld.add_action(joint_state_publisher_node)
+    ld.add_action(robot_state_publisher_node)
+    #ld.add_action(base_to_d456_tf)
+    #ld.add_action(base_to_d455_tf)
+    #ld.add_action(base_to_s3_lidar_tf)
+    ld.add_action(joint_state_publisher_node)
     ld.add_action(s3_lidar_node)
     ld.add_action(s3_filter_node)
     ld.add_action(d455_launch)
     ld.add_action(d456_launch)
+    ld.add_action(apriltag_to_landmarks_node)
     #ld.add_action()
     ld.add_action(imu_rotator_node)
     ld.add_action(d455_imu_filter)
@@ -335,6 +396,10 @@ def generate_launch_description():
     ld.add_action(rgbd_sync2_node)
     ld.add_action(apriltag_d455_node)
     ld.add_action(apriltag_d456_node)
+    ld.add_action(crater_scan_d455_node)
+    ld.add_action(crater_scan_d456_node)
+    #ld.add_action(d455_filter_node)
+    #ld.add_action(d456_filter_node)
     ld.add_action(hardware_controller_module)
     ld.add_action(depositing_module)
     ld.add_action(excavation_module)
@@ -343,15 +408,18 @@ def generate_launch_description():
     ld.add_action(rosbridge_node)
     ld.add_action(d456_compress_node)
     ld.add_action(d455_compress_node)
+    ld.add_action(TimerAction(period=2.0,  actions=[rf2o_odometry_node]))
+    ld.add_action(TimerAction(period=4.0,  actions=[ukf_node]))
+    ld.add_action(TimerAction(period=8.0,  actions=[slam_node]))
 
     # ── MANUAL MODE ───────────────────────────────────────────────────────────
     ld.add_action(GroupAction(
         condition=LaunchConfigurationEquals("robot_mode", "manual"),
         actions=[
-            TimerAction(period=2.0, actions=[rf2o_odometry_node]),   # lidar must be up first
-            TimerAction(period=4.0, actions=[ukf_node]),              # needs rf2o publishing
-            TimerAction(period=8.0, actions=[slam_node]),             # needs /odometry/filtered
-            TimerAction(period=20.0, actions=[
+            #TimerAction(period=2.0, actions=[rf2o_odometry_node]),   # lidar must be up first
+            #TimerAction(period=4.0, actions=[ukf_node]),              # needs rf2o publishing
+            #TimerAction(period=8.0, actions=[slam_node]),             # needs /odometry/filtered
+            TimerAction(period=30.0, actions=[                        # wait longer for RTAB-Map to build map
                 controller_server_node, planner_server_node,
                 behavior_server_node, bt_navigator_node, lifecycle_manager_node,
             ]),
@@ -362,13 +430,16 @@ def generate_launch_description():
     ld.add_action(GroupAction(
         condition=LaunchConfigurationEquals("robot_mode", "auto"),
         actions=[
-            TimerAction(period=2.0, actions=[rf2o_odometry_node]),
-            TimerAction(period=4.0, actions=[ukf_node]),
-            TimerAction(period=8.0, actions=[slam_node]),
+            #TimerAction(period=2.0, actions=[rf2o_odometry_node]),
+            #TimerAction(period=4.0, actions=[ukf_node]),
+            #TimerAction(period=8.0, actions=[slam_node]),
             TimerAction(period=3.0, actions=[
-                excavation_server_node, localization_server_node, navigation_client_node,
+                excavation_server_node, localization_server_node,
             ]),
-            TimerAction(period=20.0, actions=[
+            TimerAction(period=40.0, actions=[
+                navigation_client_node,   # ← after Nav2 is fully active
+            ]),
+            TimerAction(period=35.0, actions=[                        # wait longer for RTAB-Map to build map
                 controller_server_node, planner_server_node,
                 behavior_server_node, bt_navigator_node, lifecycle_manager_node,
             ]),

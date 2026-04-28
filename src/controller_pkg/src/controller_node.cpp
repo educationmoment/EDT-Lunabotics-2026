@@ -83,8 +83,9 @@ public:
         prev_vibrator_button_(false),
         alternate_mode_active_(false),
         prev_alternate_button_(false),
-        nav2_control_active_(false), 
-        last_cmd_vel_time_(this->now())  
+        last_sync_time_(this->now()),
+        last_cmd_vel_time_(this->now()),
+        nav2_control_active_(false)
   {
     RCLCPP_INFO(this->get_logger(), "Begin Initializing Node");
 
@@ -220,6 +221,9 @@ private:
   SparkMax leftTilt;
   SparkMax rightTilt;
   SparkMax vibrator;
+  double dt_ = 0.02;
+
+  rclcpp::Time last_sync_time_;
 
   // Action clients (excavation and depositing are now action servers)
   rclcpp_action::Client<msg_pkg::action::Excavation>::SharedPtr excavation_client_;
@@ -253,7 +257,13 @@ private:
 
   float lift_offset_ = 0.0f;
   float tilt_offset_ = 0.0f;
-  bool offsets_calibrated_ = false;
+  bool  offsets_calibrated_ = false;
+  bool           homing_          = false;
+  rclcpp::Time   home_timer_;
+  float          last_left_lift_  = 0.0f;
+  float          last_right_lift_ = 0.0f;
+  float          last_left_tilt_  = 0.0f;
+  float          last_right_tilt_ = 0.0f;
   // Helper for stepped output, in velocity control mode it is multiplied by VELOCITY_MAX
   /**
    * @brief Output must be bound within the range [-1.0,1.0].
@@ -366,6 +376,15 @@ private:
     right_lift_position = health_msg->right_lift_position;
     left_tilt_position = health_msg->left_tilt_position;
     right_tilt_position = health_msg->right_tilt_position;
+    auto now = this->now();
+    dt_ = (now - last_sync_time_).seconds();
+    last_sync_time_ = now;
+
+    dt_ = std::clamp(dt_, 0.001, 0.1);
+    //dt = std::clamp(dt,0.001,0.1);
+
+
+    
         if (!offsets_calibrated_)
     {
         lift_offset_ = right_lift_position - left_lift_position;
@@ -496,16 +515,70 @@ private:
 
       vibrator.SetDutyCycle(vibrator_duty);
 
-      // EXCAVATION RESET BUTTON (X button)
       if (joy_msg->buttons[Gp::Buttons::_X] > 0)
       {
-        //leftLift.SetPosition(0.0f);
-        //rightLift.SetPosition(0.0f);
-        //setTiltDutyCycle(1.0f);
-        //RCLCPP_INFO(this->get_logger(), "Left lift CPR: %d", leftLift.GetEncoderCountsPerRev());
-        //RCLCPP_INFO(this->get_logger(), "Right lift CPR: %d", rightLift.GetEncoderCountsPerRev());
-        //RCLCPP_INFO(this->get_logger(), "Left tilt CPR: %d", leftTilt.GetEncoderCountsPerRev());
-        //RCLCPP_INFO(this->get_logger(), "Right tilt CPR: %d", rightTilt.GetEncoderCountsPerRev());
+          homing_          = true;
+          home_timer_      = this->now();
+          // Seed with current position so first settled check doesn't fire immediately
+          last_left_lift_  = left_lift_position;
+          last_right_lift_ = right_lift_position;
+          last_left_tilt_  = left_tilt_position;
+          last_right_tilt_ = right_tilt_position;
+      }
+
+
+      if (homing_)
+      {
+          // Drive toward 0.0 — positive duty moves actuators up/back to zero
+          float lift_err_l = 0.0f - left_lift_position;
+          float lift_err_r = 0.0f - right_lift_position;
+          float tilt_err_l = 0.0f - left_tilt_position;
+          float tilt_err_r = 0.0f - right_tilt_position;
+
+          bool lift_done = fabs(lift_err_l) < 0.04f && fabs(lift_err_r) < 0.04f;
+          bool tilt_done = fabs(tilt_err_l) < 0.04f && fabs(tilt_err_r) < 0.04f;
+
+          if (!lift_done)
+          {
+              leftLift.SetDutyCycle(lift_err_l > 0 ? 0.5f : -0.5f);
+              rightLift.SetDutyCycle(lift_err_r > 0 ? 0.5f : -0.5f);
+          }
+          else
+          {
+              leftLift.SetDutyCycle(0.0f);
+              rightLift.SetDutyCycle(0.0f);
+          }
+
+          if (!tilt_done)
+          {
+              leftTilt.SetDutyCycle(tilt_err_l > 0 ? 0.5f : -0.5f);
+              rightTilt.SetDutyCycle(tilt_err_r > 0 ? 0.5f : -0.5f);
+          }
+          else
+          {
+              leftTilt.SetDutyCycle(0.0f);
+              rightTilt.SetDutyCycle(0.0f);
+          }
+
+          bool timed_out = (this->now() - home_timer_).seconds() > 13.0;
+
+          if ((lift_done && tilt_done) || timed_out)
+          {
+              leftLift.SetDutyCycle(0.0f);
+              rightLift.SetDutyCycle(0.0f);
+              leftTilt.SetDutyCycle(0.0f);
+              rightTilt.SetDutyCycle(0.0f);
+
+              lift_offset_        = right_lift_position - left_lift_position;
+              tilt_offset_        = right_tilt_position - left_tilt_position;
+              offsets_calibrated_ = true;
+              homing_             = false;
+
+              RCLCPP_INFO(get_logger(), "Homed. LL=%.3f RL=%.3f LT=%.3f RT=%.3f",
+                          left_lift_position, right_lift_position,
+                          left_tilt_position, right_tilt_position);
+          }
+          return;
       }
       else
       {
@@ -517,16 +590,16 @@ private:
         else if (joy_msg->buttons[Gp::Buttons::_D_PAD_LEFT] > 0 && joy_msg->buttons[Gp::Buttons::_X_BOX_KEY] == 0)
             tilt_setpoint = -1.0f;
 
-        const float KP_TILT = 1.2f;
-        const float KD_TILT = 0.3f;  
-        const float TILT_DEADBAND = 0.07f;  
+        const float KP_TILT = 0.5f;
+        const float KD_TILT = 0.05f;  
+        const float TILT_DEADBAND = 0.02f;  
 
           //const float HIGH_PASS_FILTER = 0.05f;  // tighter deadband
           //const float KP_LIFT = 1.5f;            // much more aggressive
           //const float KD_LIFT = 0.4f;            // higher to match
 
         float tilt_error = (right_tilt_position - left_tilt_position) - tilt_offset_;
-        float tilt_error_rate = tilt_error - prev_tilt_error_;
+        float tilt_error_rate = (tilt_error - prev_tilt_error_) / dt_;
         prev_tilt_error_ = tilt_error;
 
         float left_tilt_duty  = tilt_setpoint;
@@ -535,7 +608,7 @@ private:
         if (tilt_setpoint != 0.0f && fabs(tilt_error) > TILT_DEADBAND)
         {
             float correction = KP_TILT * fabs(tilt_error)
-                            - KD_TILT * fabs(tilt_error_rate);
+                            + KD_TILT * fabs(tilt_error_rate);
             correction = std::max(0.0f, correction);
             float factor = std::max(0.0f, 1.0f - correction);
 
@@ -559,13 +632,26 @@ private:
         }
         else if (tilt_setpoint == 0.0f && fabs(tilt_error) > TILT_DEADBAND)
         {
-            float correction_duty = KP_TILT * tilt_error * 0.3f;
-            correction_duty = std::clamp(correction_duty, -0.5f, 0.5f);
-            left_tilt_duty  =  correction_duty * 0.5f;
-            right_tilt_duty = -correction_duty * 0.5f;
+            float nudge = std::clamp(KP_TILT * fabsf(tilt_error) * 0.2f, 0.0f, 0.3f);
+            if (tilt_error < 0)  // left is ahead
+            {
+              left_tilt_duty  = 0.0f;
+              right_tilt_duty = nudge;
+            }
+            else  // right is ahead
+            {
+              right_tilt_duty = 0.0f;
+              left_tilt_duty  = nudge;
+            }
+            RCLCPP_INFO(this->get_logger(), "TILT IDLE SYNC: error=%.3f nudge=%.3f",
+                tilt_error, nudge);
+            //float correction_duty = KP_TILT * tilt_error * 0.3f;
+            //correction_duty = std::clamp(correction_duty, -0.5f, 0.5f);
+            //left_tilt_duty  =  correction_duty * 0.5f;
+            //right_tilt_duty = -correction_duty * 0.5f;
 
-            RCLCPP_INFO(this->get_logger(), "TILT IDLE SYNC: error=%.3f correction=%.3f",
-                        tilt_error, correction_duty);
+            //RCLCPP_INFO(this->get_logger(), "TILT IDLE SYNC: error=%.3f correction=%.3f",
+              //          tilt_error, correction_duty);
         }
 
         left_tilt_duty  = std::clamp(left_tilt_duty,  -1.0f, 1.0f);
@@ -590,15 +676,15 @@ private:
 
 
           const float HIGH_PASS_FILTER = 0.05f;  // tighter deadband
-          const float KP_LIFT = 1.5f;            // much more aggressive
-          const float KD_LIFT = 0.4f;            // higher to match
+          const float KP_LIFT = 1.3f;            // much more aggressive
+          const float KD_LIFT = 0.5f;            // higher to match
 
 
 
           float lift_error = (right_lift_position - left_lift_position) - lift_offset_;
 
 
-          float lift_error_rate = lift_error - prev_lift_error_;
+          float lift_error_rate = (lift_error - prev_lift_error_) / dt_;
           prev_lift_error_ = lift_error;
 
           // get user lift direction
@@ -616,7 +702,7 @@ private:
           if (lift_setpoint != 0.0f && fabs(lift_error) > HIGH_PASS_FILTER)
           {
               float correction = KP_LIFT * fabs(lift_error) 
-                              - KD_LIFT * fabs(lift_error_rate);
+                              + KD_LIFT * fabs(lift_error_rate);
               correction = std::max(0.0f, correction);
               float factor = std::max(0.0f, 1.0f - correction);
 
@@ -640,14 +726,29 @@ private:
           }
           else if (lift_setpoint == 0.0f && fabs(lift_error) > HIGH_PASS_FILTER)
           {
-              float correction_duty = KP_LIFT * lift_error * 0.3f;
-              correction_duty = std::clamp(correction_duty, -0.5f, 0.5f);
-              left_duty  =  correction_duty * 0.5f;
-              right_duty = -correction_duty * 0.5f;
+              //float correction_duty = KP_LIFT * lift_error * 0.3f;
+              float nudge = std::clamp(KP_LIFT * fabsf(lift_error) * 0.2f, 0.0f, 0.3f);
+              if (lift_error < 0)
+              {
+                // left is ahead
+                  left_duty  = 0.0f;
+                  right_duty = nudge;   // bring right up
+              }
+              else     
+              {            // right is ahead
+                  right_duty = 0.0f;
+                  left_duty  = nudge;
+              }
+                    // bring left up
 
-              RCLCPP_INFO(this->get_logger(), "IDLE SYNC: error=%.3f correction=%.3f",
-                          lift_error, correction_duty);
+              RCLCPP_INFO(this->get_logger(), "IDLE SYNC: error=%.3f nudge=%.3f",
+                lift_error, nudge);
           }
+              //correction_duty = std::clamp(correction_duty, -0.5f, 0.5f);
+              //left_duty  =  correction_duty * 0.5f;
+             // right_duty = -correction_duty * 0.5f;
+
+          
 
         left_duty  = std::clamp(left_duty,  -1.0f, 1.0f);
         right_duty = std::clamp(right_duty, -1.0f, 1.0f);

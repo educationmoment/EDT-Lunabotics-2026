@@ -83,7 +83,7 @@ controller_server:
     goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.15
-      yaw_goal_tolerance: 0.1
+      yaw_goal_tolerance: 0.25
       stateful: true
     MPPI:
       plugin: "nav2_mppi_controller::MPPIController"
@@ -96,7 +96,7 @@ controller_server:
       vx_max: 0.3
       vx_min: -0.35
       vy_max: 0.5
-      wz_max: 1.9
+      wz_max: 1.0
       iteration_count: 1
       prune_distance: 1.7
       transform_tolerance: 0.5
@@ -120,8 +120,8 @@ controller_server:
       GoalAngleCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 1.0
-        threshold_to_consider: 0.3
+        cost_weight: 4.0
+        threshold_to_consider: 0.5
       PreferForwardCritic:
         enabled: true
         cost_power: 1
@@ -170,6 +170,8 @@ global_costmap:
       publish_frequency: 30.0
       global_frame: map
       robot_base_frame: base_link
+      rolling_window: false
+      track_unknown_space: true
       use_sim_time: false
       width: 20
       height: 20
@@ -191,7 +193,7 @@ global_costmap:
         footprint_clearing_enabled: true
         max_obstacle_height: 2.0
         combination_method: 1
-        observation_sources: scan scan2
+        observation_sources: scan #scan2
         scan:
           topic: /scan
           obstacle_max_range: 8.0
@@ -201,16 +203,16 @@ global_costmap:
           clearing: true
           marking: true
           data_type: "LaserScan"
-        scan2:
-          topic: /scan2
-          obstacle_max_range: 2.5
-          raytrace_max_range: 3.0
-          max_obstacle_height: 2.0
-          min_obstacle_height: 0.0
-          clearing: true
-          marking: true
-          data_type: "LaserScan"
-          inf_is_valid: false
+       # scan2:
+        #  topic: /scan2
+        #  obstacle_max_range: 2.5
+        #  raytrace_max_range: 3.0
+        #  max_obstacle_height: 2.0
+        #  min_obstacle_height: 0.0
+        #  clearing: true
+        #  marking: true
+        #  data_type: "LaserScan"
+        #  inf_is_valid: false
       denoise_layer:
         plugin: "nav2_costmap_2d::DenoiseLayer"
         enabled: true
@@ -223,7 +225,7 @@ global_costmap:
         inflation_radius: 0.8
         cost_scaling_factor: 3.0
         inflate_unknown: false
-        inflate_around_unknown: true
+        inflate_around_unknown: false
       always_send_full_costmap: true
 
 
@@ -249,26 +251,69 @@ local_costmap:
         footprint_clearing_enabled: true
         max_obstacle_height: 2.0
         combination_method: 1
-        observation_sources: scan scan2   # was missing scan2 and scan was outside layer
+        observation_sources: scan crater_scan_rear crater_scan_front d455_cloud d456_cloud
         scan:
           topic: /scan
-          obstacle_max_range: 5.0
-          raytrace_max_range: 5.5
-          max_obstacle_height: 2.0
-          min_obstacle_height: 0.0
-          clearing: true
+          sensor_frame: s3_lidar_link
+          data_type: LaserScan
           marking: true
-          data_type: "LaserScan"
-        scan2:
-          topic: /scan2
+          clearing: true
+          obstacle_max_range: 8.0
+          raytrace_max_range: 10.0
+
+        crater_scan_rear:
+          topic: /crater_scan_rear
+          sensor_frame: d455_depth_optical_frame
+          data_type: LaserScan
+          marking: true
+          clearing: false
           obstacle_max_range: 2.5
+          obstacle_min_range: 0.3
           raytrace_max_range: 3.0
-          max_obstacle_height: 2.0
-          min_obstacle_height: 0.0
-          clearing: true
+          inf_is_valid: false        # missing depth return = crater = obstacle
+
+        crater_scan_front:
+          topic: /crater_scan_front
+          sensor_frame: d456_depth_optical_frame
+          data_type: LaserScan
           marking: true
-          data_type: "LaserScan"
+          clearing: false
+          obstacle_max_range: 1.5
+          obstacle_min_range: 0.2
+          raytrace_max_range: 2.0
           inf_is_valid: false
+
+        d455_cloud:
+          topic: /d455/depth/color/points
+          sensor_frame: d455_color_optical_frame
+          data_type: PointCloud2
+          marking: true
+          clearing: false
+          min_obstacle_height: 0.03
+          max_obstacle_height: 0.45
+          obstacle_max_range: 3.0
+          obstacle_min_range: 0.20
+
+        d456_cloud:
+          topic: /d456/depth/color/points
+          sensor_frame: d456_color_optical_frame
+          data_type: PointCloud2
+          marking: true
+          clearing: false
+          min_obstacle_height: 0.05
+          max_obstacle_height: 0.20
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.20
+      #  scan2:
+      #    topic: /scan2
+      #    obstacle_max_range: 2.5
+      #    raytrace_max_range: 3.0
+      #    max_obstacle_height: 2.0
+      #    min_obstacle_height: 0.0
+      #    clearing: true
+      #    marking: true
+      #    data_type: "LaserScan"
+      #    inf_is_valid: false
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true

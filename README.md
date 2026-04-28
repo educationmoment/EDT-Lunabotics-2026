@@ -1,16 +1,21 @@
-<h1>EDT-Lunabotics-2025</h1>
+<h1>EDT-Lunabotics-2026</h1>
 
-
-
-<img src="https://github.com/user-attachments/assets/6e77045f-b1a8-47ea-ad5b-2ae286bfaef3" style="width: 400px" alt="EDT-Logo"></img>
-
-    ╔═║╔═║╔═║ ╝╔═╝╔═╝═╔╝  ╔═ ╔═╝╔═║═╔╝║ ║╔═ ╔═╝
-    ╔═╝╔╔╝║ ║ ║╔═╝║   ║   ║ ║╔═╝╔═╝ ║ ║ ║║ ║╔═╝
-    ╝  ╝ ╝══╝═╝══╝══╝ ╝   ╝ ╝══╝╝   ╝ ══╝╝ ╝══╝
+<img src="https://i.imgur.com/KgdN7f8.png" style="width: 400px" alt="EDT-Logo"></img>
 <hr>
 <h2>Packages</h2>
     <ul>
         <li>neptune_bringup</li>
+        <li>config_pkg</li> 
+        <li>description_pkg</li>
+        <li>interfaces_pkg</li>
+        <li>logger_pkg</li>
+        <li>msg_pkg</li>
+        <li>navigation_pkg</li>
+        <li>scripts</li>
+        <li>sim_pkg</li>
+        <li>teleop_pkg</li>
+        <li>third_party_packages</li>
+        <li>util_pkg</li>
         <li>controller_pkg</li>
         <li>vision_pkg</li>
         <li>webgui_pkg</li>
@@ -21,7 +26,7 @@
 <h2>Description</h2>
 <hr>
 <p>This is a GitHub repository created for the University of Illinois Chicago Engineering Design Team
-for the NASA Lunabotics 2025 competition.</p>
+for the NASA Lunabotics 2026 competition.</p>
 
 <h2>Potential Bugs and their fixes.</h2>
 <p>Video Cameras not showing (and not throwing the error: "Failed to open USB RGB camera 1 (/dev/video6)")" etc</p> 
@@ -49,6 +54,14 @@ for the NASA Lunabotics 2025 competition.</p>
 <p>CAN Interface not found / CAN is busy</p>
 
     fix: sudo ip link set can0 up type can bitrate 1000000 || OR || lift E-stop (if busy).
+    
+<p>Controller node dies as canbus is overloaded, yet e-stop is up</p>
+
+    fix: restart the NUC, ensure that the canusb is only connected AFTER the NUC is powered on.
+
+<p>RPLiDar Internal Error</p>
+
+    fix: ensure lidar power cable is directly plugged into the NUC, and not into the USB extender. restart the nuc after.
 
 <p> robot isnt moving, no heartbeat sent.</p>
 
@@ -66,36 +79,9 @@ for the NASA Lunabotics 2025 competition.</p>
 
     the service isnt displaying. press b to kill the service then try auto depositing again
 
-<p>rs_camera_node fails and dies instantly, with -11 error code.</p>
-
-    make sure the d455 is plugged in.
-
-
-<h2>Installation</h2>
-<hr>
-<h3><strong>(Optional)</strong> Using Docker</h3>
-<p>Pull and run the ROS2 Humble Docker Image</p>
-
-    docker run -it --network=host --privileged -v /dev/:/dev/ --name=ros-workspace ros:humble-ros-base
-
-<p>Active and stopped containers can be listed using</p>
-
-    docker ps --all
-
-<p>If the container <em>ros-workspace</em> is already running, checked with the command above, then
-you can either reattach to it using</p>
-
-    docker start ros-workspace && docker attach ros-workspace
-
-<p>OR remove the container using</p>
-
-    docker rm ros-workspace
-
-<p>Note: Removing the container means the entire container must be reinstalled; however, the ros-humble-base image remains.</p>
-
 <h3>Clone this Github Repo</h3>
 
-    git clone git@github.com/educationmoment/EDT-Lunabotics-2025.git && cd EDT-Lunabotics-2025/
+    git clone git@github.com/educationmoment/EDT-Lunabotics-2026.git && cd EDT-Lunabotics-2026/
 
 <p>From within a computer running Ubuntu 22.04, run <em>install.sh</em> script with root privileges using</p>
     
@@ -108,8 +94,10 @@ It updates the system, installs the Robotics Operating System (ROS2 Humble), and
 <hr>
 <h3>Build the Project</h3>
 <p>From within the workspace, run the following to build the entire project.</p>
+<p>Note that building RTABMAP can take awhile, so its best to select packages to build individually.</p>
 
-    colcon build
+
+    colcon build --symlink-install --cmake-args -DRTABMAP_SYNC_MULTI_RGBD=ON -DWITH_OPENCV=ON -DWITH_APRILTAG=ON -DWITH_OPENGV=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5 --parallel-workers 1 # Modify number as needed
 
 <p> SparkCAN and Control Area Networks (CAN) will require the setup of the CAN interface on the host system.
 A CAN interface should be immediately visible upon connecting the USB-to-CAN adapter. It may initially show as <strong>DOWN</strong>.
@@ -120,11 +108,11 @@ Configure the CAN interface using</p>
 
 <p>At this point, launch the robot using</p>
 
-    ros2 launch neptune_bringup neptune.launch.py
+    ros2 launch neptune_bringup test.launch.py
 
 <p>The pilot can access the WebGUI by visiting</p>
 
-    http://192.168.0.140:59440/pilot
+    http://192.168.0.131:59440/pilot
 
 <p>You can also view the health status of the robot with </p>
 

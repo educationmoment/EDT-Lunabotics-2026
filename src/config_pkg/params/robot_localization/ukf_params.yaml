@@ -1,11 +1,11 @@
 ukf_filter_node:
   ros__parameters:
     use_sim_time: false
-    frequency: 20.0
+    frequency: 10.0
     sensor_timeout: 0.5
     two_d_mode: true
-    transform_time_offset: 0.02
-    transform_timeout: 0.5
+    transform_time_offset: 0.0
+    transform_timeout: 0.1
     print_diagnostics: true
     debug: false
     permit_corrected_publication: false
@@ -35,19 +35,29 @@ ukf_filter_node:
     # ── IMU: yaw rate only ────────────────────────────────────────────────────
     # Real d455 IMU — fuse only yaw rate to correct rf2o heading drift.
     # Not fusing linear accel (wheel slip on regolith makes it noisy/misleading).
-   # imu0: /d455/imu/data
-   # imu0_config: [false, false, false,    # x, y, z
-   #               false, false, false,    # roll, pitch, yaw (not absolute orientation)
-   #               false, false, false,    # vx, vy, vz
-   #               false, false, true,     # vroll, vpitch, vyaw ← yaw rate only
-   #               false, false, false]    # ax, ay, az
-   # imu0_differential: false
-   # imu0_relative: true
-   # imu0_queue_size: 10
-   # imu0_pose_rejection_threshold: 0.4
-   # imu0_twist_rejection_threshold: 0.4
-   # imu0_linear_acceleration_rejection_threshold: 0.8
-   # imu0_remove_gravitational_acceleration: true   # real robot: remove gravity
+    imu0: /d455/imu/data
+    imu0_config: [false, false, false,    # x, y, z
+                  false, false, false,    # roll, pitch, yaw (not absolute orientation)
+                  false, false, false,    # vx, vy, vz
+                  false, false, true,     # vroll, vpitch, vyaw ← yaw rate only
+                  false, false, false]    # ax, ay, az
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 10
+    imu0_pose_rejection_threshold: 0.4
+    imu0_twist_rejection_threshold: 0.4
+    imu0_linear_acceleration_rejection_threshold: 0.8
+    imu0_remove_gravitational_acceleration: true   # real robot: remove gravity
+    #imu1: /d456/imu/data
+    #imu1_config: [false, false, false,
+    #          false, false, false,
+    #          false, false, false,
+    #          false, false, true,    # yaw rate only, same as imu0
+    #          false, false, false]
+    #imu1_differential: false
+    #imu1_relative: false
+    #imu1_queue_size: 10
+    #imu1_twist_rejection_threshold: 0.4
 
     use_control: false
 
@@ -75,18 +85,18 @@ ukf_filter_node:
     ]
 
     initial_estimate_covariance: [
-      1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
-      0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+      0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+      0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
       0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
       0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
       0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
-      0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
-      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
-      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.5,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.1,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.1,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,
-      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,
+      0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.1,  0.0,  0.0,  0.0,
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,
       0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9,
