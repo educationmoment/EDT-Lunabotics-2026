@@ -2,8 +2,8 @@
 <package format="3">
   <name>teleop_pkg</name>
   <version>1.0.0</version>
-  <description>This package contains code to control the robot with either a keyboard or game controller.</description>
-  <maintainer email="grayson.n.arendt5@gmail.com">Grayson Arendt</maintainer>
+  <description></description>
+  <maintainer email="abaja5@uic.edu">Aakash Bajaj</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

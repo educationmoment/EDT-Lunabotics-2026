@@ -29,6 +29,12 @@
 for the NASA Lunabotics 2026 competition.</p>
 
 <h2>Potential Bugs and their fixes.</h2>
+<p>Default ("Zeroed") Lift / Tilt Positions:</p>
+
+    tilts: 5 1/2 inches
+
+    lifts: 7 inches
+    
 <p>Video Cameras not showing (and not throwing the error: "Failed to open USB RGB camera 1 (/dev/video6)")" etc</p> 
 
     fix: run "v4l2-ctl --list-devices" in /home/Desktop/robot_WS
@@ -36,12 +42,12 @@ for the NASA Lunabotics 2026 competition.</p>
 
 <p>"ROS Webbridge is overloaded- restarting in 2ms"</p>
 
-    fix: okay so we started the robot too many times on the same uptime for the jetson. The cache is overloaded- and unfourtently the only fix is to restart the Jetson entirely. This happens after starting the robot 5+ times on the same uptime.
+    fix: okay so we started the robot too many times on the same uptime for the nuc. The cache is overloaded- and unfourtently the only fix is to restart the nuc entirely. This happens after starting the robot 5+ times on the same uptime.
 
 <p>/joy topic not found</p>
 
     there should be /joy topic always, run ros topic list and look for /joy. then echo ros topic echo /joy
-    if nothing comes up, something is wrong, likely the ROS bridge being overloaded. restart the jetson.
+    if nothing comes up, something is wrong, likely the ROS bridge being overloaded. restart the nuc.
 
 <p>Building and sourcing throwing an error.</p>
 
@@ -69,9 +75,9 @@ for the NASA Lunabotics 2026 competition.</p>
 
 <p>Clock Skew</p>
 
-    fix: run "date" on the jetson. you might get a date/time that is off from the current time / date. then, run "sudo date -s "2025-05-15 10:00:00" (change the date to the current date) and run colcon build.
+    fix: run "date" on the nuc. you might get a date/time that is off from the current time / date. then, run "sudo date -s "2025-05-15 10:00:00" (change the date to the current date) and run colcon build.
 
-    if you still encounter clock skew after this, you will have to "touch" all files to replace their time and date- "find . -exec touch {} +" IN THE ROOT OF THE WORKSPACE (ROBOT_WS)! !! DOING THIS OUTSIDE WILL BREAK THE JETSON!
+    if you still encounter clock skew after this, you will have to "touch" all files to replace their time and date- "find . -exec touch {} +" IN THE ROOT OF THE WORKSPACE (ROBOT_WS)! !! DOING THIS OUTSIDE WILL BREAK THE nuc!
 
     then you may need to clear artificatsion, in robot_WS do "rm -rf build/ install/ log/" and then finally build again, "colcon build --symlink-install"
 
@@ -83,12 +89,26 @@ for the NASA Lunabotics 2026 competition.</p>
 
     git clone git@github.com/educationmoment/EDT-Lunabotics-2026.git && cd EDT-Lunabotics-2026/
 
-<p>From within a computer running Ubuntu 22.04, run <em>install.sh</em> script with root privileges using</p>
+<p>Setup UDEV RULES and General Installation Scripts:</p>
     
-    sudo echo install.sh | bash
+    cd src/scripts
+    chmod +x setup_udev_rules.sh
+    chmod +x install_dependencies.sh
+    sudo ./setup_udev_rules.sh && ./install_dependencies.sh
 
-<p>The script periodically asks for user input and was designed to run inside a Docker container.
-It updates the system, installs the Robotics Operating System (ROS2 Humble), and several dependencies.</p>
+<h2>Control Diagram</h2>
+
+<img src="https://i.imgur.com/vq8L5NY.png" style="width: 1200px" alt="ControlDiagram"></img>
+
+<h2>Media</h2>
+
+<p>Simulated Bot</p>
+<img src="https://i.imgur.com/FDQ2jEP.png" style="width: 200px" alt="bot1"></img>
+<img src="https://i.imgur.com/6yCUJSa.png" style="width: 200px" alt="bot2"></img>
+
+<p>WebGUI</p>
+
+<img src="https://i.imgur.com/siKAxiW.png" style="width: 1100px" alt="web"></img>
 
 <h2>Setup</h2>
 <hr>
@@ -105,7 +125,6 @@ Configure the CAN interface using</p>
 
     sudo ip link set can0 up type can bitrate 1000000
 
-
 <p>At this point, launch the robot using</p>
 
     ros2 launch neptune_bringup test.launch.py
@@ -117,6 +136,7 @@ Configure the CAN interface using</p>
 <p>You can also view the health status of the robot with </p>
 
     ros2 topic echo health_topic
-<p>Before UCF and then KSC, make sure to copy over the appropriate version of odometry onto odometry_node.cpp. Also, note that the pilot needs to be clicked into the WebGUI for this to work. To run it, use</p>
 
-    ros2 run controller_pkg odometry_node
+
+<h2>Special Credits</h2>
+<p>Big shoutout to Grayson from COD (@grayson-arendt) for giving us his Maps to use for our robot, as well as the NUC, and many other small helping hands he has given me.</p>
