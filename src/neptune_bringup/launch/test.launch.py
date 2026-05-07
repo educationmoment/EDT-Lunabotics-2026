@@ -1,5 +1,6 @@
 import os
 import xacro
+import sys
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
@@ -10,6 +11,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     TimerAction,
     GroupAction,
+    ExecuteProcess,
 )
 
 
@@ -20,7 +22,7 @@ def generate_launch_description():
     nav2_params_file     = os.path.join(config_dir, "params", "nav2",               "nav2_uic_bot_params.yaml")
     rtabmap_params_file  = os.path.join(config_dir, "params", "rtabmap",             "rtabmap_params.yaml")
     ukf_params_file      = os.path.join(config_dir, "params", "robot_localization",  "ukf_params.yaml")
-    s3_params_file       = os.path.join(config_dir, "params", "laser_filters",       "s3_params.yaml")
+    #s3_params_file       = os.path.join(config_dir, "params", "laser_filters",       "s3_params.yaml")
     apriltag_params_file = os.path.join(config_dir, "params", "apriltag",            "tag_params.yaml")
     bt_nav_to_pose       = os.path.join(config_dir, "behavior_trees", "nav_to_pose_with_consistent_replanning_and_if_path_becomes_invalid.xml")
     bt_nav_through_poses = os.path.join(config_dir, "behavior_trees", "nav_through_poses_w_replanning_and_recovery.xml")
@@ -32,6 +34,12 @@ def generate_launch_description():
 
     declare_robot_mode = DeclareLaunchArgument(
         "robot_mode", default_value="manual", choices=["manual", "auto"]
+    )
+
+    point_lio_relay_node = ExecuteProcess(
+        cmd=[sys.executable,
+            "/home/nuc/robot_WS/EDT-Lunabotics-2025/src/scripts/point_lio_relay.py"],
+        output="screen",
     )
 
     # ── ROBOT STATE ───────────────────────────────────────────────────────────
@@ -49,33 +57,71 @@ def generate_launch_description():
         output="screen", parameters=[{"use_sim_time": False}],
     )
 
+    lidar_tf_node = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="base_to_unilidar_tf",
+        arguments=["-0.353", "0.0", "0.721",   # x y z in meters
+                "0", "0", "3.14159",          # yaw pitch roll — roll=180° upside down
+                "base_link", "s3_lidar_link"],
+    )
+
+    d435_tf_node = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="base_to_d455_tf",
+        arguments=["-0.634", "0.0", "0.703",   # x y z
+                "0", "0", "3.14159",          # facing rear
+                "base_link", "d455_link"],
+    )
     # ── LIDAR ─────────────────────────────────────────────────────────────────
-    s3_lidar_node = Node(
-        package="rplidar_ros", executable="rplidar_node", name="rplidar_node",
+    #s3_lidar_node = Node(
+    #    package="rplidar_ros", executable="rplidar_node", name="rplidar_node",
+    #    output="screen",
+    #    parameters=[{
+    #        "channel_type": "serial", "serial_port": "/dev/ttyUSB0",
+    #        "serial_baudrate": 1000000, "frame_id": "s3_lidar_link",
+    #        "inverted": False, "scan_mode": "DenseBoost",
+     #       "angle_compensate": True, "scan_frequency": 10.0,
+     #   }],
+     #   remappings=[("scan", "/scan_raw")],
+    #)
+    #s3_filter_node = Node(
+    #    package="laser_filters", executable="scan_to_scan_filter_chain",
+    #    parameters=[s3_params_file],
+    #    remappings=[("scan", "/scan_raw"), ("scan_filtered", "/scan")],
+    #)
+
+    # ADD — replace the two rplidar nodes with this
+    unitree_lidar_node = Node(
+        package="unitree_lidar_ros2",
+        executable="unitree_lidar_ros2_node",
+        name="unitree_lidar",
         output="screen",
         parameters=[{
-            "channel_type": "serial", "serial_port": "/dev/ttyUSB0",
-            "serial_baudrate": 1000000, "frame_id": "s3_lidar_link",
-            "inverted": False, "scan_mode": "DenseBoost",
-            "angle_compensate": True, "scan_frequency": 10.0,
+            "port": "/dev/ttyUSB0",   # udev rule name, or /dev/ttyUSB0
+            "cloud_frame_id": "s3_lidar_link",
+            "cloud_topic": "/unilidar/cloud",
+            "imu_topic":   "/unilidar/imu",
+            "rotate_yaw_bias": 3.14159,
+            "range_min": 0.1,
+            "range_max": 30.0,
+            "cloud_flip": 1,
         }],
-        remappings=[("scan", "/scan_raw")],
-    )
-    s3_filter_node = Node(
-        package="laser_filters", executable="scan_to_scan_filter_chain",
-        parameters=[s3_params_file],
-        remappings=[("scan", "/scan_raw"), ("scan_filtered", "/scan")],
     )
 
     # ── CAMERAS ───────────────────────────────────────────────────────────────
     d455_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(realsense_dir, "launch", "rs_launch.py")),
         launch_arguments={
-            "camera_name": "d455", "camera_namespace": "", "device_type": "d455",
-            "publish_tf": "true", "serial_no": "'318122303486'",
-            "enable_gyro": "true", "enable_accel": "true", "unite_imu_method": "2",
-            "depth_module.depth_profile": "640x480x30",
-            "rgb_camera.color_profile": "640x480x30",
+            "camera_name": "d455", "camera_namespace": "", "device_type": "d435i",
+            "publish_tf": "true", "serial_no": "'336222070835'",
+            "enable_color": "false",
+            "enable_infra1": "true",
+            "enable_depth": "true",
+            "enable_gyro": "false", "enable_accel": "false", "unite_imu_method": "2",
+            "depth_module.depth_profile": "848x480x30",   # was 1280x720x30
+            #"rgb_camera.color_profile":   "848x480x30",   # was 1280x720x30
             "pointcloud.enable": "true",
         }.items(),
     )
@@ -84,26 +130,27 @@ def generate_launch_description():
         launch_arguments={
             "camera_name": "d456", "camera_namespace": "", "device_type": "d455",
             "publish_tf": "true", "serial_no": "'308222300472'",
-            "enable_gyro": "true", "enable_accel": "true", "unite_imu_method": "2",
-            "depth_module.depth_profile": "640x480x30",
-            "rgb_camera.color_profile": "640x480x30",
+            "enable_color": "true",
+            "enable_gyro": "false", "enable_accel": "false", "unite_imu_method": "2",
+            "depth_module.depth_profile": "848x480x30",
+            "rgb_camera.color_profile": "848x480x30",
             "pointcloud.enable": "true",
         }.items(),
     )
 
 
     # ── IMU ───────────────────────────────────────────────────────────────────
-    imu_rotator_node = Node(package="util_pkg", executable="imu_rotator")
-    d455_imu_filter = Node(
-        package="imu_complementary_filter", executable="complementary_filter_node",
-        name="d455_imu_filter", output="screen",
-        parameters=[{
-            "publish_tf": False, "fixed_frame": "odom",
-            "do_bias_estimation": True, "do_adaptive_gain": True,
-            "use_mag": False, "gain_acc": 0.01, "gain_mag": 0.01,
-        }],
-        remappings=[("imu/data_raw", "/d455/imu/data_raw"), ("imu/data", "/d455/imu/data")],
-    )
+    #imu_rotator_node = Node(package="util_pkg", executable="imu_rotator")
+    #d455_imu_filter = Node(
+    #    package="imu_complementary_filter", executable="complementary_filter_node",
+    #    name="d455_imu_filter", output="screen",
+    #    parameters=[{
+    #        "publish_tf": False, "fixed_frame": "odom",
+    #        "do_bias_estimation": True, "do_adaptive_gain": True,
+    #        "use_mag": False, "gain_acc": 0.01, "gain_mag": 0.01,
+    #    }],
+    #    remappings=[("imu/data_raw", "/d455/imu/data_raw"), ("imu/data", "/d455/imu/data")],
+    #)
     d456_imu_filter = Node(
         package="imu_complementary_filter", executable="complementary_filter_node",
         name="d456_imu_filter", output="screen",
@@ -115,11 +162,19 @@ def generate_launch_description():
         remappings=[("imu/data_raw", "/d456/imu/data_raw"), ("imu/data", "/d456/imu/data")],
     )
 
+    camera_init_tf_node = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="camera_init_to_odom_tf",
+        arguments=["0", "0", "0", "0", "0", "0",
+                "odom", "camera_init"],
+    )
+
     # ── RGBD SYNC ─────────────────────────────────────────────────────────────
     rgbd_sync1_node = Node(
         package="rtabmap_sync", executable="rgbd_sync", name="rgbd_sync1",
         output="screen",
-        parameters=[{"use_sim_time": False, "approx_sync": True, "sync_queue_size": 1000}],
+        parameters=[{"use_sim_time": False, "approx_sync": True, "approx_sync_max_interval": 0.05, "sync_queue_size": 1000, "qos_image": 2, "qos_camera_info": 2, "qos": 2}],
         remappings=[
             ("rgb/image", "/d456/color/image_raw"), ("depth/image", "/d456/depth/image_rect_raw"),
             ("rgb/camera_info", "/d456/color/camera_info"), ("rgbd_image", "/d456/rgbd_image"),
@@ -138,13 +193,25 @@ def generate_launch_description():
     )
 
     # ── APRILTAG ──────────────────────────────────────────────────────────────
-    apriltag_d455_node = Node(
+    #apriltag_d455_node = Node(
+    #    package="apriltag_ros", executable="apriltag_node",
+    #    name="apriltag_d455",          # ← give each a unique name
+    #    output="screen",
+    #    parameters=[apriltag_params_file],
+    #    remappings=[("/image_rect", "/d455/color/image_raw"),
+    #                ("/camera_info", "/d455/color/camera_info")],
+    #)
+    apriltag_d435_node = Node(
         package="apriltag_ros", executable="apriltag_node",
-        name="apriltag_d455",          # ← give each a unique name
+        name="apriltag_d435",
         output="screen",
         parameters=[apriltag_params_file],
-        remappings=[("/image_rect", "/d455/color/image_raw"),
-                    ("/camera_info", "/d455/color/camera_info")],
+        remappings=[
+            #("/image_rect",  "/d455/color/image_raw"),
+            #("/camera_info", "/d455/color/camera_info"),
+            ("/image_rect",  "/d455/infra1/image_rect_raw"),   # IR stream
+            ("/camera_info", "/d455/infra1/camera_info"),
+        ],
     )
     apriltag_d456_node = Node(
         package="apriltag_ros", executable="apriltag_node",
@@ -173,6 +240,76 @@ def generate_launch_description():
         arguments=["--ros-args", "--log-level", "error"],
     )
 
+    point_lio_node = Node(
+        package="point_lio",
+        executable="pointlio_mapping",
+        name="point_lio",
+        output="screen",
+        parameters=[
+            os.path.join(
+                get_package_share_directory("point_lio"),
+                "config", "unilidar_l1.yaml"
+            )
+        ],
+        remappings=[
+            ("/cloud_registered", "/point_lio/cloud"),
+            ("/aft_mapped_to_init", "/point_lio/odom"),
+            ("/tf", "/point_lio/tf_internal")
+        ],
+        arguments=["--ros-args", "--log-level", "warn"],
+    )
+
+    rgbd_odom_node = Node(
+        package="rtabmap_odom",
+        executable="rgbd_odometry",
+        name="rgbd_odometry",
+        output="screen",
+        parameters=[{
+            "use_sim_time": False,
+            "frame_id": "base_link",
+            "odom_frame_id": "odom",
+            "publish_tf": False,        # UKF owns the TF
+            "approx_sync": True,
+            "approx_sync_max_interval": 0.05,  # was default 0.0 — set to 50ms to accept 33ms offset
+            "sync_queue_size": 10,
+            "Reg/Strategy": "0",        # visual only
+            "Vis/MinInliers": "15",
+            "OdomF2M/MaxSize": "1000",
+        }],
+        remappings=[
+            ("rgb/image",       "/d456/color/image_raw"),
+            ("depth/image",     "/d456/depth/image_rect_raw"),
+            ("rgb/camera_info", "/d456/color/camera_info"),  # front camera
+        ],
+        arguments=["--ros-args", "--log-level", "warn"],
+    )
+
+
+    # ADD
+    pc_to_scan_node = Node(
+        package="pointcloud_to_laserscan",
+        executable="pointcloud_to_laserscan_node",
+        name="pc_to_scan",
+        output="screen",
+        parameters=[{
+            #   "target_frame": "s3_lidar_link",
+            "transform_tolerance": 0.01,
+            "min_height": -0.5,
+            "max_height": 0.1,
+            "angle_min": -3.14159,
+            "angle_max":  3.14159,
+            "angle_increment": 0.00436,   # ~0.25 deg
+            "scan_time": 0.1,
+            "range_min": 0.3,
+            "range_max": 30.0,
+            "use_inf": True,
+        }],
+        remappings=[
+            ("cloud_in", "/unilidar/cloud"),
+            ("scan",     "/scan"),
+        ],
+    )
+
     ukf_node = Node(
         package="robot_localization", executable="ukf_node", name="ukf_filter_node",
         output="screen",
@@ -186,7 +323,7 @@ def generate_launch_description():
             rtabmap_params_file,
             {
                 "use_sim_time": False,
-                "rgbd_cameras": 2,
+                "rgbd_cameras": 1,
                 "subscribe_depth": False, "subscribe_rgbd": True,
                 "subscribe_rgb": False, "subscribe_odom_info": False,
                 "odom_sensor_sync": True,
@@ -199,15 +336,19 @@ def generate_launch_description():
                 "approx_sync_max_interval": 0.1,
                 "sync_queue_size": 1000,
                 "topic_queue_size": 30,
-                "subscribe_scan_cloud": False, "subscribe_scan": True,
+                "subscribe_scan_cloud": True, "subscribe_scan": False, 
                 "wait_imu_to_init": False,      # real robot: IMU already stable at launch
-                "imu_topic": "/d455/imu/data",
+                "imu_topic": "/unilidar/imu",
+                "qos_image": 2, "qos_camera_info": 2, "qos": 2,
+                "tf_delay": 0.0,
+                "tf_tolerance": 0.3,
             },
         ],
         remappings=[
-            ("rgbd_image0", "/d456/rgbd_image"),
-            ("rgbd_image1", "/d455/rgbd_image"),
-            ("scan", "/scan"),
+            ("rgbd_image", "/d456/rgbd_image"),
+            #("rgbd_image1", "/d455/rgbd_image"),
+            ("scan_cloud",  "/point_lio/cloud"),      # Point-LIO registered cloud
+            #("scan", "/scan"),
         ],
         arguments=["--ros-args", "--log-level", "warn"],
     )
@@ -220,14 +361,14 @@ def generate_launch_description():
         parameters=[{
            "tag_linear_variance":  0.01,   
             "tag_angular_variance": 0.05,
-            "reference_frame": "d455_color_optical_frame",
+            "reference_frame": "base_link",
         }],
     )
 
-    crater_scan_d455_node = Node(
+    crater_scan_d435_node = Node(
         package="depthimage_to_laserscan",
         executable="depthimage_to_laserscan_node",
-        name="crater_scan_d455",
+        name="crater_scan_d435",
         output="screen",
         remappings=[
             ("depth",             "/d455/depth/image_rect_raw"),
@@ -260,6 +401,20 @@ def generate_launch_description():
             "range_max":      1.5,    # D456 at 0.141m height, 15deg down → ground at ~0.53m
             "output_frame":   "d456_depth_optical_frame",
         }],
+    )
+
+    rgbd_sync3_node = Node(
+        package="rtabmap_sync", executable="rgbd_sync", name="rgbd_sync3",
+        output="screen",
+        parameters=[{"use_sim_time": False, "approx_sync": True, "sync_queue_size": 1000}],
+        remappings=[
+            ("rgb/image",       "/d455/color/image_raw"),
+            ("depth/image",     "/d455/depth/image_rect_raw"),
+            ("rgb/camera_info", "/d455/color/camera_info"),
+            ("rgbd_image",      "/d455/rgbd_image"),
+        ],
+        namespace="d455",
+        arguments=["--ros-args", "--log-level", "error"],
     )
 
 
@@ -383,21 +538,28 @@ def generate_launch_description():
     #ld.add_action(base_to_d455_tf)
     #ld.add_action(base_to_s3_lidar_tf)
     ld.add_action(joint_state_publisher_node)
-    ld.add_action(s3_lidar_node)
-    ld.add_action(s3_filter_node)
+    #ld.add_action(s3_lidar_node)
+    #ld.add_action(s3_filter_node)
+    ld.add_action(camera_init_tf_node)
+    ld.add_action(lidar_tf_node)
+    ld.add_action(d435_tf_node)
+    ld.add_action(unitree_lidar_node)
+    ld.add_action(pc_to_scan_node)
     ld.add_action(d455_launch)
     ld.add_action(d456_launch)
     ld.add_action(apriltag_to_landmarks_node)
     #ld.add_action()
-    ld.add_action(imu_rotator_node)
-    ld.add_action(d455_imu_filter)
-    ld.add_action(d456_imu_filter)
+    #ld.add_action(imu_rotator_node)
+    #ld.add_action(d455_imu_filter)
+    #ld.add_action(d456_imu_filter)
     ld.add_action(rgbd_sync1_node)
-    ld.add_action(rgbd_sync2_node)
-    ld.add_action(apriltag_d455_node)
+    #ld.add_action(rgbd_sync2_node)
+    #ld.add_action(apriltag_d455_node)
+    ld.add_action(apriltag_d435_node)
     ld.add_action(apriltag_d456_node)
-    ld.add_action(crater_scan_d455_node)
+    ld.add_action(crater_scan_d435_node)
     ld.add_action(crater_scan_d456_node)
+    #ld.add_action(rgbd_sync3_node)
     #ld.add_action(d455_filter_node)
     #ld.add_action(d456_filter_node)
     ld.add_action(hardware_controller_module)
@@ -407,10 +569,13 @@ def generate_launch_description():
     ld.add_action(web_user_interface)
     ld.add_action(rosbridge_node)
     ld.add_action(d456_compress_node)
-    ld.add_action(d455_compress_node)
-    ld.add_action(TimerAction(period=2.0,  actions=[rf2o_odometry_node]))
-    ld.add_action(TimerAction(period=4.0,  actions=[ukf_node]))
-    ld.add_action(TimerAction(period=8.0,  actions=[slam_node]))
+    #ld.add_action(d455_compress_node)
+    #ld.add_action(TimerAction(period=2.0,  actions=[rf2o_odometry_node]))
+    ld.add_action(TimerAction(period=3.0,  actions=[point_lio_node]))
+    ld.add_action(TimerAction(period=4.0, actions=[point_lio_relay_node]))
+    ld.add_action(TimerAction(period=5.0,  actions=[rgbd_odom_node]))
+    ld.add_action(TimerAction(period=10.0, actions=[ukf_node]))    # was 4.0
+    ld.add_action(TimerAction(period=15.0, actions=[slam_node]))   # was 8.0
 
     # ── MANUAL MODE ───────────────────────────────────────────────────────────
     ld.add_action(GroupAction(

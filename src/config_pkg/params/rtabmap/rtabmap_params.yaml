@@ -3,16 +3,16 @@ rtabmap:
     Grid/CellSize: "0.05"
     Grid/MaxGroundAngle: "30"
     Grid/MinClusterSize: "30"
-    Grid/Sensor: "1"
+    Grid/Sensor: "2"
     Grid/RangeMin: "0.3"
-    Grid/RangeMax: "4.0"
+    Grid/RangeMax: "8.0" 
     Grid/MaxObstacleHeight: "1.0"
     Grid/RayTracing: "true"
     Grid/Scan2dUnknownSpaceFilled: "true"
     Grid/NormalsSegmentation: "false"
-    Reg/Force3DoF: "false"
-    Reg/Strategy: "2"
-    LccIcp/Type: "1"
+    Reg/Force3DoF: "true"
+    Reg/Strategy: "0"
+    LccIcp/Type: "0"
     LccIcp2/MaxCorrespondenceDistance: "0.5"   # was too small, increase significantly
     LccIcp2/VoxelSize: "0.0"                   # disable voxel filtering — arena is sparse
     LccIcp2/MaxIteration: "30"
@@ -62,8 +62,10 @@ rtabmap:
     Optimizer/Epsilon: "0.00001"
     Optimizer/Robust: "true"         # use robust kernel instead — handles outliers gracefully
     Optimizer/RobustKernelFactor: "0.1"
-    Odom/Strategy: "2"
+    Odom/Strategy: "0"
     Odom/FilteringStrategy: "1"
     Odom/KalmanProcessNoise: "0.01"
     Odom/KalmanMeasurementNoise: "0.1"
     Odom/GuessSmoothingDelay: "0.3"
+    "tf_delay": 0.0,
+    "tf_tolerance": 0.3,

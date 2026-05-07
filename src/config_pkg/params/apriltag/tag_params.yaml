@@ -1,10 +1,18 @@
 apriltag:
   ros__parameters:
-    image_transport: raw # image format
-    family: 36h11 # tag family name
-    size: 0.1651 # tag edge size in meter
-    max_hamming: 0 # maximum allowed hamming distance (corrected bits)
-    publish_tf: True
+    image_transport: raw
+    family: 36h11
+    size: 0.1651        # applies to all detected tags
+    max_hamming: 0
+    publish_tf: true
+
+    detector:
+      threads: 1
+      decimate: 2.0
+      blur: 0.0
+      refine: true
+      sharpening: 0.25
+      debug: false
 
     # see "apriltag.h" 'struct apriltag_detector' for more documentation on these optional parameters
     detector:

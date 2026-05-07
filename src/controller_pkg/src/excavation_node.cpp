@@ -13,10 +13,10 @@
 // ═════════════════════════════════════════════════════════════════════════════
 // TUNE THESE TONIGHT — all position setpoints in rotations
 // ═════════════════════════════════════════════════════════════════════════════
-static constexpr float LIFT_APPROACH    = -0.70f;
-static constexpr float LIFT_DIG         = -0.77f;
-static constexpr float TILT_APPROACH    = -1.08f;
-static constexpr float TILT_DIG         = -1.04f;
+static constexpr float LIFT_APPROACH    = -0.72f;
+static constexpr float LIFT_DIG         = -0.81f;
+static constexpr float TILT_APPROACH    = -1.17f;
+static constexpr float TILT_DIG         = -1.18f;
 static constexpr float LIFT_HOME        =  0.0f;
 static constexpr float TILT_HOME        =  0.0f;
 // ═════════════════════════════════════════════════════════════════════════════
@@ -322,7 +322,7 @@ private:
         send_feedback(goal_handle, "Stage 2: Entry drive + tilt to dig angle");
         auto t2 = std::chrono::high_resolution_clock::now();
         while (std::chrono::duration_cast<std::chrono::milliseconds>(
-                   std::chrono::high_resolution_clock::now() - t2).count() < 7000)
+                   std::chrono::high_resolution_clock::now() - t2).count() < 7500)
         {
             if (goal_handle->is_canceling())
             {
@@ -378,8 +378,8 @@ private:
 				return;
 			}
 
-			leftDrive.SetVelocity(1000.0f);
-			rightDrive.SetVelocity(1000.0f);
+			leftDrive.SetVelocity(800.0f);
+			rightDrive.SetVelocity(800.0f);
 			vibrator.SetDutyCycle(VIBRATOR_DUTY);
 
 			// Inline lift sync toward dig depth — same factor pattern

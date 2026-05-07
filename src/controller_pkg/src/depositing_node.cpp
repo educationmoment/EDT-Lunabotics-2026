@@ -13,7 +13,7 @@
 // ═════════════════════════════════════════════════════════════════════════════
 static constexpr float TILT_PARTIAL =  0.18f;  // Clearance tilt before lift rises
 static constexpr float LIFT_DUMP    =  1.5f;
-static constexpr float TILT_DUMP    =  0.23f;  // Final dump angle
+static constexpr float TILT_DUMP    =  0.15f;  // Final dump angle
 static constexpr float LIFT_HOME  =  0.0f;
 static constexpr float TILT_HOME  =  0.0f;
 // ═════════════════════════════════════════════════════════════════════════════
@@ -262,10 +262,10 @@ private:
             bool lift_ok = true, tilt_ok = true;
 
             std::thread lift_thread([&]() {
-                lift_ok = SyncedLiftToPos(LIFT_DUMP, 0.8f, goal_handle, 15.0f);
+                lift_ok = SyncedLiftToPos(LIFT_DUMP, 1.0f, goal_handle, 15.0f);
             });
             std::thread tilt_thread([&]() {
-                tilt_ok = SyncedTiltToPos(TILT_DUMP, 0.8f, goal_handle);
+                tilt_ok = SyncedTiltToPos(TILT_DUMP, 1.0f, goal_handle);
             });
 
             lift_thread.join();
@@ -308,10 +308,10 @@ private:
             bool lift_ok = true, tilt_ok = true;
 
             std::thread lift_thread([&]() {
-                lift_ok = SyncedLiftToPos(LIFT_HOME, 0.8f, goal_handle);
+                lift_ok = SyncedLiftToPos(LIFT_HOME, 1.0f, goal_handle);
             });
             std::thread tilt_thread([&]() {
-                tilt_ok = SyncedTiltToPos(TILT_HOME, 0.8f, goal_handle);
+                tilt_ok = SyncedTiltToPos(TILT_HOME, 1.0f, goal_handle);
             });
 
             lift_thread.join();
