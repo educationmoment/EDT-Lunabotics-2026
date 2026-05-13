@@ -208,6 +208,8 @@ public:
         std::bind(&ControllerNode::publish_heartbeat, this));
     RCLCPP_INFO(this->get_logger(), "Timer Initialized");
 
+    
+
     RCLCPP_INFO(this->get_logger(), "Node Initialization Complete");
 
   }
@@ -578,7 +580,6 @@ private:
                           left_lift_position, right_lift_position,
                           left_tilt_position, right_tilt_position);
           }
-          return;
       }
       else
       {

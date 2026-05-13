@@ -76,6 +76,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);height:100vh;o
 .bar-track{height:2px;background:var(--border);border-radius:1px;margin-top:3px;}
 .bar-fill{height:100%;border-radius:1px;transition:width .3s;background:var(--accent);}
 .bar-fill.warn{background:var(--warn);}.bar-fill.crit{background:var(--danger);}
+.mc-val.lift-pos  { color: #ffdd00; }
+.mc-val.tilt-pos  { color: #00ffee; }
+.mc-val.warn-volt { color: #ff8800; }
 
 /* ── TELEMETRY ── */
 .telem-body{flex:1;display:flex;flex-direction:column;gap:1px;overflow:auto;min-height:0;}
@@ -292,6 +295,54 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);height:100vh;o
 
 /* pub rate */
 .pub-rate{font-family:var(--mono);font-size:8px;color:var(--dim);}
+
+/* ── COMPETITION MODE ── */
+body.competition .main {
+  grid-template-columns: 65fr 35fr;
+  grid-template-rows: 60% 40%;
+}
+/* hide unused panels */
+body.competition .panel-telem,
+body.competition .panel-log,
+body.competition .panel-health { display: none; }
+
+/* cameras take left column, both rows */
+body.competition .panel-cam-front {
+  grid-column: 1; grid-row: 1;
+}
+body.competition .panel-cam-fish {
+  grid-column: 1; grid-row: 2;
+}
+/* webcam full height */
+body.competition.webcam-mode .panel-cam-front {
+  grid-column: 1; grid-row: 1 / 3;
+}
+body.competition.webcam-mode .panel-cam-fish {
+  display: none;
+}
+/* right top: bandwidth */
+body.competition .panel-bw {
+  grid-column: 2; grid-row: 1;
+}
+/* right bottom: health */
+body.competition .panel-health {
+  display: flex !important;
+  grid-column: 2; grid-row: 2;
+}
+/* right panel hidden */
+body.competition .right { display: none; }
+/* hide keyboard teleop section always in comp mode */
+body.competition .ctrl-section.teleop-section { display: none; }
+/* compact cam tabs */
+body.competition .cam-tabs { display: none; }
+/* competition cam switch button */
+.comp-cam-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 10;
+  background: rgba(0,170,255,.15); border: 1px solid var(--accent);
+  color: var(--accent); font-family: var(--mono); font-size: 9px;
+  padding: 4px 10px; cursor: pointer; letter-spacing: 1px;
+}
+.comp-cam-btn:hover { background: rgba(0,170,255,.3); }
 </style>
 </head>
 <body>
@@ -325,6 +376,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);height:100vh;o
   <button class="nbtn" id="nb-slam_manual" onclick="launchNode('slam_manual',this)" title="neptune_sim.launch.py robot_mode:=manual">slam/nav manual</button>
   <button class="nbtn" id="nb-slam_auto" onclick="launchNode('slam_auto',this)" title="neptune_sim.launch.py robot_mode:=auto">slam/nav auto</button>
   <button class="nbtn" id="nb-navigation_client" onclick="launchNode('navigation_client',this)" title="ros2 run navigation_pkg navigation_client">nav client</button>
+  <div class="nbsep"></div>
+  <button class="nbtn" id="nb-camtoggle" onclick="toggleCamSource(this)" title="Switch between cameras and webcam">switch cam</button>
+  <div class="nbsep"></div>
+  <button class="nbtn" id="nb-compmode" onclick="toggleCompMode(this)" 
+    style="border-color:#f80;color:#f80" title="Competition display mode">COMP MODE</button>
   <div class="nbsep"></div>
   <button class="nbtn" id="nb-rviz2" onclick="launchNode('rviz2',this)" title="rviz2 -d robot_view.rviz" style="border-color:#a070ff;color:#c0a0ff">rviz2</button>
   <div class="nbsep"></div>
@@ -395,6 +451,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ui);height:100vh;o
       <span class="ph-tag" id="health-tag">/health_topic</span>
     </div>
     <div class="health-grid" id="health-grid"></div>
+    <div id="actuator-warnings" style="padding:4px 8px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;font-family:var(--mono);font-size:9px;"></div>
   </div>
 
   <!-- TELEMETRY -->
@@ -889,6 +946,10 @@ let byteCount=0, msgCount=0, byteRate=0, msgRate=0;
 let bwHist = Array(60).fill(0);
 let pingT = 0;
 const topicSeen={}, topicHzCnt={}, topicHzVal={}, topicHzLast={};
+let camSourceMode = 'cameras'; // 'cameras' or 'webcam'
+let compMode = false;
+
+
 
 function toggleConnect(){connected?disconnect():connect(document.getElementById('ws-url').value);}
 
@@ -924,6 +985,73 @@ function connect(url){
     byteCount+=e.data.length; msgCount++;
     try{dispatch(JSON.parse(e.data));}catch(_){}
   };
+}
+
+function toggleCamSource(el){
+  if(camSourceMode === 'cameras'){
+    camSourceMode = 'webcam';
+    camState.front = 'webcam';
+    camState.rear  = 'webcam';
+    el.textContent = 'Webcam';
+    el.classList.add('running');
+    log('CAM','Switched to webcam — d455/d456 unsubscribed','info');
+  } else {
+    camSourceMode = 'cameras';
+    camState.front = 'd456';
+    camState.rear  = 'd455';
+    el.textContent = '📷 D455s';
+    el.classList.remove('running');
+    log('CAM','Switched to d456/d455 — webcam unsubscribed','info');
+  }
+  updateCamFeeds();
+  document.body.classList.toggle('webcam-mode', camSourceMode === 'webcam');
+  toast('CAM: ' + camSourceMode.toUpperCase());
+}
+
+function toggleCompMode(el){
+  compMode = !compMode;
+  document.body.classList.toggle('competition', compMode);
+
+  if(compMode){
+    el.classList.add('running');
+    el.style.borderColor = 'var(--ok)';
+    el.style.color = 'var(--ok)';
+    toast('COMPETITION MODE ON');
+    log('SYS','Competition mode — cameras full screen','ok');
+
+    // sync webcam class
+    document.body.classList.toggle('webcam-mode', camSourceMode === 'webcam');
+
+    // hide cam tabs, show switch button in panel header
+    ['front','rear'].forEach(p => {
+      const wrap = document.getElementById(`cwrap-${p}`);
+      if(!wrap) return;
+      // add switch button if not already present
+      if(!document.getElementById(`comp-sw-${p}`)){
+        const btn = document.createElement('button');
+        btn.className = 'comp-cam-btn';
+        btn.id = `comp-sw-${p}`;
+        btn.textContent = '⇄ SWITCH CAM';
+        btn.onclick = () => {
+          toggleCamSource(document.getElementById('nb-camtoggle'));
+          document.body.classList.toggle('webcam-mode', camSourceMode === 'webcam');
+        };
+        wrap.appendChild(btn);
+      }
+    });
+
+  } else {
+    el.classList.remove('running');
+    el.style.borderColor = '#f80';
+    el.style.color = '#f80';
+    document.body.classList.remove('webcam-mode');
+    // remove injected buttons
+    ['front','rear'].forEach(p => {
+      document.getElementById(`comp-sw-${p}`)?.remove();
+    });
+    toast('COMPETITION MODE OFF');
+    log('SYS','Returned to standard layout','info');
+  }
 }
 function disconnect(){ws?.close();}
 function send(obj){if(connected&&ws.readyState===1)ws.send(JSON.stringify(obj));}
@@ -991,6 +1119,7 @@ let camFpsTimer = {};
 const camTopicMap = {
   d456: '/d456/color/image_raw/compressed',
   d455: '/d455/color/image_raw/compressed',
+  webcam: '/webcam/image_raw/compressed',
 };
 
 function setCamMode(panel, source){
@@ -1005,13 +1134,28 @@ function setCamMode(panel, source){
 
 function updateCamFeeds(){
   if(!connected) return;
-  // Subscribe to whichever topics are being shown
-  const needed = new Set([camState.front, camState.rear].filter(s=>s!=='sim'));
-  needed.forEach(src=>{
+  
+  const needed = new Set(
+    [camState.front, camState.rear]
+    .filter(s => s !== 'sim')
+  );
+  
+  // Unsubscribe from topics no longer needed
+  Object.keys(camTopicMap).forEach(src => {
+    if(!needed.has(src)){
+      const topic = camTopicMap[src];
+      send({op:'unsubscribe', topic});
+      delete camTopicHandlers[topic];
+    }
+  });
+
+  // Subscribe to only what's needed
+  needed.forEach(src => {
     const topic = camTopicMap[src];
     if(!topic) return;
-    // subscribe (safe to re-subscribe)
-    send({op:'subscribe',id:'cam_'+src,topic,type:'sensor_msgs/CompressedImage',throttle_rate:250,queue_length:1});
+    send({op:'subscribe', id:'cam_'+src, topic,
+          type:'sensor_msgs/CompressedImage',
+          throttle_rate:250, queue_length:1});
     camTopicHandlers[topic] = (d) => onCamImage(src, d);
   });
 }
@@ -1347,9 +1491,24 @@ function buildHealthGrid(){
 function updateHealthGrid(d){
   mDefs.forEach(m=>{
     if(m.vel!==undefined)setMH(`mh-${m.id}-v`,d[m.vel],' rpm');
-    if(m.pos!==undefined)setMH(`mh-${m.id}-p`,d[m.pos],'');
+    if(m.pos!==undefined){
+      const el=document.getElementById(`mh-${m.id}-p`);
+      if(el&&d[m.pos]!==undefined){
+        el.textContent=d[m.pos].toFixed(2);
+        // color code lift vs tilt positions
+        const isLift = m.id==='ll'||m.id==='rl';
+        const isTilt = m.id==='lti'||m.id==='rti';
+        el.className='mc-val'+(isLift?' lift-pos':isTilt?' tilt-pos':'');
+      }
+    }
+    // voltage — warn if 0.0
+    const voltEl=document.getElementById(`mh-${m.id}-vo`);
+    if(voltEl&&d[m.volt]!==undefined){
+      const v=d[m.volt];
+      voltEl.textContent=v.toFixed(2)+' V';
+      voltEl.className='mc-val'+(v===0.0?' warn-volt':'');
+    }
     setMH(`mh-${m.id}-c`,d[m.curr],' A');
-    setMH(`mh-${m.id}-vo`,d[m.volt],' V');
     if(m.temp!==undefined){
       const el=document.getElementById(`mh-${m.id}-t`),v=d[m.temp];
       if(el&&v!==undefined){el.textContent=v.toFixed(1)+'°C';el.className='mc-val'+(v>80?' crit':v>60?' hi':'');}
@@ -1361,6 +1520,30 @@ function updateHealthGrid(d){
       if(b){b.style.width=pct+'%';b.className='bar-fill'+(pct>80?' crit':pct>60?' warn':'');}
     }
   });
+
+  // ── MISALIGNMENT WARNINGS ──
+  const warnings=[];
+  const liftDelta=Math.abs((d.left_lift_position||0)-(d.right_lift_position||0));
+  const tiltDelta=Math.abs((d.left_tilt_position||0)-(d.right_tilt_position||0));
+
+  if(liftDelta>0.12)
+    warnings.push(`<div style="color:#ff2244;letter-spacing:1px">⚠ LIFTS MISALIGNED — Δ${liftDelta.toFixed(3)} rev</div>`);
+  if(tiltDelta>0.12)
+    warnings.push(`<div style="color:#ff2244;letter-spacing:1px">⚠ TILTS MISALIGNED — Δ${tiltDelta.toFixed(3)} rev</div>`);
+
+  // ── ZERO VOLTAGE WARNINGS ──
+  const voltageFields=[
+    ['left_motor_voltage','L DRIVE'],['right_motor_voltage','R DRIVE'],
+    ['left_lift_voltage','L LIFT'],['right_lift_voltage','R LIFT'],
+    ['left_tilt_voltage','L TILT'],['right_tilt_voltage','R TILT'],
+    ['vibrator_voltage','VIBRATOR'],
+  ];
+  voltageFields.forEach(([field,label])=>{
+    if(d[field]!==undefined&&d[field]===0.0)
+      warnings.push(`<div style="color:#ff8800;letter-spacing:1px">⚡ ${label} VOLTAGE 0.0V</div>`);
+  });
+
+  document.getElementById('actuator-warnings').innerHTML=warnings.join('');
 }
 function setMH(id,val,unit){const el=document.getElementById(id);if(!el||val===undefined)return;el.textContent=(typeof val==='number'?val.toFixed(2):val)+unit;}
 

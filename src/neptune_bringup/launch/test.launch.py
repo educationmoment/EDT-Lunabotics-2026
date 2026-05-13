@@ -115,13 +115,13 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(os.path.join(realsense_dir, "launch", "rs_launch.py")),
         launch_arguments={
             "camera_name": "d455", "camera_namespace": "", "device_type": "d435i",
-            "publish_tf": "true", "serial_no": "'336222070835'",
-            "enable_color": "false",
+            "publish_tf": "true", "serial_no": "'337122075750'",
+            "enable_color": "true",
             "enable_infra1": "true",
             "enable_depth": "true",
             "enable_gyro": "false", "enable_accel": "false", "unite_imu_method": "2",
             "depth_module.depth_profile": "848x480x30",   # was 1280x720x30
-            #"rgb_camera.color_profile":   "848x480x30",   # was 1280x720x30
+            "rgb_camera.color_profile":   "848x480x30",   # was 1280x720x30
             "pointcloud.enable": "true",
         }.items(),
     )
@@ -136,6 +136,25 @@ def generate_launch_description():
             "rgb_camera.color_profile": "848x480x30",
             "pointcloud.enable": "true",
         }.items(),
+    )
+
+    webcam_node = Node(
+        package="usb_cam",
+        executable="usb_cam_node_exe",
+        name="webcam",
+        parameters=[{
+            "video_device": "/dev/video6",   # change to your device
+            "image_width":  640,
+            "image_height": 480,
+            "framerate":    30.0,
+            "pixel_format": "mjpeg2rgb",     # most USB webcams use mjpeg
+            "camera_frame_id": "webcam_link",
+            "camera_name": "webcam",
+        }],
+        remappings=[
+            ("image_raw",        "/webcam/image_raw"),
+            ("camera_info",      "/webcam/camera_info"),
+        ],
     )
 
 
@@ -190,6 +209,20 @@ def generate_launch_description():
             ("rgb/camera_info", "/d455/color/camera_info"), ("rgbd_image", "/d455/rgbd_image"),
         ],
         namespace="d455", arguments=["--ros-args", "--log-level", "error"],
+    )
+
+    webcam_compress_node = Node(
+        package="image_transport",
+        executable="republish",
+        name="webcam_republish",
+        arguments=["raw", "compressed"],
+        remappings=[
+            ("in",              "/webcam/image_raw"),
+            ("out/compressed",  "/webcam/image_raw/compressed"),
+        ],
+        parameters=[{
+            "compressed.jpeg_quality": 40,
+        }],
     )
 
     # ── APRILTAG ──────────────────────────────────────────────────────────────
@@ -547,6 +580,9 @@ def generate_launch_description():
     ld.add_action(pc_to_scan_node)
     ld.add_action(d455_launch)
     ld.add_action(d456_launch)
+    ld.add_action(webcam_node)
+    ld.add_action(webcam_compress_node)
+
     ld.add_action(apriltag_to_landmarks_node)
     #ld.add_action()
     #ld.add_action(imu_rotator_node)
@@ -569,7 +605,7 @@ def generate_launch_description():
     ld.add_action(web_user_interface)
     ld.add_action(rosbridge_node)
     ld.add_action(d456_compress_node)
-    #ld.add_action(d455_compress_node)
+    ld.add_action(d455_compress_node)
     #ld.add_action(TimerAction(period=2.0,  actions=[rf2o_odometry_node]))
     ld.add_action(TimerAction(period=3.0,  actions=[point_lio_node]))
     ld.add_action(TimerAction(period=4.0, actions=[point_lio_relay_node]))

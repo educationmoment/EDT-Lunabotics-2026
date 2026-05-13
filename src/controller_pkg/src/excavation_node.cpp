@@ -19,15 +19,14 @@ static constexpr float TILT_APPROACH    = -1.17f;
 static constexpr float TILT_DIG         = -1.18f;
 static constexpr float LIFT_HOME        =  0.0f;
 static constexpr float TILT_HOME        =  0.0f;
-// ═════════════════════════════════════════════════════════════════════════════
-// ═════════════════════════════════════════════════════════════════════════════
 
-// ── TUNING CONSTANTS ──────────────────────────────────────────────────────────
-const float VIBRATOR_DUTY  = 1.0f;
-const float POS_TOLERANCE  = 0.12f;   // rotations — stop within this of target
-const float SYNC_DEADBAND  = 0.08f;   // rotations — ignore sync error below this
-const float KP_LIFT        = 1.3f;    // matches controller_node
-const float KP_TILT        = 0.5f;    // matches controller_node
+static constexpr float VIBRATOR_DUTY   = 1.0f;       // ← was missing
+static constexpr float POS_TOLERANCE   = 0.05f;      // ← was missing
+static constexpr float SYNC_DEADBAND   = 0.03f;
+static constexpr float TILT_FAST_DUTY  = 0.7f;
+static constexpr float TILT_SLOW_DUTY  = 0.35f;
+static constexpr float LIFT_FAST_DUTY  = 0.9f;
+static constexpr float LIFT_SLOW_DUTY  = 0.45f;
 
 // ── MOTOR CONTROLLERS ─────────────────────────────────────────────────────────
 SparkMax leftDrive ("can0", 1);
@@ -99,14 +98,10 @@ bool SyncedLiftToPos(float target, float duty,
         float sync_error = r_pos - l_pos;
         if (fabs(sync_error) > SYNC_DEADBAND)
         {
-            float correction = KP_LIFT * fabs(sync_error);
-            float factor     = std::max(0.0f, 1.0f - correction);
-            if (sync_error > 0) r_duty = duty * factor;
-            else                l_duty = duty * factor;
-
+            if (sync_error > 0) { if (!r_done) r_duty = LIFT_SLOW_DUTY; }
+            else                { if (!l_done) l_duty = LIFT_SLOW_DUTY; }
             RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
-                "LIFT sync — err=%.3f  factor=%.3f  L_duty=%.3f  R_duty=%.3f",
-                sync_error, factor, l_duty * dir, r_duty * dir);
+                "LIFT nudge — err=%.3f  L=%.3f  R=%.3f", sync_error, l_duty*dir, r_duty*dir);
         }
 
         leftLift.SetDutyCycle(l_duty * dir);
@@ -177,14 +172,10 @@ bool SyncedTiltToPos(float target, float duty,
         float sync_error = r_pos - l_pos;
         if (fabs(sync_error) > SYNC_DEADBAND)
         {
-            float correction = KP_TILT * fabs(sync_error);
-            float factor     = std::max(0.0f, 1.0f - correction);
-            if (sync_error > 0) r_duty = duty * factor;
-            else                l_duty = duty * factor;
-
+            if (sync_error > 0) { if (!r_done) r_duty = TILT_SLOW_DUTY; }
+            else                { if (!l_done) l_duty = TILT_SLOW_DUTY; }
             RCLCPP_INFO(rclcpp::get_logger("excavation_node"),
-                "TILT sync — err=%.3f  factor=%.3f  L_duty=%.3f  R_duty=%.3f",
-                sync_error, factor, l_duty * dir, r_duty * dir);
+                "TILT nudge — err=%.3f  L=%.3f  R=%.3f", sync_error, l_duty*dir, r_duty*dir);
         }
 
         leftTilt.SetDutyCycle(l_duty * dir);
@@ -297,7 +288,7 @@ private:
                 lift_ok = SyncedLiftToPos(LIFT_APPROACH, 0.9f, goal_handle);
             });
             std::thread tilt_thread([&]() {
-                tilt_ok = SyncedTiltToPos(TILT_APPROACH + buffer, 0.8f, goal_handle);
+                tilt_ok = SyncedTiltToPos(TILT_APPROACH + buffer, 0.7f, goal_handle);
             });
 
             lift_thread.join();
@@ -343,14 +334,13 @@ private:
             float r_pos      = rightTilt.GetPosition();
             float dig_target = TILT_DIG + buffer;
             float dir        = (dig_target > l_pos) ? 1.0f : -1.0f;
-            float l_duty     = (fabs(l_pos - dig_target) > POS_TOLERANCE) ? 0.8f : 0.0f;
-            float r_duty     = (fabs(r_pos - dig_target) > POS_TOLERANCE) ? 0.8f : 0.0f;
-            float sync_err   = r_pos - l_pos;
+            float l_duty     = (fabs(l_pos - dig_target) > POS_TOLERANCE) ? 0.7f : 0.0f;
+            float r_duty     = (fabs(r_pos - dig_target) > POS_TOLERANCE) ? 0.7f : 0.0f;
+            float sync_err = r_pos - l_pos;
             if (fabs(sync_err) > SYNC_DEADBAND)
             {
-                float factor = std::max(0.0f, 1.0f - KP_TILT * fabsf(sync_err));
-                if (sync_err > 0) r_duty = 0.8f * factor;
-                else              l_duty = 0.8f * factor;
+                if (sync_err > 0) r_duty = TILT_SLOW_DUTY;
+                else              l_duty = TILT_SLOW_DUTY;
             }
             leftTilt.SetDutyCycle(l_duty * dir);
             rightTilt.SetDutyCycle(r_duty * dir);
@@ -386,15 +376,14 @@ private:
 			float l_pos  = leftLift.GetPosition();
 			float r_pos  = rightLift.GetPosition();
 			float dir    = (LIFT_DIG > l_pos) ? 1.0f : -1.0f;
-			float l_duty = (fabs(l_pos - LIFT_DIG) > POS_TOLERANCE) ? 0.8f : 0.0f;
-			float r_duty = (fabs(r_pos - LIFT_DIG) > POS_TOLERANCE) ? 0.8f : 0.0f;
-			float sync_err = r_pos - l_pos;
-			if (fabs(sync_err) > SYNC_DEADBAND)
-			{
-				float factor = std::max(0.0f, 1.0f - KP_LIFT * fabsf(sync_err));
-				if (sync_err > 0) r_duty = 0.8f * factor;
-				else              l_duty = 0.8f * factor;
-			}
+			float l_duty = (fabs(l_pos - LIFT_DIG) > POS_TOLERANCE) ? 0.9f : 0.0f;
+			float r_duty = (fabs(r_pos - LIFT_DIG) > POS_TOLERANCE) ? 0.9f : 0.0f;
+            float sync_err = r_pos - l_pos;
+            if (fabs(sync_err) > SYNC_DEADBAND)
+            {
+                if (sync_err > 0) r_duty = LIFT_SLOW_DUTY;
+                else              l_duty = LIFT_SLOW_DUTY;
+            }
 			leftLift.SetDutyCycle(l_duty * dir);
 			rightLift.SetDutyCycle(r_duty * dir);
 
@@ -421,7 +410,7 @@ private:
         // Tilt confirmed at home. Lift rises back to zero.
         // Change LIFT_HOME at the top of the file.
         send_feedback(goal_handle, "Stage 6: Lift returning to home (0.0)");
-        CHECK(SyncedTiltToPos(TILT_HOME + buffer, 0.8f, goal_handle))
+        CHECK(SyncedTiltToPos(TILT_HOME + buffer, 0.7f, goal_handle))
 
         CHECK(SyncedLiftToPos(LIFT_HOME, 0.9f, goal_handle))
 
